@@ -159,7 +159,7 @@ export default function CardFramesAdminPanel({
                 </label>
               </div>
 
-              {/* 보관함 전용 설정 영역 */}
+              {/* 보관함 전용 설정 영역 (띄어쓰기 및 줄바꿈 완전 유지) */}
               <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50/50 p-3.5 space-y-3">
                 <p className="text-xs font-bold text-emerald-900">📦 보관함 표시 설정</p>
                 <label className="block text-xs font-medium text-gray-700">
@@ -172,7 +172,7 @@ export default function CardFramesAdminPanel({
                   />
                 </label>
                 <label className="block text-xs font-medium text-gray-700">
-                  보관함 내용 (줄바꿈 및 띄어쓰기 완전 지원)
+                  보관함 내용 (띄어쓰기 및 줄바꿈 유지)
                   <textarea
                     value={frame.inboxDescription ?? frame.description ?? ""}
                     onChange={(e) =>
@@ -182,9 +182,10 @@ export default function CardFramesAdminPanel({
                       })
                     }
                     rows={3}
+                    wrap="soft"
                     placeholder="보관함에서 표시될 상세 설명을 입력하세요 (엔터 줄바꿈 및 스페이스 띄어쓰기 유지)"
-                    style={{ whiteSpace: "pre-wrap" }}
-                    className="mt-1 w-full whitespace-pre-wrap rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500 font-sans"
+                    style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}
+                    className="mt-1 w-full whitespace-pre-wrap break-words rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500 font-sans"
                   />
                 </label>
               </div>
