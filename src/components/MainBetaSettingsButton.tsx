@@ -351,8 +351,8 @@ export default function MainBetaSettingsButton({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: session.displayName,
-          providerToken: session.provider_token,
+          email: session?.displayName ?? "",
+          providerToken: session?.provider_token ?? "",
         }),
       });
       const payload = (await response.json()) as {
