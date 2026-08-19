@@ -155,7 +155,6 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
     default_map_tab_name: DEFAULT_MAP_TAB_NAME,
     default_map_marker_img: "",
     default_benefit_btn_label: DEFAULT_BENEFIT_BTN_LABEL,
-    event_stamp_btn_label: DEFAULT_STAMP_BTN_LABEL,
   });
   const [events, setEvents] = useState<MapEvent[]>([]);
   const [partners, setPartners] = useState<Partner[]>([]);
@@ -423,16 +422,6 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
               value={config.default_benefit_btn_label}
               onChange={(e) =>
                 setConfig((prev) => ({ ...prev, default_benefit_btn_label: e.target.value }))
-              }
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-            />
-          </label>
-          <label className="block text-sm font-medium text-gray-700">
-            도장 찍기 버튼 라벨
-            <input
-              value={config.event_stamp_btn_label}
-              onChange={(e) =>
-                setConfig((prev) => ({ ...prev, event_stamp_btn_label: e.target.value }))
               }
               className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
             />

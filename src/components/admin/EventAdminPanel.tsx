@@ -27,6 +27,10 @@ type EventFormState = {
   is_active: boolean;
   sort_order: number;
   distance_error_message: string;
+  win_popup_message: string;
+  lose_popup_message: string;
+  completion_popup_message: string;
+  stamp_btn_label: string;
 };
 
 type TabFormState = {
@@ -47,7 +51,11 @@ const EMPTY_EVENT: EventFormState = {
   list_type: "event",
   is_active: true,
   sort_order: 0,
-  distance_error_message: "",
+  distance_error_message: "제휴처와의 거리가 {distance}m 남았습니다. 지정된 반경({radius}m) 내에서 도장을 찍어주세요.",
+  win_popup_message: "",
+  lose_popup_message: "",
+  completion_popup_message: "",
+  stamp_btn_label: "도장 찍기",
 };
 
 const EMPTY_TAB: TabFormState = {
@@ -150,7 +158,13 @@ export default function EventAdminPanel({
     setTabForm(EMPTY_TAB);
   }
 
-  function startEditEvent(event: SiteEvent & { distance_error_message?: string | null }) {
+  function startEditEvent(event: SiteEvent & { 
+    distance_error_message?: string | null;
+    win_popup_message?: string | null;
+    lose_popup_message?: string | null;
+    completion_popup_message?: string | null;
+    stamp_btn_label?: string | null;
+  }) {
     setEditingEventId(event.id);
     setSelectedEventId(event.id);
     setEventForm({
@@ -163,6 +177,10 @@ export default function EventAdminPanel({
       is_active: event.is_active,
       sort_order: event.sort_order ?? 0,
       distance_error_message: event.distance_error_message ?? "",
+      win_popup_message: event.win_popup_message ?? "",
+      lose_popup_message: event.lose_popup_message ?? "",
+      completion_popup_message: event.completion_popup_message ?? "",
+      stamp_btn_label: event.stamp_btn_label ?? "도장 찍기",
     });
     resetTabForm();
     onMessage("");
@@ -233,6 +251,10 @@ export default function EventAdminPanel({
       is_active: eventForm.is_active,
       sort_order: Number.isFinite(eventForm.sort_order) ? eventForm.sort_order : 0,
       distance_error_message: eventForm.distance_error_message.trim() || null,
+      win_popup_message: eventForm.win_popup_message.trim() || null,
+      lose_popup_message: eventForm.lose_popup_message.trim() || null,
+      completion_popup_message: eventForm.completion_popup_message.trim() || null,
+      stamp_btn_label: eventForm.stamp_btn_label.trim() || null,
       updated_at: new Date().toISOString(),
     };
 
@@ -592,6 +614,22 @@ export default function EventAdminPanel({
             />
           </label>
 
+          {/* 팝업 문구 커스텀 필드 */}
+          <label className="block text-sm font-medium text-gray-700">
+            도장 버튼 라벨 (선택)
+            <input
+              value={eventForm.stamp_btn_label}
+              onChange={(e) =>
+                setEventForm((prev) => ({ ...prev, stamp_btn_label: e.target.value }))
+              }
+              placeholder="도장 찍기"
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-emerald-500"
+            />
+            <span className="mt-1 block text-xs font-normal text-gray-500">
+              * 비워두면 기본값 "도장 찍기"가 사용됩니다.
+            </span>
+          </label>
+
           {/* 거리 초과 안내 문구 커스텀 필드 */}
           <label className="block text-sm font-medium text-gray-700">
             거리 초과 안내 문구 (선택)
@@ -605,6 +643,52 @@ export default function EventAdminPanel({
             />
             <span className="mt-1 block text-xs font-normal text-gray-500">
               * <code>{`{distance}`}</code>는 남은 거리(m), <code>{`{radius}`}</code>는 허용 반경(m)으로 자동 치환됩니다. 비워두면 기본 문구가 사용됩니다.
+            </span>
+          </label>
+
+          {/* 팝업 문구 커스텀 필드 */}
+          <label className="block text-sm font-medium text-gray-700">
+            당첨 팝업 문구 (선택)
+            <input
+              value={eventForm.win_popup_message}
+              onChange={(e) =>
+                setEventForm((prev) => ({ ...prev, win_popup_message: e.target.value }))
+              }
+              placeholder="축하합니다! 선물함으로 보상이 지급되었습니다!"
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-emerald-500"
+            />
+            <span className="mt-1 block text-xs font-normal text-gray-500">
+              * 비워두면 기본 문구가 사용됩니다.
+            </span>
+          </label>
+
+          <label className="block text-sm font-medium text-gray-700">
+            미당첨 팝업 문구 (선택)
+            <input
+              value={eventForm.lose_popup_message}
+              onChange={(e) =>
+                setEventForm((prev) => ({ ...prev, lose_popup_message: e.target.value }))
+              }
+              placeholder="아쉽지만 이번엔 당첨되지 않았습니다."
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-emerald-500"
+            />
+            <span className="mt-1 block text-xs font-normal text-gray-500">
+              * 비워두면 기본 문구가 사용됩니다.
+            </span>
+          </label>
+
+          <label className="block text-sm font-medium text-gray-700">
+            완주 팝업 문구 (선택)
+            <input
+              value={eventForm.completion_popup_message}
+              onChange={(e) =>
+                setEventForm((prev) => ({ ...prev, completion_popup_message: e.target.value }))
+              }
+              placeholder="완주 축하합니다! 선물함으로 보상이 지급되었습니다!"
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-emerald-500"
+            />
+            <span className="mt-1 block text-xs font-normal text-gray-500">
+              * 비워두면 기본 문구가 사용됩니다.
             </span>
           </label>
 

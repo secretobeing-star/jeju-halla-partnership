@@ -119,7 +119,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     default_map_tab_name: DEFAULT_MAP_TAB_NAME,
     default_map_marker_img: "",
     default_benefit_btn_label: DEFAULT_BENEFIT_BTN_LABEL,
-    event_stamp_btn_label: DEFAULT_STAMP_BTN_LABEL,
     distance_error_message: DEFAULT_DISTANCE_ERROR_MSG,
   });
   const [events, setEvents] = useState<(MapEvent & { distance_error_message?: string })[]>([]);
@@ -312,23 +311,17 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
       if (!response.ok) {
         if (payload.distanceError) {
-          const template =
-            payload.messages?.distance ||
-            activeEvent.distance_error_message ||
-            config.distance_error_message ||
-            DEFAULT_DISTANCE_ERROR_MSG;
-
           const distanceVal = Math.round(payload.distanceMeters ?? 0);
           const radiusVal = Math.round(payload.radiusMeters ?? 50);
 
-          const formattedBody = template
+          const formattedBody = (payload.error || DEFAULT_DISTANCE_ERROR_MSG)
             .replace(/\{distance\}/g, String(distanceVal))
             .replace(/\{radius\}/g, String(radiusVal));
 
           setRewardModal({
             kind: "distance",
             title: "거리 확인 안내",
-            body: payload.error || formattedBody,
+            body: formattedBody,
             banner: activeEvent.banner_img || null,
             rewardName: null,
             rewardImg: null,
@@ -518,7 +511,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
                 label:
                   cooldownRemainMs > 0
                     ? `${formatCooldownRemain(cooldownRemainMs)} 후 가능`
-                    : config.event_stamp_btn_label || DEFAULT_STAMP_BTN_LABEL,
+                    : activeEvent.stamp_btn_label || DEFAULT_STAMP_BTN_LABEL,
                 onStamp: (partner) => {
                   void handleStamp(partner);
                 },

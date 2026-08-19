@@ -47,6 +47,10 @@ export type MapEvent = {
   win_message: string | null;
   lose_message: string | null;
   completion_message: string | null;
+  win_popup_message: string | null;
+  lose_popup_message: string | null;
+  completion_popup_message: string | null;
+  stamp_btn_label: string | null;
   sort_order: number;
   partner_ids?: string[];
   rewards?: MapEventReward[];

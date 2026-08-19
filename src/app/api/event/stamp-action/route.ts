@@ -167,10 +167,12 @@ export async function POST(request: NextRequest) {
     const customMsg = typeof event.distance_error_message === "string" && event.distance_error_message.trim()
       ? event.distance_error_message.trim()
       : null;
-    const defaultMsg = `제휴처 ${Math.round(radius)}m 안에서만 도장을 찍을 수 있습니다. (현재 약 ${Math.round(distance)}m)`;
+    const distanceMsg = customMsg 
+      ? customMsg.replace('{distance}', Math.round(distance).toString()).replace('{radius}', radius.toString())
+      : `제휴처 ${Math.round(radius)}m 안에서만 도장을 찍을 수 있습니다. (현재 약 ${Math.round(distance)}m)`;
     return NextResponse.json(
       {
-        error: customMsg || defaultMsg,
+        error: distanceMsg,
         distanceMeters: Math.round(distance),
         radiusMeters: radius,
         distanceError: true,
@@ -321,9 +323,9 @@ export async function POST(request: NextRequest) {
         ? "win"
         : "lose",
     messages: {
-      win: event.win_message || "선물함으로 보상이 지급되었습니다!",
-      lose: event.lose_message || "아쉽지만 이번엔 당첨되지 않았습니다.",
-      completion: event.completion_message || "완주 보상이 선물함으로 지급되었습니다!",
+      win: event.win_popup_message?.trim() || event.win_message || "선물함으로 보상이 지급되었습니다!",
+      lose: event.lose_popup_message?.trim() || event.lose_message || "아쉽지만 이번엔 당첨되지 않았습니다.",
+      completion: event.completion_popup_message?.trim() || event.completion_message || "완주 보상이 선물함으로 지급되었습니다!",
     },
   });
 }

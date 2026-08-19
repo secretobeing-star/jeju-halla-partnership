@@ -158,6 +158,13 @@ export type SiteEvent = {
   updated_at: string;
   /** 스탬프·거리·체류 인증 설정 */
   stamp_quest?: Record<string, unknown> | null;
+  /** 이벤트 스탬프 팝업 문구 설정 */
+  distance_error_message?: string | null;
+  win_popup_message?: string | null;
+  lose_popup_message?: string | null;
+  completion_popup_message?: string | null;
+  /** 도장 버튼 라벨 */
+  stamp_btn_label?: string | null;
 };
 
 export type SiteEventTab = {
