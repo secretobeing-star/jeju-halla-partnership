@@ -33,6 +33,7 @@ type EventForm = {
   percents: number[];
   radius_meters: number;
   cooldown_minutes: number;
+  stamp_btn_label: string;
   stamp_active_img: string;
   stamp_inactive_img: string;
   marker_icon_img: string;
@@ -41,6 +42,7 @@ type EventForm = {
   stamp_bar_bg_color: string;
   completion_badge_img: string;
   guide_text: string;
+  distance_error_message: string;
   win_message: string;
   lose_message: string;
   completion_message: string;
@@ -58,6 +60,7 @@ const EMPTY_FORM: EventForm = {
   percents: [10],
   radius_meters: 30,
   cooldown_minutes: 0,
+  stamp_btn_label: "",
   stamp_active_img: "",
   stamp_inactive_img: "",
   marker_icon_img: "",
@@ -66,6 +69,7 @@ const EMPTY_FORM: EventForm = {
   stamp_bar_bg_color: "#ecfdf5",
   completion_badge_img: "",
   guide_text: "",
+  distance_error_message: "제휴처와의 거리가 {distance}m 남았습니다. 지정된 반경({radius}m) 내에서 도장을 찍어주세요.",
   win_message: "선물함으로 보상이 지급되었습니다!",
   lose_message: "",
   completion_message: "완주 보상이 선물함으로 지급되었습니다!",
@@ -87,6 +91,7 @@ function eventToForm(event: MapEvent): EventForm {
     ),
     radius_meters: event.radius_meters || 30,
     cooldown_minutes: event.cooldown_minutes || 0,
+    stamp_btn_label: event.stamp_btn_label ?? "",
     stamp_active_img: event.stamp_active_img ?? "",
     stamp_inactive_img: event.stamp_inactive_img ?? "",
     marker_icon_img: event.marker_icon_img ?? "",
@@ -95,9 +100,12 @@ function eventToForm(event: MapEvent): EventForm {
     stamp_bar_bg_color: event.stamp_bar_bg_color?.trim() || "#ecfdf5",
     completion_badge_img: event.completion_badge_img ?? "",
     guide_text: event.guide_text ?? "",
-    win_message: event.win_message ?? "",
-    lose_message: event.lose_message ?? "",
-    completion_message: event.completion_message ?? "",
+    distance_error_message:
+      event.distance_error_message ??
+      "제휴처와의 거리가 {distance}m 남았습니다. 지정된 반경({radius}m) 내에서 도장을 찍어주세요.",
+    win_message: event.win_popup_message ?? event.win_message ?? "",
+    lose_message: event.lose_popup_message ?? event.lose_message ?? "",
+    completion_message: event.completion_popup_message ?? event.completion_message ?? "",
     partner_ids: event.partner_ids ?? [],
   };
 }
@@ -155,6 +163,7 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
     default_map_tab_name: DEFAULT_MAP_TAB_NAME,
     default_map_marker_img: "",
     default_benefit_btn_label: DEFAULT_BENEFIT_BTN_LABEL,
+    event_stamp_btn_label: DEFAULT_STAMP_BTN_LABEL,
   });
   const [events, setEvents] = useState<MapEvent[]>([]);
   const [partners, setPartners] = useState<Partner[]>([]);
@@ -275,6 +284,7 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
         step_probabilities: form.percents.map((value) => value / 100),
         radius_meters: form.radius_meters,
         cooldown_minutes: form.cooldown_minutes,
+        stamp_btn_label: form.stamp_btn_label?.trim() || null,
         stamp_active_img: form.stamp_active_img || null,
         stamp_inactive_img: form.stamp_inactive_img || null,
         marker_icon_img: form.marker_icon_img || null,
@@ -283,9 +293,13 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
         stamp_bar_bg_color: form.stamp_bar_bg_color || null,
         completion_badge_img: form.completion_badge_img || null,
         guide_text: form.guide_text || null,
-        win_message: form.win_message || null,
-        lose_message: form.lose_message || null,
-        completion_message: form.completion_message || null,
+        distance_error_message: form.distance_error_message?.trim() || null,
+        win_popup_message: form.win_message?.trim() || null,
+        lose_popup_message: form.lose_message?.trim() || null,
+        completion_popup_message: form.completion_message?.trim() || null,
+        win_message: form.win_message?.trim() || null,
+        lose_message: form.lose_message?.trim() || null,
+        completion_message: form.completion_message?.trim() || null,
         partner_ids: form.partner_ids,
       };
       if (editingId) {
@@ -609,6 +623,35 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
               </span>
             </label>
           </div>
+
+          {/* 도장 찍기 버튼 라벨 커스텀 */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="text-sm font-medium text-gray-700">
+              도장 찍기 버튼 문구
+              <input
+                value={form.stamp_btn_label}
+                onChange={(e) => setForm((prev) => ({ ...prev, stamp_btn_label: e.target.value }))}
+                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                placeholder="도장 찍기 (비우면 기본값 적용)"
+              />
+              <span className="mt-1 block text-xs font-normal text-gray-500">
+                해당 이벤트 탭 활성화 시 지도 하단 및 매장 상세의 스탬프 버튼에 표시됩니다.
+              </span>
+            </label>
+            <label className="text-sm font-medium text-gray-700">
+              거리 초과 안내 문구
+              <input
+                value={form.distance_error_message}
+                onChange={(e) => setForm((prev) => ({ ...prev, distance_error_message: e.target.value }))}
+                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                placeholder="제휴처와의 거리가 {distance}m 남았습니다. ({radius}m 내)"
+              />
+              <span className="mt-1 block text-xs font-normal text-gray-500">
+                {`{distance}`}와 {`{radius}`}는 실제 거리/반경 숫자로 자동 치환됩니다.
+              </span>
+            </label>
+          </div>
+
           <label className="text-sm font-medium text-gray-700">
             안내 문구
             <textarea
