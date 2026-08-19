@@ -73,9 +73,6 @@ type RewardModalState = {
   showGiftButton: boolean;
 };
 
-// --------------------------------------------------------------------------
-// 구글 스프레드시트 웹훅 로깅 함수
-// --------------------------------------------------------------------------
 const sendMapStampLog = (params: {
   action: "도장 찍기" | "스탬프 완주" | "당첨 보상" | "미당첨";
   eventTitle: string;
@@ -119,6 +116,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     default_map_tab_name: DEFAULT_MAP_TAB_NAME,
     default_map_marker_img: "",
     default_benefit_btn_label: DEFAULT_BENEFIT_BTN_LABEL,
+    event_stamp_btn_label: DEFAULT_STAMP_BTN_LABEL,
     distance_error_message: DEFAULT_DISTANCE_ERROR_MSG,
   });
   const [events, setEvents] = useState<(MapEvent & { distance_error_message?: string })[]>([]);
@@ -178,7 +176,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       if (configPayload.config) setConfig(configPayload.config);
       setEvents((eventsPayload.events ?? []).filter((event) => isEventLive(event)));
     } catch {
-      // 기본 제휴 탭 유지
+      // 기본 탭 유지
     }
   }, []);
 
@@ -311,17 +309,23 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
       if (!response.ok) {
         if (payload.distanceError) {
+          const template =
+            payload.messages?.distance ||
+            activeEvent.distance_error_message ||
+            config.distance_error_message ||
+            DEFAULT_DISTANCE_ERROR_MSG;
+
           const distanceVal = Math.round(payload.distanceMeters ?? 0);
           const radiusVal = Math.round(payload.radiusMeters ?? 50);
 
-          const formattedBody = (payload.error || DEFAULT_DISTANCE_ERROR_MSG)
+          const formattedBody = template
             .replace(/\{distance\}/g, String(distanceVal))
             .replace(/\{radius\}/g, String(radiusVal));
 
           setRewardModal({
             kind: "distance",
             title: "거리 확인 안내",
-            body: formattedBody,
+            body: payload.error || formattedBody,
             banner: activeEvent.banner_img || null,
             rewardName: null,
             rewardImg: null,
@@ -336,7 +340,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       const maxStamps = activeEvent.max_stamps || 5;
       const nextStampCount = payload.progress?.current_stamps ?? (progress?.current_stamps ?? 0) + 1;
 
-      // 1. 도장 찍기 성공 구글 시트 웹훅 전송
       sendMapStampLog({
         action: "도장 찍기",
         eventTitle: activeEvent.title,
@@ -353,7 +356,11 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       const popupKind = payload.popup || (payload.completion?.reached ? "completion" : (payload.giftCount ?? 0) > 0 ? "win" : "lose");
 
       if (popupKind === "completion") {
-        const completionMsg = payload.messages?.completion || "완주 보상이 선물함으로 지급되었습니다!";
+        const completionMsg =
+          payload.messages?.completion ||
+          (activeEvent as unknown as { completion_popup_message?: string })?.completion_popup_message ||
+          "완주 보상이 선물함으로 지급되었습니다!";
+
         setRewardModal({
           kind: "completion",
           title: "완주 보상",
@@ -364,7 +371,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
           showGiftButton: (payload.giftCount ?? 0) > 0,
         });
 
-        // 2. 완주 구글 시트 웹훅 전송
         sendMapStampLog({
           action: "스탬프 완주",
           eventTitle: activeEvent.title,
@@ -377,20 +383,30 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
           rewardMessage: completionMsg,
         });
       } else if (popupKind === "win") {
+        const winMsg =
+          payload.messages?.win ||
+          (activeEvent as unknown as { win_popup_message?: string })?.win_popup_message ||
+          "선물함으로 보상이 지급되었습니다!";
+
         setRewardModal({
           kind: "win",
           title: "당첨",
-          body: payload.messages?.win || "선물함으로 보상이 지급되었습니다!",
+          body: winMsg,
           banner: activeEvent.banner_img,
           rewardName: winReward?.reward_name || null,
           rewardImg: winReward?.reward_img || null,
           showGiftButton: true,
         });
       } else {
+        const loseMsg =
+          payload.messages?.lose ||
+          (activeEvent as unknown as { lose_popup_message?: string })?.lose_popup_message ||
+          "아쉽지만 이번엔 당첨되지 않았습니다.";
+
         setRewardModal({
           kind: "lose",
           title: "미당첨",
-          body: payload.messages?.lose || "아쉽지만 이번엔 당첨되지 않았습니다.",
+          body: loseMsg,
           banner: activeEvent.banner_img,
           rewardName: null,
           rewardImg: null,
@@ -417,6 +433,11 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     isEventLive(activeEvent!) &&
     !progress?.is_completed &&
     cooldownRemainMs <= 0;
+
+  const currentStampBtnLabel =
+    (activeEvent as unknown as { stamp_btn_label?: string })?.stamp_btn_label?.trim() ||
+    config.event_stamp_btn_label ||
+    DEFAULT_STAMP_BTN_LABEL;
 
   return (
     <div className="map-event-shell">
@@ -511,7 +532,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
                 label:
                   cooldownRemainMs > 0
                     ? `${formatCooldownRemain(cooldownRemainMs)} 후 가능`
-                    : activeEvent.stamp_btn_label || DEFAULT_STAMP_BTN_LABEL,
+                    : currentStampBtnLabel,
                 onStamp: (partner) => {
                   void handleStamp(partner);
                 },
