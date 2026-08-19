@@ -6,6 +6,16 @@ import {
   type PublicCardFrameItem,
 } from "@/data/cardFrames";
 
+export type ExtendedCardFrameItem = CardFrameItem & {
+  inboxTitle?: string;
+  inboxDescription?: string;
+};
+
+export type ExtendedPublicCardFrameItem = PublicCardFrameItem & {
+  inboxTitle?: string;
+  inboxDescription?: string;
+};
+
 export type { CardFrameItem, PublicCardFrameItem };
 
 /** 해금 출처 — 이벤트 보상 연동 시 `event` 사용 */
@@ -39,21 +49,28 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return value as Record<string, unknown>;
 }
 
-export function normalizeCardFrameItem(raw: unknown): CardFrameItem | null {
+export function normalizeCardFrameItem(raw: unknown): ExtendedCardFrameItem | null {
   const row = asRecord(raw);
   if (!row) {
     return null;
   }
 
-  const item = createEmptyCardFrameItem({
+  const baseItem = createEmptyCardFrameItem({
     id: typeof row.id === "string" ? row.id.trim() : "",
     name: typeof row.name === "string" ? row.name.trim() : "",
     imageUrl: typeof row.imageUrl === "string" ? row.imageUrl.trim() : "",
     cssBorder: typeof row.cssBorder === "string" ? row.cssBorder.trim() : "",
     itemCode: typeof row.itemCode === "string" ? row.itemCode.trim() : "",
-    description: typeof row.description === "string" ? row.description.trim() : "",
+    // 설명 내 공백 및 줄바꿈은 보존
+    description: typeof row.description === "string" ? row.description : "",
     isDefaultUnlocked: Boolean(row.isDefaultUnlocked),
   });
+
+  const item: ExtendedCardFrameItem = {
+    ...baseItem,
+    inboxTitle: typeof row.inboxTitle === "string" ? row.inboxTitle.trim() : undefined,
+    inboxDescription: typeof row.inboxDescription === "string" ? row.inboxDescription : undefined,
+  };
 
   return isCardFrameItemFilled(item) ? item : null;
 }
@@ -61,8 +78,8 @@ export function normalizeCardFrameItem(raw: unknown): CardFrameItem | null {
 /** DB / 파일 시드를 병합한 전체 카탈로그 (코드 포함, 서버·관리자용) */
 export function resolveCardFrameCatalog(
   stored: unknown,
-): CardFrameItem[] {
-  const fromDb: CardFrameItem[] = [];
+): ExtendedCardFrameItem[] {
+  const fromDb: ExtendedCardFrameItem[] = [];
   if (Array.isArray(stored)) {
     for (const row of stored) {
       const item = normalizeCardFrameItem(row);
@@ -72,8 +89,8 @@ export function resolveCardFrameCatalog(
     }
   }
 
-  const fromFile = CARD_FRAME_ITEMS.filter(isCardFrameItemFilled);
-  const byId = new Map<string, CardFrameItem>();
+  const fromFile = CARD_FRAME_ITEMS.filter(isCardFrameItemFilled) as ExtendedCardFrameItem[];
+  const byId = new Map<string, ExtendedCardFrameItem>();
 
   for (const item of fromFile) {
     byId.set(item.id, item);
@@ -86,7 +103,7 @@ export function resolveCardFrameCatalog(
   return Array.from(byId.values());
 }
 
-export function toPublicCardFrame(item: CardFrameItem): PublicCardFrameItem {
+export function toPublicCardFrame(item: ExtendedCardFrameItem): ExtendedPublicCardFrameItem {
   return {
     id: item.id,
     name: item.name,
@@ -94,17 +111,19 @@ export function toPublicCardFrame(item: CardFrameItem): PublicCardFrameItem {
     cssBorder: item.cssBorder || "",
     description: item.description,
     isDefaultUnlocked: item.isDefaultUnlocked,
+    inboxTitle: item.inboxTitle,
+    inboxDescription: item.inboxDescription,
   };
 }
 
-export function toPublicCardFrames(items: CardFrameItem[]): PublicCardFrameItem[] {
+export function toPublicCardFrames(items: ExtendedCardFrameItem[]): ExtendedPublicCardFrameItem[] {
   return items.map(toPublicCardFrame);
 }
 
 export function findCardFrameByCode(
-  catalog: CardFrameItem[],
+  catalog: ExtendedCardFrameItem[],
   code: string,
-): CardFrameItem | null {
+): ExtendedCardFrameItem | null {
   const normalized = code.trim().toLowerCase();
   if (!normalized) {
     return null;
@@ -115,9 +134,9 @@ export function findCardFrameByCode(
 }
 
 export function findCardFrameById(
-  catalog: CardFrameItem[],
+  catalog: ExtendedCardFrameItem[],
   frameId: string,
-): CardFrameItem | null {
+): ExtendedCardFrameItem | null {
   const id = frameId.trim();
   if (!id) {
     return null;
@@ -187,7 +206,7 @@ export function writeCardFrameUserState(studentId: string, state: CardFrameUserS
 /** 기본 해금 프레임을 반영한 상태 + 활성 프레임 보정 */
 export function hydrateCardFrameUserState(
   studentId: string,
-  catalog: PublicCardFrameItem[] | CardFrameItem[],
+  catalog: ExtendedPublicCardFrameItem[] | ExtendedCardFrameItem[],
 ): CardFrameUserState {
   const state = readCardFrameUserState(studentId);
   const unlocked = new Set(state.unlockedIds);
@@ -259,13 +278,12 @@ export function setActiveCardFrame(
 /** 서버에서 상태 불러와 로컬 캐시와 병합 (계정·기기 간 동기화) */
 export async function syncCardFrameUserStateFromRemote(
   studentId: string,
-  catalog: PublicCardFrameItem[] | CardFrameItem[],
+  catalog: ExtendedPublicCardFrameItem[] | ExtendedCardFrameItem[],
 ): Promise<CardFrameUserState> {
   if (!studentId.trim() || typeof window === "undefined") {
     return emptyState();
   }
 
-  // 로컬은 읽기만 (원격 우선). hydrate의 즉시 write로 원격이 덮이지 않게 함.
   const local = readCardFrameUserState(studentId);
 
   try {
@@ -303,7 +321,6 @@ export async function syncCardFrameUserStateFromRemote(
       }
     }
 
-    // 원격에 레코드가 있으면 장착 프레임은 원격 우선 (다른 기기에서 맞춘 값)
     let activeFrameId: string | null = null;
     if (payload.exists) {
       activeFrameId =
@@ -362,7 +379,7 @@ export async function persistCardFrameUserStateRemote(
   }
 }
 
-export async function loadCardFrameCatalogFromDb(): Promise<CardFrameItem[]> {
+export async function loadCardFrameCatalogFromDb(): Promise<ExtendedCardFrameItem[]> {
   const { createSupabaseServer } = await import("@/lib/supabase-server");
   const supabase = createSupabaseServer();
   if (!supabase) {
