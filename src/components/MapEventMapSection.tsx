@@ -15,6 +15,7 @@ import {
   type MapEventReward,
   type UserEventProgress,
 } from "@/lib/map-events";
+import type { MapMarkerCustomSettings } from "@/lib/naver-map-partner-ui";
 import { getCurrentGeolocation } from "@/lib/geolocation";
 import { getSiteMemberSession } from "@/lib/site-member-session";
 import { SITE_STUDENT_NEED_LOGIN_EVENT } from "@/lib/site-student-auth-settings";
@@ -58,6 +59,7 @@ type MapEventMapSectionProps = {
   onMapReady?: () => void;
   onFavoriteToggle?: (partnerId: string) => void;
   favoritesTerm?: string;
+  markerSettings?: MapMarkerCustomSettings | null;
 };
 
 type RewardModalState = {
@@ -205,6 +207,20 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
   useEffect(() => {
     void loadProgress();
+  }, [loadProgress]);
+
+  useEffect(() => {
+    (window as unknown as Record<string, unknown>).__activeMapEventId =
+      activeEvent?.id ?? null;
+    return () => {
+      (window as unknown as Record<string, unknown>).__activeMapEventId = null;
+    };
+  }, [activeEvent]);
+
+  useEffect(() => {
+    const onStampChanged = () => void loadProgress();
+    window.addEventListener("site-stamp-progress-changed", onStampChanged);
+    return () => window.removeEventListener("site-stamp-progress-changed", onStampChanged);
   }, [loadProgress]);
 
   const visiblePartners = useMemo(() => {
@@ -462,6 +478,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       <PartnerMainMapPanel
         {...props}
         partners={visiblePartners}
+        markerSettings={props.markerSettings}
         stampAction={
           activeEvent
             ? {

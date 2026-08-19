@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import NaverMapPartnersView, {
   type NaverMapPartnerMarker,
 } from "@/components/NaverMapPartnersView";
-import { parsePartnerMapCoordinate } from "@/lib/naver-map-partner-ui";
+import { parsePartnerMapCoordinate, type MapMarkerCustomSettings } from "@/lib/naver-map-partner-ui";
 import { hasValidPartnerMapCoords } from "@/lib/partner-map-url";
 import { loadNaverMapsSdk } from "@/lib/naver-maps-loader";
 import { useNaverMapConfig } from "@/lib/use-naver-map-config";
@@ -43,6 +43,7 @@ type PartnerMainMapPanelProps = {
   };
   favoriteCountdownEndAt?: string | null;
   detailButtonLabel?: string;
+  markerSettings?: MapMarkerCustomSettings | null;
 };
 
 export default function PartnerMainMapPanel({
@@ -60,6 +61,7 @@ export default function PartnerMainMapPanel({
   stampAction,
   favoriteCountdownEndAt = null,
   detailButtonLabel,
+  markerSettings = null,
 }: PartnerMainMapPanelProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const { clientId, loading: configLoading, available: naverJsAvailable, geocodeKeyFallback } =
@@ -167,6 +169,7 @@ export default function PartnerMainMapPanel({
               stampAction={stampAction}
               favoriteCountdownEndAt={favoriteCountdownEndAt}
               detailButtonLabel={detailButtonLabel}
+              markerSettings={markerSettings}
             />
           ) : (
             <div className="partner-main-map__canvas partner-main-map__canvas--loading flex items-center justify-center px-4 text-center text-sm text-gray-500">

@@ -54,6 +54,27 @@ export function usePartnerFavorites() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, placeId: partnerId, favorited: nextFavorited }),
       });
+
+      if (nextFavorited) {
+        const activeEventId =
+          (window as unknown as Record<string, unknown>).__activeMapEventId as
+            | string
+            | undefined;
+        if (activeEventId) {
+          void fetch("/api/event/favorite-stamp", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userId, placeId: partnerId, eventId: activeEventId }),
+          })
+            .then((res) => res.json())
+            .then((data: { stamped?: boolean }) => {
+              if (data?.stamped) {
+                window.dispatchEvent(new Event("site-stamp-progress-changed"));
+              }
+            })
+            .catch(() => {});
+        }
+      }
     }
   }, []);
 

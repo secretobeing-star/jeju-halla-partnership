@@ -120,7 +120,6 @@ export const STUDENT_CHROME_LABEL_META: Array<{
   adminLabel: string;
 }> = [
   { key: "formTitle", adminLabel: "정보 기입 창 제목" },
-  { key: "pendingTitle", adminLabel: "승인 대기 창 제목" },
   { key: "cancel", adminLabel: "취소 버튼" },
   { key: "submit", adminLabel: "신청/제출 버튼" },
   { key: "submitting", adminLabel: "제출 중 문구" },

@@ -118,9 +118,9 @@ function normalizeApprovalStatus(raw: string | null | undefined): StudentApprova
     return "rejected";
   }
   if (value === "pending" || value === "대기" || value === "승인대기" || value === "대기중") {
-    return "pending";
+    return "approved";
   }
-  return "pending";
+  return "approved";
 }
 
 export function getStudentSheetWebhookUrl() {
@@ -704,7 +704,7 @@ export async function checkStudentApplicationDuplicate(
     return { duplicate: true, reason: "approval_approved" };
   }
   if (approval.approvalStatus === "pending") {
-    return { duplicate: true, reason: "approval_pending" };
+    return { duplicate: true, reason: "approval_approved" };
   }
 
   const logs = await listStudentApplicationLogs(config, {
@@ -716,7 +716,7 @@ export async function checkStudentApplicationDuplicate(
     return { duplicate: true, reason: "log_approved" };
   }
   if (exact.some((row) => row.statusNormalized === "pending")) {
-    return { duplicate: true, reason: "log_pending" };
+    return { duplicate: true, reason: "log_approved" };
   }
 
   return { duplicate: false, reason: null };

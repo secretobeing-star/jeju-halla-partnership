@@ -107,6 +107,12 @@ export function buildSiteSettingsPayload(next: SiteSettings) {
     partner_map_geocode_api_enabled: next.partner_map_geocode_api_enabled ?? true,
     partner_map_geocode_naver_enabled: next.partner_map_geocode_naver_enabled ?? true,
     partner_map_geocode_nominatim_enabled: next.partner_map_geocode_nominatim_enabled ?? true,
+    site_map_marker_border_color: next.site_map_marker_border_color?.trim() || null,
+    site_map_marker_bg_img: next.site_map_marker_bg_img?.trim() || null,
+    site_map_marker_thumbnail_enabled: next.site_map_marker_thumbnail_enabled ?? true,
+    site_map_marker_top_icon_img: next.site_map_marker_top_icon_img?.trim() || null,
+    site_map_marker_time_icon: next.site_map_marker_time_icon?.trim() || null,
+    site_map_marker_time_format: next.site_map_marker_time_format?.trim() || null,
     partner_detail_section_label: next.partner_detail_section_label?.trim() || null,
     partner_map_section_label: next.partner_map_section_label?.trim() || null,
     partner_map_locate_enabled: next.partner_map_locate_enabled ?? true,
@@ -333,6 +339,7 @@ export function buildSiteSettingsPayload(next: SiteSettings) {
     site_student_sheets_spreadsheet_id: next.site_student_sheets_spreadsheet_id?.trim() || null,
     site_student_sheets_log_tab: next.site_student_sheets_log_tab?.trim() || null,
     site_student_sheets_approval_tab: next.site_student_sheets_approval_tab?.trim() || null,
+    /** @deprecated 승인 기능 삭제됨 — DB 호환성 유지용 */
     site_student_pending_message: next.site_student_pending_message?.trim() || null,
     site_student_ui_labels:
       next.site_student_ui_labels &&

@@ -121,10 +121,20 @@ function bindPartnerMapImageFallback(
   });
 }
 
+export type MapMarkerCustomSettings = {
+  borderColor: string | null;
+  bgImg: string | null;
+  thumbnailEnabled: boolean;
+  topIconImg: string | null;
+  timeIcon: string | null;
+  timeFormat: string | null;
+};
+
 export function createPartnerMapMarkerElement(
   partner: NaverMapPartnerMarker,
   selected: boolean,
   favorited = false,
+  markerSettings?: MapMarkerCustomSettings | null,
 ): HTMLDivElement {
   const shell = document.createElement("div");
   shell.className = [
@@ -151,21 +161,35 @@ export function createPartnerMapMarkerElement(
     event.stopPropagation();
   });
 
-  const img = document.createElement("img");
-  img.src = resolvePartnerMapImageUrl(partner.pinImageUrl, partner.imageUrl);
-  img.alt = "";
-  img.loading = "lazy";
-  img.decoding = "async";
-  img.className = "partner-map-marker__image";
-  bindPartnerMapImageFallback(img, PARTNER_MAP_DEFAULT_THUMBNAIL_PATH, () => {
-    img.remove();
-    if (!button.querySelector(".partner-map-marker__fallback")) {
-      button.prepend(
-        createPartnerMapInitialFallbackElement("partner-map-marker__fallback", partner.name),
-      );
-    }
-  });
-  button.appendChild(img);
+  if (markerSettings?.borderColor) {
+    button.style.borderColor = markerSettings.borderColor;
+  }
+  if (markerSettings?.bgImg) {
+    button.style.backgroundImage = `url(${JSON.stringify(markerSettings.bgImg)})`;
+    button.style.backgroundSize = "cover";
+    button.style.backgroundPosition = "center";
+  }
+
+  if (markerSettings?.thumbnailEnabled === false) {
+    const fallback = createPartnerMapInitialFallbackElement("partner-map-marker__fallback", partner.name);
+    button.appendChild(fallback);
+  } else {
+    const img = document.createElement("img");
+    img.src = resolvePartnerMapImageUrl(partner.pinImageUrl, partner.imageUrl);
+    img.alt = "";
+    img.loading = "lazy";
+    img.decoding = "async";
+    img.className = "partner-map-marker__image";
+    bindPartnerMapImageFallback(img, PARTNER_MAP_DEFAULT_THUMBNAIL_PATH, () => {
+      img.remove();
+      if (!button.querySelector(".partner-map-marker__fallback")) {
+        button.prepend(
+          createPartnerMapInitialFallbackElement("partner-map-marker__fallback", partner.name),
+        );
+      }
+    });
+    button.appendChild(img);
+  }
 
   const tail = document.createElement("span");
   tail.className = "partner-map-marker__tail";
@@ -175,7 +199,19 @@ export function createPartnerMapMarkerElement(
   shell.appendChild(button);
 
   if (favorited) {
-    shell.appendChild(createPartnerMapFavoriteBadgeElement());
+    if (markerSettings?.topIconImg) {
+      const customBadge = document.createElement("span");
+      customBadge.className = "partner-map-marker__favorite-badge";
+      customBadge.setAttribute("aria-hidden", "true");
+      const badgeImg = document.createElement("img");
+      badgeImg.src = markerSettings.topIconImg;
+      badgeImg.alt = "";
+      badgeImg.className = "partner-map-marker__favorite-badge-img";
+      customBadge.appendChild(badgeImg);
+      shell.appendChild(customBadge);
+    } else {
+      shell.appendChild(createPartnerMapFavoriteBadgeElement());
+    }
   }
 
   return shell;

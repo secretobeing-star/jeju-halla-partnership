@@ -16,6 +16,7 @@ import {
   updatePartnerMapMarkerFavorite,
   updatePartnerMapMiniCardFavorite,
   upsertPartnerMapCountdownBadge,
+  type MapMarkerCustomSettings,
   type NaverMapPartnerMarker,
 } from "@/lib/naver-map-partner-ui";
 import { createPartnerMapMiniCardOverlay } from "@/lib/naver-map-mini-card-overlay";
@@ -59,6 +60,7 @@ type NaverMapPartnersViewProps = {
   };
   favoriteCountdownEndAt?: string | null;
   detailButtonLabel?: string;
+  markerSettings?: MapMarkerCustomSettings | null;
 };
 
 export default function NaverMapPartnersView({
@@ -76,6 +78,7 @@ export default function NaverMapPartnersView({
   stampAction,
   favoriteCountdownEndAt = null,
   detailButtonLabel,
+  markerSettings = null,
 }: NaverMapPartnersViewProps) {
   const mapElementRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<naver.maps.Map | null>(null);
@@ -527,6 +530,7 @@ export default function NaverMapPartnersView({
           partner,
           false,
           favoritesEnabled && Boolean(favoritePartnerIds?.has(partner.id)),
+          markerSettings,
         );
         markerElementsRef.current.set(partner.id, markerElement);
 

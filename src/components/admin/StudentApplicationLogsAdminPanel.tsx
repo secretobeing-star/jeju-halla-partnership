@@ -57,7 +57,6 @@ export default function StudentApplicationLogsAdminPanel() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<number | null>(null);
-  const [busyRow, setBusyRow] = useState<number | null>(null);
 
   const loadLogs = useCallback(
     async (filters?: {
@@ -125,68 +124,10 @@ export default function StudentApplicationLogsAdminPanel() {
     void loadLogs({ query: "", status: "all", from: "", to: "" });
   }
 
-  async function handleReview(row: StudentApplicationLogRow, action: "approve" | "reject") {
-    const label = action === "approve" ? "승인" : "거절";
-    if (
-      !window.confirm(
-        action === "reject"
-          ? `${row.name || row.studentId} 신청을 거절하고 로그에서 삭제할까요?`
-          : `${row.name || row.studentId} 신청을 ${label}할까요?`,
-      )
-    ) {
-      return;
-    }
-
-    setBusyRow(row.rowNumber);
-    setMessage(null);
-    setError(null);
-    try {
-      const payload = (await adminApiFetch("/api/admin/student-logs/review", {
-        method: "POST",
-        body: JSON.stringify({
-          rowNumber: row.rowNumber,
-          action,
-          sendPush: action === "approve",
-        }),
-        timeoutMs: 45_000,
-      })) as {
-        push?: { sent?: number; skipped?: boolean; message?: string };
-        deleted?: boolean;
-      };
-
-      if (action === "reject" || payload.deleted) {
-        setLogs((prev) => prev.filter((item) => item.rowNumber !== row.rowNumber));
-        setMessage("거절 처리되어 신청 로그에서 삭제했습니다.");
-        return;
-      }
-
-      if (action === "approve") {
-        const push = payload.push;
-        if (push?.skipped) {
-          setMessage(`${label} 처리했습니다. 푸시: ${push.message || "건너뜀"}`);
-        } else if (typeof push?.sent === "number") {
-          setMessage(`${label} 처리했습니다. 푸시 ${push.sent}건 발송`);
-        } else {
-          setMessage(`${label} 처리했습니다.`);
-        }
-      } else {
-        setMessage(`${label} 처리했습니다.`);
-      }
-
-      await loadLogs();
-    } catch (reviewError) {
-      setError(
-        reviewError instanceof Error ? reviewError.message : `${label} 처리에 실패했습니다.`,
-      );
-    } finally {
-      setBusyRow(null);
-    }
-  }
-
   return (
     <AdminCollapsibleSection
       title="신청 로그"
-      description="구글 시트 신청 로그를 필터하고, 여기서 승인·거절할 수 있습니다. 승인 시 해당 기기 푸시 구독으로 알림을 보냅니다."
+      description="구글 시트 신청 로그를 필터하고 조회합니다. 회원가입 시 자동 승인됩니다."
       defaultExpanded
     >
       <div className="mb-3 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
@@ -280,7 +221,6 @@ export default function StudentApplicationLogsAdminPanel() {
           <ul className="divide-y divide-gray-100">
             {logs.map((log) => {
               const open = expandedId === log.rowNumber;
-              const busy = busyRow === log.rowNumber;
               return (
                 <li key={`${log.rowNumber}-${log.studentId}-${log.submittedAt}`}>
                   <div className="flex w-full items-start justify-between gap-3 px-4 py-3">
@@ -308,24 +248,7 @@ export default function StudentApplicationLogsAdminPanel() {
                       >
                         {statusLabel(log.statusNormalized, log.status)}
                       </span>
-                      <div className="flex flex-wrap justify-end gap-1.5">
-                        <button
-                          type="button"
-                          disabled={busy || loading || log.statusNormalized === "approved"}
-                          onClick={() => void handleReview(log, "approve")}
-                          className="rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          승인
-                        </button>
-                        <button
-                          type="button"
-                          disabled={busy || loading || log.statusNormalized === "rejected"}
-                          onClick={() => void handleReview(log, "reject")}
-                          className="rounded border border-red-200 bg-red-50 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          거절
-                        </button>
-                      </div>
+                      <span className="text-[10px] text-gray-400">자동 승인</span>
                     </div>
                   </div>
                   {open ? (

@@ -18,12 +18,11 @@ async function loadLoginFailMessage() {
   }
   const { data } = await supabase
     .from("site_settings")
-    .select("site_login_status_notice, site_student_pending_message")
+    .select("site_login_status_notice")
     .limit(1)
     .maybeSingle();
   return {
     statusNotice: data?.site_login_status_notice?.trim() || null,
-    pendingMessage: data?.site_student_pending_message?.trim() || null,
   };
 }
 
@@ -54,7 +53,7 @@ export async function POST(request: Request) {
     try {
       const record = await lookupStudentApprovalStatus(config, studentId);
 
-      if (record.approvalStatus === "approved") {
+      if (record.approvalStatus !== "none") {
         const student: SiteMemberStudentProfile = {
           studentId: record.studentId,
           name: record.name?.trim() || record.studentId,
@@ -75,15 +74,6 @@ export async function POST(request: Request) {
             loggedInAt: new Date().toISOString(),
             student,
           },
-        });
-      }
-
-      if (record.approvalStatus === "pending") {
-        return NextResponse.json({
-          status: "error",
-          message:
-            notices?.pendingMessage ||
-            "승인 대기 중입니다. 승인 후 다시 로그인해 주세요.",
         });
       }
 

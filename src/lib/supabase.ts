@@ -243,6 +243,12 @@ export type SiteSettings = {
   partner_map_geocode_api_enabled: boolean;
   partner_map_geocode_naver_enabled: boolean;
   partner_map_geocode_nominatim_enabled: boolean;
+  site_map_marker_border_color: string | null;
+  site_map_marker_bg_img: string | null;
+  site_map_marker_thumbnail_enabled: boolean;
+  site_map_marker_top_icon_img: string | null;
+  site_map_marker_time_icon: string | null;
+  site_map_marker_time_format: string | null;
   partner_detail_section_label: string | null;
   partner_map_section_label: string | null;
   partner_map_locate_enabled: boolean;

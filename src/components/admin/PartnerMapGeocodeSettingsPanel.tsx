@@ -1,7 +1,8 @@
 "use client";
 
-import { FormEvent } from "react";
+import { FormEvent, useRef } from "react";
 import AdminCollapsibleSection from "@/components/admin/AdminCollapsibleSection";
+import { uploadPartnershipImage, getStorageErrorMessage } from "@/lib/storage";
 import {
   DEFAULT_PARTNER_DETAIL_POPUP_MAX_WIDTH_REM,
   MAX_PARTNER_DETAIL_POPUP_MAX_WIDTH_REM,
@@ -32,6 +33,54 @@ export default function PartnerMapGeocodeSettingsPanel({
     event.preventDefault();
     const { error } = await saveSettings(settings);
     onMessage(error ? formatSiteSettingsSaveError(error.message) : "제휴 상세·지도 설정이 저장되었습니다.");
+  }
+
+  function MarkerImageUploadField({
+    label,
+    value,
+    onChange,
+    onMessage: notify,
+  }: {
+    label: string;
+    value: string | null | undefined;
+    onChange: (url: string | null) => void;
+    onMessage: (msg: string) => void;
+  }) {
+    const inputRef = useRef<HTMLInputElement>(null);
+    return (
+      <label className="block text-sm font-medium text-gray-700">
+        {label}
+        {value ? (
+          <div className="mt-1 flex items-center gap-2">
+            <img src={value} alt="" className="h-10 w-10 rounded border object-cover" />
+            <button
+              type="button"
+              onClick={() => onChange(null)}
+              className="text-xs text-red-600 hover:underline"
+            >
+              삭제
+            </button>
+          </div>
+        ) : null}
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          className="mt-1 block w-full text-sm text-gray-500"
+          onChange={async (e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            try {
+              const url = await uploadPartnershipImage(file, "map-marker-settings");
+              onChange(url);
+            } catch (err) {
+              notify(getStorageErrorMessage(err));
+            }
+            if (inputRef.current) inputRef.current.value = "";
+          }}
+        />
+      </label>
+    );
   }
 
   return (
@@ -271,6 +320,90 @@ export default function PartnerMapGeocodeSettingsPanel({
               </label>
             </div>
           )}
+        </div>
+      </AdminCollapsibleSection>
+
+      <AdminCollapsibleSection title="지도 마커 커스텀">
+        <p className="text-sm text-gray-600">
+          메인 지도 마커의 테두리, 배경, 썸네일, 상단 아이콘, 시간 표시를 설정합니다.
+        </p>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <label className="block text-sm font-medium text-gray-700">
+            마커 테두리 색상
+            <input
+              type="color"
+              value={settings.site_map_marker_border_color ?? "#ec4899"}
+              onChange={(e) =>
+                setSettings((prev) => ({
+                  ...prev,
+                  site_map_marker_border_color: e.target.value,
+                }))
+              }
+              className="mt-1 block h-10 w-full cursor-pointer rounded-lg border border-gray-300"
+            />
+          </label>
+          <MarkerImageUploadField
+            label="마커 배경 이미지"
+            value={settings.site_map_marker_bg_img}
+            onChange={(url) =>
+              setSettings((prev) => ({ ...prev, site_map_marker_bg_img: url }))
+            }
+            onMessage={onMessage}
+          />
+          <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-3 text-sm text-gray-700 sm:col-span-2">
+            <input
+              type="checkbox"
+              checked={settings.site_map_marker_thumbnail_enabled ?? true}
+              onChange={(e) =>
+                setSettings((prev) => ({
+                  ...prev,
+                  site_map_marker_thumbnail_enabled: e.target.checked,
+                }))
+              }
+              className="h-4 w-4 rounded border-gray-300 text-emerald-600"
+            />
+            업체 썸네일 마커에 노출
+          </label>
+          <MarkerImageUploadField
+            label="상단 마커 아이콘 이미지"
+            value={settings.site_map_marker_top_icon_img}
+            onChange={(url) =>
+              setSettings((prev) => ({ ...prev, site_map_marker_top_icon_img: url }))
+            }
+            onMessage={onMessage}
+          />
+          <label className="block text-sm font-medium text-gray-700">
+            시간 영역 아이콘 (이모지 또는 텍스트)
+            <input
+              value={settings.site_map_marker_time_icon ?? ""}
+              onChange={(e) =>
+                setSettings((prev) => ({
+                  ...prev,
+                  site_map_marker_time_icon: e.target.value.trim() || null,
+                }))
+              }
+              placeholder="⏰"
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-emerald-500"
+            />
+          </label>
+          <label className="block text-sm font-medium text-gray-700">
+            시간 노출 형식
+            <select
+              value={settings.site_map_marker_time_format ?? ""}
+              onChange={(e) =>
+                setSettings((prev) => ({
+                  ...prev,
+                  site_map_marker_time_format: e.target.value || null,
+                }))
+              }
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-emerald-500"
+            >
+              <option value="">미표시</option>
+              <option value="d-day">D-day</option>
+              <option value="remaining-hours">남은 시간</option>
+              <option value="remaining-days">남은 일수</option>
+            </select>
+          </label>
         </div>
       </AdminCollapsibleSection>
 

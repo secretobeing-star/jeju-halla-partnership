@@ -13,7 +13,6 @@ import {
 } from "@/lib/site-student-auth-settings";
 import { createSupabaseServer } from "@/lib/supabase-server";
 
-const DUPLICATE_PENDING_MESSAGE = "승인 대기 중입니다.";
 const REJOIN_BLOCK_MESSAGE =
   "탈퇴 후 14일이 지나지 않아 재가입할 수 없습니다. 기간이 지난 뒤 다시 신청해 주세요.";
 
@@ -183,8 +182,8 @@ export async function POST(request: Request) {
         }
 
         return NextResponse.json({
-          status: "duplicate_pending",
-          message: DUPLICATE_PENDING_MESSAGE,
+          status: "already_approved",
+          message: "이미 신청된 학번입니다. 로그인해 주세요.",
           student: {
             studentId,
             name,
@@ -194,7 +193,7 @@ export async function POST(request: Request) {
             graduationStatus: graduationStatus ?? "enrolled",
             photoUrl,
             notes: null,
-            approvalStatus: "pending",
+            approvalStatus: "approved",
           },
         });
       }
@@ -280,7 +279,7 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({
-    status: "pending",
+    status: "ok",
     student: {
       studentId,
       name,
@@ -290,7 +289,7 @@ export async function POST(request: Request) {
       graduationStatus: graduationStatus ?? "enrolled",
       photoUrl,
       notes: mergedNotes || null,
-      approvalStatus: "pending",
+      approvalStatus: "approved",
     },
   });
 }

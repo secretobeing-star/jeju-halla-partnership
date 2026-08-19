@@ -126,6 +126,7 @@ import {
   resolveSiteNavDisplayTitle,
 } from "@/lib/site-nav-links";
 import { getMainPartnerMapDisplay } from "@/lib/main-partner-map-settings";
+import type { MapMarkerCustomSettings } from "@/lib/naver-map-partner-ui";
 import { getInitialPartnerSort, type PartnerSort } from "@/lib/partner-sort";
 import { dispatchSiteMapRefresh } from "@/lib/naver-map-layout";
 import { getPartnerRecommendationScore } from "@/lib/partner-reaction";
@@ -884,6 +885,21 @@ export default function HomePage() {
       settings.main_partner_map_default_expanded,
     ],
   );
+  const mapMarkerSettings = useMemo((): MapMarkerCustomSettings => ({
+    borderColor: settings.site_map_marker_border_color ?? null,
+    bgImg: settings.site_map_marker_bg_img ?? null,
+    thumbnailEnabled: settings.site_map_marker_thumbnail_enabled ?? true,
+    topIconImg: settings.site_map_marker_top_icon_img ?? null,
+    timeIcon: settings.site_map_marker_time_icon ?? null,
+    timeFormat: settings.site_map_marker_time_format ?? null,
+  }), [
+    settings.site_map_marker_border_color,
+    settings.site_map_marker_bg_img,
+    settings.site_map_marker_thumbnail_enabled,
+    settings.site_map_marker_top_icon_img,
+    settings.site_map_marker_time_icon,
+    settings.site_map_marker_time_format,
+  ]);
   const showCategoryRegionSection =
     (settings.partner_category_section_enabled ?? true) &&
     (userBetaPrefs.show_category_region ?? true);
@@ -1133,6 +1149,7 @@ export default function HomePage() {
       onMapReady={handleMainMapReady}
       onFavoriteToggle={togglePartnerFavorite}
       favoritesTerm={partnerFavoritesDisplay.label}
+      markerSettings={mapMarkerSettings}
     />
   ) : null;
 

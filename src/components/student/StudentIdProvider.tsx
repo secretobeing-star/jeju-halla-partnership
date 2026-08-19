@@ -14,7 +14,6 @@ import StudentCardModal, {
   type StudentCardBrandDisplay,
 } from "@/components/student/StudentCardModal";
 import StudentInfoFormModal from "@/components/student/StudentInfoFormModal";
-import StudentPendingModal from "@/components/student/StudentPendingModal";
 import StudentSamsungPaySwipe from "@/components/student/StudentSamsungPaySwipe";
 import { useStandaloneDisplayMode } from "@/hooks/useStandaloneDisplayMode";
 import {
@@ -31,7 +30,7 @@ import {
 } from "@/lib/site-student-auth-settings";
 import type { PublicCardFrameItem } from "@/lib/student-card-frames";
 
-type FlowStep = "idle" | "guide" | "form" | "pending" | "card";
+type FlowStep = "idle" | "guide" | "form" | "card";
 
 type StudentIdContextValue = {
   enabled: boolean;
@@ -81,8 +80,6 @@ export default function StudentIdProvider({
   const standalone = useStandaloneDisplayMode();
   const [step, setStep] = useState<FlowStep>("idle");
   const [student, setStudent] = useState<SiteMemberStudentProfile | null>(null);
-  const [pendingMessageOverride, setPendingMessageOverride] = useState<string | null>(null);
-
   const refreshSession = useCallback(() => {
     const session = getSiteMemberSession();
     setStudent(session?.student ?? null);
@@ -93,41 +90,6 @@ export default function StudentIdProvider({
     window.addEventListener(SITE_MEMBER_SESSION_EVENT, refreshSession);
     return () => window.removeEventListener(SITE_MEMBER_SESSION_EVENT, refreshSession);
   }, [refreshSession]);
-
-  const refreshApproval = useCallback(async (profile: SiteMemberStudentProfile) => {
-    try {
-      const response = await fetch(
-        `/api/student/status?studentId=${encodeURIComponent(profile.studentId)}`,
-      );
-      if (!response.ok) {
-        return profile;
-      }
-      const payload = (await response.json()) as {
-        status?: SiteMemberStudentProfile["approvalStatus"];
-        student?: {
-          name?: string | null;
-          photoUrl?: string | null;
-          department?: string | null;
-          major?: string | null;
-          approvalStatus?: SiteMemberStudentProfile["approvalStatus"];
-        };
-      };
-
-      const next: SiteMemberStudentProfile = {
-        ...profile,
-        approvalStatus: payload.status ?? payload.student?.approvalStatus ?? profile.approvalStatus,
-        name: payload.student?.name?.trim() || profile.name,
-        photoUrl: payload.student?.photoUrl?.trim() || profile.photoUrl,
-        department: payload.student?.department?.trim() || profile.department,
-        major: payload.student?.major?.trim() || profile.major,
-      };
-      patchSiteMemberStudentProfile(next);
-      setStudent(next);
-      return next;
-    } catch {
-      return profile;
-    }
-  }, []);
 
   const startStudentAuth = useCallback(() => {
     if (!authDisplay.enabled) {
@@ -151,7 +113,7 @@ export default function StudentIdProvider({
     }
     const session = getSiteMemberSession();
     const profile = session?.student ?? null;
-    if (!profile || profile.approvalStatus !== "approved") {
+    if (!profile) {
       return;
     }
     setStudent(profile);
@@ -164,21 +126,11 @@ export default function StudentIdProvider({
     }
 
     const session = getSiteMemberSession();
-    let profile = session?.student ?? null;
+    const profile = session?.student ?? null;
 
     if (profile?.studentId) {
-      profile = await refreshApproval(profile);
-    }
-
-    if (profile?.approvalStatus === "approved") {
       setStudent(profile);
       setStep("card");
-      return;
-    }
-
-    if (profile?.approvalStatus === "pending") {
-      setStudent(profile);
-      setStep("pending");
       return;
     }
 
@@ -189,14 +141,9 @@ export default function StudentIdProvider({
     }
 
     setStep("guide");
-  }, [authDisplay.enabled, lockGestures, loginDisplay.enabled, refreshApproval]);
+  }, [authDisplay.enabled, lockGestures, loginDisplay.enabled]);
 
-  const approvedStudent =
-    student?.approvalStatus === "approved"
-      ? student
-      : getSiteMemberSession()?.student?.approvalStatus === "approved"
-        ? getSiteMemberSession()?.student
-        : null;
+  const approvedStudent = student ?? getSiteMemberSession()?.student ?? null;
 
   const swipeEnabled =
     authDisplay.enabled &&
@@ -207,7 +154,6 @@ export default function StudentIdProvider({
 
   const closeAll = useCallback(() => {
     setStep("idle");
-    setPendingMessageOverride(null);
   }, []);
 
   const contextValue = useMemo(
@@ -265,26 +211,8 @@ export default function StudentIdProvider({
         onSubmitted={(next) => {
           patchSiteMemberStudentProfile(next);
           setStudent(next);
-          setPendingMessageOverride(null);
-          if (next.approvalStatus === "approved") {
-            setStep("card");
-            return;
-          }
-          setStep("pending");
+          setStep("card");
         }}
-        onDuplicatePending={(next, message) => {
-          patchSiteMemberStudentProfile(next);
-          setStudent(next);
-          setPendingMessageOverride(message);
-          setStep("pending");
-        }}
-      />
-
-      <StudentPendingModal
-        open={step === "pending"}
-        onClose={closeAll}
-        title={authDisplay.labels.pendingTitle}
-        message={pendingMessageOverride || authDisplay.pendingMessage}
       />
 
       {student ? (

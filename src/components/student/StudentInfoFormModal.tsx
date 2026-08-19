@@ -18,7 +18,6 @@ type StudentInfoFormModalProps = {
   open: boolean;
   onClose: () => void;
   onSubmitted: (student: SiteMemberStudentProfile) => void;
-  onDuplicatePending?: (student: SiteMemberStudentProfile, message: string) => void;
   labels: SiteStudentUiLabels;
   hiddenFormFields?: SiteStudentFormFieldKey[];
   customFields?: SiteStudentCustomField[];
@@ -54,7 +53,6 @@ export default function StudentInfoFormModal({
   open,
   onClose,
   onSubmitted,
-  onDuplicatePending,
   labels,
   hiddenFormFields = [],
   customFields = [],
@@ -184,21 +182,9 @@ export default function StudentInfoFormModal({
         student?: SiteMemberStudentProfile;
       };
 
-      if (payload.status === "duplicate_pending" && payload.student) {
-        setForm(INITIAL);
-        onDuplicatePending?.(
-          payload.student,
-          payload.message?.trim() || "승인 대기 중입니다.",
-        );
-        return;
-      }
-
       if (payload.status === "already_approved" && payload.student) {
         setForm(INITIAL);
-        onDuplicatePending?.(
-          { ...payload.student, approvalStatus: "pending" },
-          payload.message?.trim() || "이미 승인된 학번입니다. 로그인해 주세요.",
-        );
+        onSubmitted({ ...payload.student, approvalStatus: "approved" });
         return;
       }
 

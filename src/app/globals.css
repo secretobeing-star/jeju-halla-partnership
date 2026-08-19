@@ -9800,8 +9800,7 @@ html.dark-mode .student-card-modal__pay-handle span {
   background: #f9fafb;
 }
 
-.student-auth-guide__body,
-.student-pending__message {
+.student-auth-guide__body {
   margin: 0;
   font-size: 0.9rem;
   line-height: 1.55;
@@ -10402,8 +10401,7 @@ html.dark-mode .student-id-card__footer-name {
   color: #065f46;
 }
 
-html.dark-mode .student-auth-guide__body,
-html.dark-mode .student-pending__message {
+html.dark-mode .student-auth-guide__body {
   color: #d1d5db;
 }
 

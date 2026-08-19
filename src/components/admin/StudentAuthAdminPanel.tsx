@@ -246,20 +246,6 @@ export default function StudentAuthAdminPanel({
             ) : null}
           </div>
         ) : null}
-        <label className="mt-4 block text-sm font-medium text-gray-700">
-          승인 대기 안내 문구
-          <textarea
-            value={settings.site_student_pending_message ?? ""}
-            onChange={(e) =>
-              setSettings((prev) => ({
-                ...prev,
-                site_student_pending_message: e.target.value.trim() ? e.target.value : null,
-              }))
-            }
-            rows={3}
-            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-emerald-500"
-          />
-        </label>
       </AdminCollapsibleSection>
 
       <AdminCollapsibleSection

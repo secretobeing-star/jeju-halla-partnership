@@ -34,7 +34,8 @@ export type UploadFolder =
   | "step-quest"
   | "map-events"
   | "push-notifications"
-  | "pwa-icons";
+  | "pwa-icons"
+  | "map-marker-settings";
 
 export const ALLOWED_UPLOAD_FOLDERS = new Set<string>([
   "banners",
@@ -73,6 +74,7 @@ export const ALLOWED_UPLOAD_FOLDERS = new Set<string>([
   "map-events",
   "push-notifications",
   "pwa-icons",
+  "map-marker-settings",
 ]);
 
 export const PUBLIC_BOARD_UPLOAD_FOLDERS = new Set([
