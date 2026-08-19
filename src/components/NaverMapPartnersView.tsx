@@ -105,12 +105,17 @@ export default function NaverMapPartnersView({
   const [tilesReady, setTilesReady] = useState(false);
   const [mapRevealed, setMapRevealed] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const normalizedPartners = useMemo(
+
+  const normalizedPartners = useMemo<NaverMapPartnerMarker[]>(
     () =>
       partners.flatMap((partner) => {
         const latitude = parsePartnerMapCoordinate(partner.latitude);
         const longitude = parsePartnerMapCoordinate(partner.longitude);
-        if (!hasValidPartnerMapCoords(latitude, longitude)) {
+        if (
+          latitude === null ||
+          longitude === null ||
+          !hasValidPartnerMapCoords(latitude, longitude)
+        ) {
           return [];
         }
 
@@ -119,7 +124,7 @@ export default function NaverMapPartnersView({
             ...partner,
             latitude,
             longitude,
-          },
+          } as NaverMapPartnerMarker,
         ];
       }),
     [partners],
@@ -333,7 +338,6 @@ export default function NaverMapPartnersView({
       clearUserLocationOverlay();
 
       mapRef.current = null;
-      // Strict Mode 재마운트 시 loading 깜빡임 줄이기 — cleanup 에서 setMapReady(false) 생략
     };
   }, [clientId, clearUserLocationOverlay]);
 
@@ -612,7 +616,6 @@ export default function NaverMapPartnersView({
     }
 
     if (preserveMapView && markersRef.current.length > 0) {
-      // 정렬만 바뀐 경우 지도를 다시 가리지 않음
       if (orderChanged) {
         armContentReady();
       }
@@ -673,7 +676,6 @@ export default function NaverMapPartnersView({
     };
   }, [clientId, mapReady, normalizedPartners]);
 
-  // 스플래시 오버레이가 끝난 뒤에도 지도/마커 오버레이가 준비될 때까지 「로딩중」유지
   useEffect(() => {
     const wasHolding = wasHoldingLoadingRef.current;
     wasHoldingLoadingRef.current = holdLoadingOverlay;
@@ -756,7 +758,6 @@ export default function NaverMapPartnersView({
   }, [loadError, mapReady, onReady, tilesReady]);
 
   const canvasClassName = ["partner-main-map__canvas", className].filter(Boolean).join(" ");
-  // 최초 공개 이후에는 화면 꺼짐·정렬 변경으로 「로딩중」이 다시 뜨지 않게 함
   const showLoadingOverlay =
     holdLoadingOverlay || (!mapRevealed && (!mapReady || !tilesReady));
 
