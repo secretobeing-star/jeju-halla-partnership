@@ -30,9 +30,13 @@ type EventRow = {
   completion_badge_img?: string | null;
   guide_text?: string | null;
   distance_error_message?: string | null;
+  win_popup_message?: string | null;
+  lose_popup_message?: string | null;
+  completion_popup_message?: string | null;
   win_message?: string | null;
   lose_message?: string | null;
   completion_message?: string | null;
+  stamp_btn_label?: string | null;
   sort_order: number;
 };
 
@@ -57,13 +61,15 @@ function mapEventRow(row: EventRow, extras?: Partial<MapEvent>): MapEvent {
     stamp_bar_bg_color: row.stamp_bar_bg_color ?? null,
     completion_badge_img: row.completion_badge_img ?? null,
     guide_text: row.guide_text ?? null,
-    distance_error_message: row.distance_error_message ?? null,
-    win_message: row.win_message ?? null,
-    lose_message: row.lose_message ?? null,
-    completion_message: row.completion_message ?? null,
+    distance_error_message: row.distance_error_message ?? extras?.distance_error_message ?? null,
+    win_popup_message: row.win_popup_message ?? row.win_message ?? extras?.win_popup_message ?? null,
+    lose_popup_message: row.lose_popup_message ?? row.lose_message ?? extras?.lose_popup_message ?? null,
+    completion_popup_message: row.completion_popup_message ?? row.completion_message ?? extras?.completion_popup_message ?? null,
+    stamp_btn_label: row.stamp_btn_label ?? extras?.stamp_btn_label ?? null,
     sort_order: Number(row.sort_order) || 0,
-    ...extras,
-  };
+    partner_ids: extras?.partner_ids ?? [],
+    rewards: extras?.rewards ?? [],
+  } as MapEvent;
 }
 
 export async function GET(request: NextRequest) {
@@ -187,9 +193,10 @@ export async function POST(request: NextRequest) {
     completion_badge_img: body.completion_badge_img?.trim() || null,
     guide_text: body.guide_text?.trim() || null,
     distance_error_message: body.distance_error_message?.trim() || null,
-    win_message: body.win_message?.trim() || null,
-    lose_message: body.lose_message?.trim() || null,
-    completion_message: body.completion_message?.trim() || null,
+    win_popup_message: body.win_popup_message?.trim() || null,
+    lose_popup_message: body.lose_popup_message?.trim() || null,
+    completion_popup_message: body.completion_popup_message?.trim() || null,
+    stamp_btn_label: body.stamp_btn_label?.trim() || null,
     sort_order: Number(body.sort_order) || 0,
     updated_at: new Date().toISOString(),
   };
