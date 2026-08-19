@@ -1,0 +1,34 @@
+{
+  "name": "jeju-halla-partnership",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "twa:init": "powershell -ExecutionPolicy Bypass -File ./scripts/twa-init.ps1",
+    "twa:build": "powershell -ExecutionPolicy Bypass -File ./scripts/twa-build.ps1"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.787.0",
+    "@supabase/supabase-js": "^2.49.8",
+    "@tailwindcss/postcss": "^4.0.17",
+    "googleapis": "^174.0.1",
+    "next": "^15.2.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "sharp": "^0.35.3",
+    "tailwindcss": "^4.0.17",
+    "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.24",
+    "@types/react": "^19.0.12",
+    "@types/react-dom": "^19.0.4",
+    "typescript": "^5.8.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

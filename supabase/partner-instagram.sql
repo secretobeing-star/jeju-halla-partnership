@@ -1,0 +1,1 @@
+-- 이 파일은 supabase/setup.sql 로 통합되었습니다.
