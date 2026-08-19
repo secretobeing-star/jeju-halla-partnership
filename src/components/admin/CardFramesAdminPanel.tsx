@@ -6,6 +6,11 @@ import { createEmptyCardFrameItem, type CardFrameItem } from "@/data/cardFrames"
 import { resolveCardFrameCatalog } from "@/lib/student-card-frames";
 import { SiteSettings } from "@/lib/supabase";
 
+type ExtendedCardFrameItem = CardFrameItem & {
+  inboxTitle?: string;
+  inboxDescription?: string;
+};
+
 type CardFramesAdminPanelProps = {
   settings: SiteSettings;
   setSettings: React.Dispatch<React.SetStateAction<SiteSettings>>;
@@ -30,18 +35,18 @@ export default function CardFramesAdminPanel({
   const [draftCodeVisible, setDraftCodeVisible] = useState<Record<string, boolean>>({});
 
   const frames = useMemo(
-    () => resolveCardFrameCatalog(settings.site_student_card_frames),
+    () => resolveCardFrameCatalog(settings.site_student_card_frames) as ExtendedCardFrameItem[],
     [settings.site_student_card_frames],
   );
 
-  function commitFrames(next: CardFrameItem[]) {
+  function commitFrames(next: ExtendedCardFrameItem[]) {
     setSettings((prev) => ({
       ...prev,
       site_student_card_frames: next,
     }));
   }
 
-  function updateFrame(id: string, patch: Partial<CardFrameItem>) {
+  function updateFrame(id: string, patch: Partial<ExtendedCardFrameItem>) {
     commitFrames(
       frames.map((frame) => (frame.id === id ? { ...frame, ...patch } : frame)),
     );
@@ -58,34 +63,27 @@ export default function CardFramesAdminPanel({
         id: createFrameId(),
         name: "새 코스튬",
         isDefaultUnlocked: false,
-      }),
+      }) as ExtendedCardFrameItem,
     ]);
   }
 
   return (
     <AdminCollapsibleSection
       title="학생증 · 코스튬 아이템"
-      description="코스튬 이미지를 등록하고 시크릿 코드로 해금되게 합니다. 학번 지정 지급은 「보상 지급」 메뉴를 사용하세요."
+      description="코스튬 이미지를 등록하고 보관함 제목 및 내용을 설정합니다."
     >
       <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs leading-relaxed text-gray-600">
         <p className="font-semibold text-gray-800">학생증 · 사진 규격 (참고)</p>
         <ul className="mt-1 list-disc space-y-0.5 pl-4">
           <li>카드: ISO ID-1 비율 1.586 · 실물 약 8.56×5.40cm · 화면 약 384×242px</li>
-          <li>사진: 3.5×4.5cm (비율 3.5/4.5) · 설정 미리보기 56×72px · 인쇄 300dpi 약 413×531px</li>
           <li>코스튬 이미지: 카드와 동일 비율(가로:세로 ≈ 1.586:1) PNG/SVG 권장</li>
         </ul>
       </div>
-      <p className="text-xs text-gray-500">
-        시드 템플릿은 <code className="rounded bg-gray-100 px-1">src/data/cardFrames.ts</code> 에도
-        둘 수 있으며, 여기서 저장한 항목이 같은 id면 우선 적용됩니다. 저장 전 Supabase에서{" "}
-        <code className="rounded bg-gray-100 px-1">supabase/site-student-card-frames.sql</code> 을
-        실행해 주세요.
-      </p>
 
       <div className="mt-4 space-y-4">
         {frames.length === 0 ? (
           <p className="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-3 py-4 text-sm text-gray-500">
-            등록된 코스튬이 없습니다. 아래 버튼으로 추가하거나 cardFrames.ts 템플릿을 채워 주세요.
+            등록된 코스튬이 없습니다. 아래 버튼으로 추가해 주세요.
           </p>
         ) : null}
 
@@ -101,7 +99,7 @@ export default function CardFramesAdminPanel({
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
                   <label className="block text-sm font-medium text-gray-700">
-                    이름
+                    코스튬 기본 이름
                     <input
                       value={frame.name}
                       onChange={(e) => updateFrame(frame.id, { name: e.target.value })}
@@ -125,9 +123,7 @@ export default function CardFramesAdminPanel({
                     value={frame.id}
                     onChange={(e) => {
                       const nextId = e.target.value.trim();
-                      if (!nextId) {
-                        return;
-                      }
+                      if (!nextId) return;
                       commitFrames(
                         frames.map((item) =>
                           item.id === frame.id ? { ...item, id: nextId } : item,
@@ -163,15 +159,35 @@ export default function CardFramesAdminPanel({
                 </label>
               </div>
 
-              <label className="mt-3 block text-sm font-medium text-gray-700">
-                설명
-                <textarea
-                  value={frame.description}
-                  onChange={(e) => updateFrame(frame.id, { description: e.target.value })}
-                  rows={2}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-emerald-500"
-                />
-              </label>
+              {/* 보관함 전용 설정 영역 */}
+              <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50/50 p-3.5 space-y-3">
+                <p className="text-xs font-bold text-emerald-900">📦 보관함 표시 설정</p>
+                <label className="block text-xs font-medium text-gray-700">
+                  보관함 제목
+                  <input
+                    value={frame.inboxTitle ?? ""}
+                    onChange={(e) => updateFrame(frame.id, { inboxTitle: e.target.value })}
+                    placeholder={frame.name || "보관함에 표시될 제목을 입력하세요"}
+                    className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                  />
+                </label>
+                <label className="block text-xs font-medium text-gray-700">
+                  보관함 내용 (줄바꿈 및 띄어쓰기 완전 지원)
+                  <textarea
+                    value={frame.inboxDescription ?? frame.description ?? ""}
+                    onChange={(e) =>
+                      updateFrame(frame.id, {
+                        inboxDescription: e.target.value,
+                        description: e.target.value,
+                      })
+                    }
+                    rows={3}
+                    placeholder="보관함에서 표시될 상세 설명을 입력하세요 (엔터 줄바꿈 및 스페이스 띄어쓰기 유지)"
+                    style={{ whiteSpace: "pre-wrap" }}
+                    className="mt-1 w-full whitespace-pre-wrap rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500 font-sans"
+                  />
+                </label>
+              </div>
 
               <label className="mt-3 block text-sm font-medium text-gray-700">
                 이미지 URL / Data URL
@@ -224,7 +240,7 @@ export default function CardFramesAdminPanel({
                 <input
                   value={frame.cssBorder ?? ""}
                   onChange={(e) => updateFrame(frame.id, { cssBorder: e.target.value })}
-                  placeholder='예: 3px solid #10b981'
+                  placeholder="예: 3px solid #10b981"
                   className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-xs outline-none focus:border-emerald-500"
                 />
               </label>
