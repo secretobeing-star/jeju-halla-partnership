@@ -122,8 +122,8 @@ export default function NaverMapPartnersView({
         return [
           {
             ...partner,
-            latitude,
-            longitude,
+            latitude: latitude as number,
+            longitude: longitude as number,
           } as NaverMapPartnerMarker,
         ];
       }),
@@ -253,7 +253,6 @@ export default function NaverMapPartnersView({
               }
             }),
             window.naver.maps.Event.addListener(map, "idle", () => {
-              // 스플래시 오버레이가 덮고 있는 동안에는 「로딩중...」유지
               if (!holdLoadingOverlayRef.current) {
                 setTilesReady(true);
               }
@@ -364,7 +363,6 @@ export default function NaverMapPartnersView({
     mapMarkersOrderRef.current = nextOrderKey;
 
     if (!preserveMapView) {
-      // 전체/카테고리·필터 변경으로 마커가 다시 그려질 때 로딩 표시
       setTilesReady(false);
       miniCardOverlayRef.current?.close();
       miniCardOverlayRef.current = null;
@@ -514,11 +512,15 @@ export default function NaverMapPartnersView({
       for (const partner of validPartners) {
         const latitude = parsePartnerMapCoordinate(partner.latitude);
         const longitude = parsePartnerMapCoordinate(partner.longitude);
-        if (!hasValidPartnerMapCoords(latitude, longitude)) {
+        if (
+          latitude === null ||
+          longitude === null ||
+          !hasValidPartnerMapCoords(latitude, longitude)
+        ) {
           continue;
         }
 
-        const position = new window.naver.maps.LatLng(latitude, longitude);
+        const position = new window.naver.maps.LatLng(latitude as number, longitude as number);
         bounds.extend(position);
 
         const markerElement = createPartnerMapMarkerElement(
@@ -590,7 +592,7 @@ export default function NaverMapPartnersView({
 
       if (validPartners.length === 1) {
         const partner = validPartners[0];
-        activeMap.setCenter(new window.naver.maps.LatLng(partner.latitude, partner.longitude));
+        activeMap.setCenter(new window.naver.maps.LatLng(partner.latitude as number, partner.longitude as number));
         activeMap.setZoom(SINGLE_ZOOM);
       } else if (validPartners.length > 1) {
         activeMap.fitBounds(bounds, FIT_BOUNDS_MARGIN);
