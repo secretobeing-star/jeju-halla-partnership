@@ -364,8 +364,8 @@ export default function SitePwaAppSettingsButton({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: session.displayName,
-          providerToken: session.provider_token,
+          email: (session as unknown as { displayName?: string })?.displayName ?? "",
+          providerToken: (session as unknown as { provider_token?: string })?.provider_token ?? null,
         }),
       });
       const payload = (await response.json()) as {

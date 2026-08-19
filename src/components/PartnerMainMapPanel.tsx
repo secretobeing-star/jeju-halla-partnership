@@ -96,7 +96,11 @@ export default function PartnerMainMapPanel({
         const latitude = parsePartnerMapCoordinate(partner.latitude);
         const longitude = parsePartnerMapCoordinate(partner.longitude);
 
-        if (!hasValidPartnerMapCoords(latitude, longitude)) {
+        if (
+          latitude === null ||
+          longitude === null ||
+          !hasValidPartnerMapCoords(latitude, longitude)
+        ) {
           return [];
         }
 
@@ -104,8 +108,8 @@ export default function PartnerMainMapPanel({
           {
             id: partner.id,
             name: partner.name,
-            latitude,
-            longitude,
+            latitude: latitude as number,
+            longitude: longitude as number,
             imageUrl: partner.image_url ?? null,
             pinImageUrl: partner.pinImageUrl ?? null,
             category: partner.category ?? null,
