@@ -26,6 +26,7 @@ type EventFormState = {
   list_type: SiteEventListType;
   is_active: boolean;
   sort_order: number;
+  distance_error_message: string;
 };
 
 type TabFormState = {
@@ -46,6 +47,7 @@ const EMPTY_EVENT: EventFormState = {
   list_type: "event",
   is_active: true,
   sort_order: 0,
+  distance_error_message: "",
 };
 
 const EMPTY_TAB: TabFormState = {
@@ -148,7 +150,7 @@ export default function EventAdminPanel({
     setTabForm(EMPTY_TAB);
   }
 
-  function startEditEvent(event: SiteEvent) {
+  function startEditEvent(event: SiteEvent & { distance_error_message?: string | null }) {
     setEditingEventId(event.id);
     setSelectedEventId(event.id);
     setEventForm({
@@ -160,6 +162,7 @@ export default function EventAdminPanel({
       list_type: normalizeSiteEventListType(event.list_type),
       is_active: event.is_active,
       sort_order: event.sort_order ?? 0,
+      distance_error_message: event.distance_error_message ?? "",
     });
     resetTabForm();
     onMessage("");
@@ -229,19 +232,14 @@ export default function EventAdminPanel({
       list_type: normalizeSiteEventListType(eventForm.list_type),
       is_active: eventForm.is_active,
       sort_order: Number.isFinite(eventForm.sort_order) ? eventForm.sort_order : 0,
+      distance_error_message: eventForm.distance_error_message.trim() || null,
       updated_at: new Date().toISOString(),
     };
 
     if (editingEventId) {
       const { error } = await supabase.from("site_events").update(payload).eq("id", editingEventId);
       if (error) {
-        onMessage(
-          error.message.includes("thumbnail_url") ||
-            error.message.includes("starts_at") ||
-            error.message.includes("list_type")
-            ? "이벤트 카드 필드가 없습니다. Supabase SQL Editor에서 site-events-card-fields.sql을 실행해 주세요."
-            : `이벤트 수정 실패: ${error.message}`,
-        );
+        onMessage(`이벤트 수정 실패: ${error.message}`);
         setSaving(false);
         return;
       }
@@ -249,13 +247,7 @@ export default function EventAdminPanel({
     } else {
       const { data, error } = await supabase.from("site_events").insert(payload).select("id").maybeSingle();
       if (error) {
-        onMessage(
-          error.message.includes("thumbnail_url") ||
-            error.message.includes("starts_at") ||
-            error.message.includes("list_type")
-            ? "이벤트 카드 필드가 없습니다. Supabase SQL Editor에서 site-events-card-fields.sql을 실행해 주세요."
-            : `이벤트 등록 실패: ${error.message}`,
-        );
+        onMessage(`이벤트 등록 실패: ${error.message}`);
         setSaving(false);
         return;
       }
@@ -576,7 +568,7 @@ export default function EventAdminPanel({
 
       <AdminCollapsibleSection
         title={editingEventId ? "이벤트 수정" : "이벤트 등록"}
-        description="카드 목록용 썸네일·기간·분류를 설정하고, 각 이벤트 안에 탭(이미지·문구·링크)을 추가합니다."
+        description="카드 목록용 썸네일·기간·분류 및 거리 초과 안내 문구를 설정합니다."
       >
         <form onSubmit={handleEventSubmit} className="space-y-4">
           <label className="block text-sm font-medium text-gray-700">
@@ -598,6 +590,22 @@ export default function EventAdminPanel({
               placeholder=""
               className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-emerald-500"
             />
+          </label>
+
+          {/* 거리 초과 안내 문구 커스텀 필드 */}
+          <label className="block text-sm font-medium text-gray-700">
+            거리 초과 안내 문구 (선택)
+            <input
+              value={eventForm.distance_error_message}
+              onChange={(e) =>
+                setEventForm((prev) => ({ ...prev, distance_error_message: e.target.value }))
+              }
+              placeholder="제휴처와의 거리가 {distance}m 남았습니다. 지정된 반경({radius}m) 내에서 도장을 찍어주세요."
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-emerald-500"
+            />
+            <span className="mt-1 block text-xs font-normal text-gray-500">
+              * <code>{`{distance}`}</code>는 남은 거리(m), <code>{`{radius}`}</code>는 허용 반경(m)으로 자동 치환됩니다. 비워두면 기본 문구가 사용됩니다.
+            </span>
           </label>
 
           <div>

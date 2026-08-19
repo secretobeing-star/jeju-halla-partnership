@@ -179,7 +179,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       if (configPayload.config) setConfig(configPayload.config);
       setEvents((eventsPayload.events ?? []).filter((event) => isEventLive(event)));
     } catch {
-      // 테이블 미생성 시 기본 제휴 탭만 표시
+      // 기본 제휴 탭 유지
     }
   }, []);
 
@@ -312,7 +312,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
       if (!response.ok) {
         if (payload.distanceError) {
-          // 관리자 커스텀 메시지 템플릿 치환 로직
           const template =
             payload.messages?.distance ||
             activeEvent.distance_error_message ||
@@ -344,7 +343,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       const maxStamps = activeEvent.max_stamps || 5;
       const nextStampCount = payload.progress?.current_stamps ?? (progress?.current_stamps ?? 0) + 1;
 
-      // 1. 도장 찍기 성공 시 구글 시트 로깅 호출
+      // 1. 도장 찍기 성공 구글 시트 웹훅 전송
       sendMapStampLog({
         action: "도장 찍기",
         eventTitle: activeEvent.title,
@@ -372,7 +371,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
           showGiftButton: (payload.giftCount ?? 0) > 0,
         });
 
-        // 2. 완주 보상 획득 시 구글 시트 로깅 호출
+        // 2. 완주 구글 시트 웹훅 전송
         sendMapStampLog({
           action: "스탬프 완주",
           eventTitle: activeEvent.title,
