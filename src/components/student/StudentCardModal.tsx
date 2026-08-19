@@ -15,8 +15,8 @@ import {
 } from "@/lib/student-card-frames";
 
 const DISMISS_THRESHOLD_PX = 110;
-/** 스와이프 속도 +120% (기존 대비 2.2배) */
-const SWIPE_SPEED_MULTIPLIER = 2.2;
+/** 스와이프 속도 +250% (기존 대비 3.5배) */
+const SWIPE_SPEED_MULTIPLIER = 3.5;
 const OPACITY_STORAGE_KEY = "student-card-opacity";
 const DEFAULT_CARD_OPACITY = 0.92;
 

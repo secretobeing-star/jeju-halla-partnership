@@ -310,3 +310,29 @@ export function cachePwaLoadingSettings(settings?: SitePwaSettingsSource | null)
     // ignore storage errors
   }
 }
+
+/** 오프라인 여부 확인 (SSR 세이프) */
+export function isPwaOffline(): boolean {
+  if (typeof window === "undefined" || typeof navigator === "undefined") {
+    return false;
+  }
+  return !navigator.onLine;
+}
+
+/** 오프라인/온라인 상태 감지 이벤트 리스너 등록 */
+export function subscribePwaNetworkStatus(onChange: (online: boolean) => void) {
+  if (typeof window === "undefined") {
+    return () => {};
+  }
+
+  const handleOnline = () => onChange(true);
+  const handleOffline = () => onChange(false);
+
+  window.addEventListener("online", handleOnline);
+  window.addEventListener("offline", handleOffline);
+
+  return () => {
+    window.removeEventListener("online", handleOnline);
+    window.removeEventListener("offline", handleOffline);
+  };
+}
