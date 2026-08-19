@@ -22,6 +22,7 @@ import { SITE_STUDENT_NEED_LOGIN_EVENT } from "@/lib/site-student-auth-settings"
 
 const DEFAULT_TAB_ID = "__default_partners__";
 const DEFAULT_STAMP_BAR_BG = "#ecfdf5";
+const DEFAULT_DISTANCE_ERROR_MSG = "제휴처와의 거리가 {distance}m 남았습니다. 지정된 반경({radius}m) 내에서 도장을 찍어주세요.";
 
 function stampBarCssVars(
   event: Pick<MapEvent, "stamp_bar_bg_color" | "stamp_bar_bg_img">,
@@ -63,7 +64,7 @@ type MapEventMapSectionProps = {
 };
 
 type RewardModalState = {
-  kind: "win" | "lose" | "completion";
+  kind: "win" | "lose" | "completion" | "distance";
   title: string;
   body: string;
   banner: string | null;
@@ -114,13 +115,14 @@ const sendMapStampLog = (params: {
 };
 
 export default function MapEventMapSection(props: MapEventMapSectionProps) {
-  const [config, setConfig] = useState<MapAppConfig>({
+  const [config, setConfig] = useState<MapAppConfig & { distance_error_message?: string }>({
     default_map_tab_name: DEFAULT_MAP_TAB_NAME,
     default_map_marker_img: "",
     default_benefit_btn_label: DEFAULT_BENEFIT_BTN_LABEL,
     event_stamp_btn_label: DEFAULT_STAMP_BTN_LABEL,
+    distance_error_message: DEFAULT_DISTANCE_ERROR_MSG,
   });
-  const [events, setEvents] = useState<MapEvent[]>([]);
+  const [events, setEvents] = useState<(MapEvent & { distance_error_message?: string })[]>([]);
   const [activeTabId, setActiveTabId] = useState(DEFAULT_TAB_ID);
   const [progress, setProgress] = useState<UserEventProgress | null>(null);
   const [busy, setBusy] = useState(false);
@@ -172,8 +174,8 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         fetch("/api/map-events/config", { cache: "no-store" }),
         fetch("/api/map-events", { cache: "no-store" }),
       ]);
-      const configPayload = (await configRes.json()) as { config?: MapAppConfig };
-      const eventsPayload = (await eventsRes.json()) as { events?: MapEvent[] };
+      const configPayload = (await configRes.json()) as { config?: MapAppConfig & { distance_error_message?: string } };
+      const eventsPayload = (await eventsRes.json()) as { events?: (MapEvent & { distance_error_message?: string })[] };
       if (configPayload.config) setConfig(configPayload.config);
       setEvents((eventsPayload.events ?? []).filter((event) => isEventLive(event)));
     } catch {
@@ -302,9 +304,39 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         guaranteed?: { reward?: MapEventReward | null };
         step?: { won?: boolean; reward?: MapEventReward | null };
         completion?: { reached?: boolean; reward?: MapEventReward | null };
-        messages?: { win?: string; lose?: string; completion?: string };
+        messages?: { win?: string; lose?: string; completion?: string; distance?: string };
+        distanceError?: boolean;
+        distanceMeters?: number;
+        radiusMeters?: number;
       };
+
       if (!response.ok) {
+        if (payload.distanceError) {
+          // 관리자 커스텀 메시지 템플릿 치환 로직
+          const template =
+            payload.messages?.distance ||
+            activeEvent.distance_error_message ||
+            config.distance_error_message ||
+            DEFAULT_DISTANCE_ERROR_MSG;
+
+          const distanceVal = Math.round(payload.distanceMeters ?? 0);
+          const radiusVal = Math.round(payload.radiusMeters ?? 50);
+
+          const formattedBody = template
+            .replace(/\{distance\}/g, String(distanceVal))
+            .replace(/\{radius\}/g, String(radiusVal));
+
+          setRewardModal({
+            kind: "distance",
+            title: "거리 확인 안내",
+            body: payload.error || formattedBody,
+            banner: activeEvent.banner_img || null,
+            rewardName: null,
+            rewardImg: null,
+            showGiftButton: false,
+          });
+          return;
+        }
         throw new Error(payload.error || "도장을 찍지 못했습니다.");
       }
       if (payload.progress) setProgress(payload.progress);
@@ -509,7 +541,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
               <img src={rewardModal.banner} alt="" className="map-event-modal__banner" />
             ) : null}
             <h3 className="map-event-modal__title">{rewardModal.title}</h3>
-            <p className="map-event-modal__body">{rewardModal.body}</p>
+            <p className="map-event-modal__body" style={{ whiteSpace: "pre-line" }}>{rewardModal.body}</p>
             {rewardModal.rewardImg ? (
               <img src={rewardModal.rewardImg} alt="" className="map-event-modal__reward-img" />
             ) : null}

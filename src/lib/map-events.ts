@@ -43,6 +43,7 @@ export type MapEvent = {
   stamp_bar_bg_color: string | null;
   completion_badge_img: string | null;
   guide_text: string | null;
+  distance_error_message: string | null;
   win_message: string | null;
   lose_message: string | null;
   completion_message: string | null;

@@ -41,6 +41,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     patch.cooldown_minutes = Math.max(0, Number(body.cooldown_minutes) || 0);
   }
   if (typeof body.guide_text === "string") patch.guide_text = body.guide_text.trim() || null;
+  if (typeof body.distance_error_message === "string") patch.distance_error_message = body.distance_error_message.trim() || null;
   if (typeof body.win_message === "string") patch.win_message = body.win_message.trim() || null;
   if (typeof body.lose_message === "string") patch.lose_message = body.lose_message.trim() || null;
   if (typeof body.completion_message === "string") {

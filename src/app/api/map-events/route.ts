@@ -29,6 +29,7 @@ type EventRow = {
   stamp_bar_bg_color?: string | null;
   completion_badge_img?: string | null;
   guide_text?: string | null;
+  distance_error_message?: string | null;
   win_message?: string | null;
   lose_message?: string | null;
   completion_message?: string | null;
@@ -56,6 +57,7 @@ function mapEventRow(row: EventRow, extras?: Partial<MapEvent>): MapEvent {
     stamp_bar_bg_color: row.stamp_bar_bg_color ?? null,
     completion_badge_img: row.completion_badge_img ?? null,
     guide_text: row.guide_text ?? null,
+    distance_error_message: row.distance_error_message ?? null,
     win_message: row.win_message ?? null,
     lose_message: row.lose_message ?? null,
     completion_message: row.completion_message ?? null,
@@ -184,6 +186,7 @@ export async function POST(request: NextRequest) {
     stamp_bar_bg_color: body.stamp_bar_bg_color?.trim() || null,
     completion_badge_img: body.completion_badge_img?.trim() || null,
     guide_text: body.guide_text?.trim() || null,
+    distance_error_message: body.distance_error_message?.trim() || null,
     win_message: body.win_message?.trim() || null,
     lose_message: body.lose_message?.trim() || null,
     completion_message: body.completion_message?.trim() || null,

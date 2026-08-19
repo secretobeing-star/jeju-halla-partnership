@@ -164,11 +164,16 @@ export async function POST(request: NextRequest) {
   const radius = Math.max(1, Number(event.radius_meters) || DEFAULT_RADIUS_METERS);
   const distance = haversineMeters(userLat, userLng, placeLat, placeLng);
   if (distance > radius) {
+    const customMsg = typeof event.distance_error_message === "string" && event.distance_error_message.trim()
+      ? event.distance_error_message.trim()
+      : null;
+    const defaultMsg = `제휴처 ${Math.round(radius)}m 안에서만 도장을 찍을 수 있습니다. (현재 약 ${Math.round(distance)}m)`;
     return NextResponse.json(
       {
-        error: `제휴처 ${Math.round(radius)}m 안에서만 도장을 찍을 수 있습니다. (현재 약 ${Math.round(distance)}m)`,
+        error: customMsg || defaultMsg,
         distanceMeters: Math.round(distance),
         radiusMeters: radius,
+        distanceError: true,
       },
       { status: 403 },
     );
