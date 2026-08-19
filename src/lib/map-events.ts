@@ -20,7 +20,7 @@ export type MapAppConfig = {
   default_map_tab_name: string;
   default_map_marker_img: string;
   default_benefit_btn_label: string;
-  event_stamp_btn_label: string;
+  event_stamp_btn_label?: string;
 };
 
 export type MapEvent = {
@@ -246,6 +246,7 @@ export function configFromRows(rows: Array<{ key?: string; value?: string | null
     default_map_marker_img: marker,
     default_benefit_btn_label:
       map.get(DEFAULT_BENEFIT_BTN_LABEL_KEY)?.trim() || DEFAULT_BENEFIT_BTN_LABEL,
-    event_stamp_btn_label: map.get(EVENT_STAMP_BTN_LABEL_KEY)?.trim() || DEFAULT_STAMP_BTN_LABEL,
+    event_stamp_btn_label:
+      map.get(EVENT_STAMP_BTN_LABEL_KEY)?.trim() || DEFAULT_STAMP_BTN_LABEL,
   };
 }
