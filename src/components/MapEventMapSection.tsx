@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import PartnerMainMapPanel from "@/components/PartnerMainMapPanel";
 import {
   DEFAULT_BENEFIT_BTN_LABEL,
@@ -113,15 +113,32 @@ const sendMapStampLog = (params: {
 };
 
 export default function MapEventMapSection(props: MapEventMapSectionProps) {
-  const [config, setConfig] = useState<MapAppConfig & { distance_error_message?: string; login_required_message?: string }>({
+  const [config, setConfig] = useState<
+    MapAppConfig & {
+      distance_error_message?: string;
+      login_required_message?: string;
+      win_popup_title?: string;
+      completion_popup_title?: string;
+    }
+  >({
     default_map_tab_name: DEFAULT_MAP_TAB_NAME,
     default_map_marker_img: "",
     default_benefit_btn_label: DEFAULT_BENEFIT_BTN_LABEL,
     event_stamp_btn_label: DEFAULT_STAMP_BTN_LABEL,
     distance_error_message: DEFAULT_DISTANCE_ERROR_MSG,
     login_required_message: DEFAULT_LOGIN_REQUIRED_MSG,
+    win_popup_title: "당첨",
+    completion_popup_title: "완주 보상",
   });
-  const [events, setEvents] = useState<(MapEvent & { distance_error_message?: string; login_required_message?: string })[]>([]);
+
+  const [events, setEvents] = useState<
+    (MapEvent & {
+      distance_error_message?: string;
+      login_required_message?: string;
+      win_popup_title?: string;
+      completion_popup_title?: string;
+    })[]
+  >([]);
   const [activeTabId, setActiveTabId] = useState(DEFAULT_TAB_ID);
   const [progress, setProgress] = useState<UserEventProgress | null>(null);
   const [busy, setBusy] = useState(false);
@@ -129,14 +146,27 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const [rewardModal, setRewardModal] = useState<RewardModalState | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
 
-  // ⚡ 페이지 진입 즉시 GPS 좌표를 백그라운드 사전 캐싱 (클릭 시 0초 딜레이)
-  useEffect(() => {
+  // ⚡ 최신 위치 정보를 항상 메모리에 보유 (클릭 시 비동기 딜레이 0초 달성)
+  const lastKnownGeoRef = useRef<{ latitude: number; longitude: number } | null>(null);
+
+  const refreshLocationCache = useCallback(() => {
     void getCurrentGeolocation({
       enableHighAccuracy: false,
-      maximumAge: 120_000,
-      timeout: 5_000,
-    }).catch(() => {});
+      maximumAge: 180_000,
+      timeout: 3_000,
+    })
+      .then((geo) => {
+        lastKnownGeoRef.current = { latitude: geo.latitude, longitude: geo.longitude };
+      })
+      .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    refreshLocationCache();
+    // 30초마다 백그라운드에서 최신 위치 갱신
+    const interval = window.setInterval(refreshLocationCache, 30_000);
+    return () => window.clearInterval(interval);
+  }, [refreshLocationCache]);
 
   const liveEvents = useMemo(
     () => events.filter((event) => isEventLive(event, nowMs)),
@@ -144,6 +174,8 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   );
 
   const activeEvent = liveEvents.find((event) => event.id === activeTabId) ?? null;
+  const isDefaultTab = activeTabId === DEFAULT_TAB_ID;
+
   const cooldownRemainMs = remainingCooldownMs(
     progress?.last_stamped_at,
     activeEvent?.cooldown_minutes ?? 0,
@@ -182,8 +214,22 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         fetch("/api/map-events/config", { cache: "no-store" }),
         fetch("/api/map-events", { cache: "no-store" }),
       ]);
-      const configPayload = (await configRes.json()) as { config?: MapAppConfig & { distance_error_message?: string; login_required_message?: string } };
-      const eventsPayload = (await eventsRes.json()) as { events?: (MapEvent & { distance_error_message?: string; login_required_message?: string })[] };
+      const configPayload = (await configRes.json()) as {
+        config?: MapAppConfig & {
+          distance_error_message?: string;
+          login_required_message?: string;
+          win_popup_title?: string;
+          completion_popup_title?: string;
+        };
+      };
+      const eventsPayload = (await eventsRes.json()) as {
+        events?: (MapEvent & {
+          distance_error_message?: string;
+          login_required_message?: string;
+          win_popup_title?: string;
+          completion_popup_title?: string;
+        })[];
+      };
       if (configPayload.config) setConfig(configPayload.config);
       setEvents((eventsPayload.events ?? []).filter((event) => isEventLive(event)));
     } catch {
@@ -233,7 +279,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return () => window.removeEventListener("site-stamp-progress-changed", onStampChanged);
   }, [loadProgress]);
 
-  // 좋아요(즐겨찾기)를 누른 매장에만 pinImageUrl 부여
   const visiblePartners = useMemo(() => {
     const pin =
       activeEvent?.marker_icon_img?.trim() ||
@@ -260,13 +305,12 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   );
 
   async function handleStamp(partner: { id: string; name: string }) {
-    if (!activeEvent || busy) return;
+    if (isDefaultTab || !activeEvent || busy) return;
     if (!isEventLive(activeEvent)) {
       setMessage("이벤트 기간이 종료되어 도장을 찍을 수 없습니다.");
       return;
     }
 
-    // 좋아요(즐겨찾기)하지 않은 매장은 참여 차단
     const isFavorited = Boolean(props.favoritePartnerIds?.has(partner.id));
     if (props.favoritesEnabled && !isFavorited) {
       setRewardModal({
@@ -286,10 +330,9 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     const sessionName = sessionStudent?.name?.trim() || "";
     const sessionDepartment = sessionStudent?.department?.trim() || "";
 
-    // 비로그인 사용자: 커스텀 로그인 안내 팝업창 모달 노출
     if (!sessionUserId || !sessionStudent || !sessionName) {
       const loginMsg =
-        (activeEvent as unknown as { login_required_message?: string })?.login_required_message?.trim() ||
+        activeEvent.login_required_message?.trim() ||
         config.login_required_message?.trim() ||
         DEFAULT_LOGIN_REQUIRED_MSG;
 
@@ -319,16 +362,27 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       return;
     }
 
+    // ⚡ 즉시 중복 클릭 방지 플래그 On
     setBusy(true);
     setMessage(null);
 
-    try {
-      const geo = await getCurrentGeolocation({
-        enableHighAccuracy: false,
-        maximumAge: 120_000,
-        timeout: 3000,
-      });
+    // ⚡ 메모리 캐시 우선 확인 (없을 시에만 빠른 비동기 조회)
+    let geo = lastKnownGeoRef.current;
+    if (!geo) {
+      try {
+        const fetched = await getCurrentGeolocation({
+          enableHighAccuracy: false,
+          maximumAge: 180_000,
+          timeout: 1500,
+        });
+        geo = { latitude: fetched.latitude, longitude: fetched.longitude };
+        lastKnownGeoRef.current = geo;
+      } catch {
+        geo = { latitude: 0, longitude: 0 };
+      }
+    }
 
+    try {
       const response = await fetch("/api/event/stamp-action", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -354,6 +408,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         step?: { won?: boolean; reward?: MapEventReward | null };
         completion?: { reached?: boolean; reward?: MapEventReward | null };
         messages?: { win?: string; lose?: string; completion?: string; distance?: string };
+        titles?: { win?: string; completion?: string };
         distanceError?: boolean;
         distanceMeters?: number;
         radiusMeters?: number;
@@ -397,6 +452,12 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       const popupKind = payload.popup || (payload.completion?.reached ? "completion" : (payload.giftCount ?? 0) > 0 ? "win" : "lose");
 
       if (popupKind === "completion") {
+        const completionTitle =
+          payload.titles?.completion ||
+          activeEvent.completion_popup_title?.trim() ||
+          config.completion_popup_title?.trim() ||
+          "완주 보상";
+
         const completionMsg =
           payload.messages?.completion ||
           (activeEvent as unknown as { completion_popup_message?: string })?.completion_popup_message ||
@@ -404,7 +465,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
         setRewardModal({
           kind: "completion",
-          title: "완주 보상",
+          title: completionTitle,
           body: completionMsg,
           banner: activeEvent.banner_img,
           rewardName: completionReward?.reward_name || winReward?.reward_name || null,
@@ -412,6 +473,12 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
           showGiftButton: (payload.giftCount ?? 0) > 0,
         });
       } else if (popupKind === "win") {
+        const winTitle =
+          payload.titles?.win ||
+          activeEvent.win_popup_title?.trim() ||
+          config.win_popup_title?.trim() ||
+          "당첨";
+
         const winMsg =
           payload.messages?.win ||
           (activeEvent as unknown as { win_popup_message?: string })?.win_popup_message ||
@@ -419,7 +486,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
         setRewardModal({
           kind: "win",
-          title: "당첨",
+          title: winTitle,
           body: winMsg,
           banner: activeEvent.banner_img,
           rewardName: winReward?.reward_name || null,
@@ -443,6 +510,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         });
       }
 
+      // ⚡ 백그라운드 비동기 로그 전송
       setTimeout(() => {
         sendMapStampLog({
           action: popupKind === "completion" ? "스탬프 완주" : "도장 찍기",
@@ -472,12 +540,8 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const completionPreview = activeEvent ? completionRewardsOf(activeEvent)[0] : null;
   const completionBadgeSrc =
     activeEvent?.completion_badge_img?.trim() || completionPreview?.reward_img || null;
-  const stampEnabled =
-    Boolean(activeEvent) &&
-    activeTabId !== DEFAULT_TAB_ID &&
-    isEventLive(activeEvent!) &&
-    !progress?.is_completed &&
-    cooldownRemainMs <= 0;
+
+  const isStampFeatureActive = !isDefaultTab && Boolean(activeEvent) && isEventLive(activeEvent!) && !progress?.is_completed;
 
   const currentStampBtnLabel =
     (activeEvent as unknown as { stamp_btn_label?: string })?.stamp_btn_label?.trim() ||
@@ -510,7 +574,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         ))}
       </div>
 
-      {activeEvent ? (
+      {activeEvent && !isDefaultTab ? (
         <div className="map-event-stamp-bar" style={stampBarCssVars(activeEvent)}>
           <div className="map-event-stamp-bar__copy">
             <p className="map-event-stamp-bar__title">{activeEvent.title}</p>
@@ -570,14 +634,16 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         partners={visiblePartners}
         markerSettings={props.markerSettings}
         stampAction={
-          activeEvent && stampEnabled
+          isStampFeatureActive
             ? {
                 enabled: true,
                 stampedPlaceIds,
                 label:
-                  cooldownRemainMs > 0
-                    ? `${formatCooldownRemain(cooldownRemainMs)} 후 가능`
-                    : currentStampBtnLabel,
+                  busy
+                    ? "확인 중..."
+                    : cooldownRemainMs > 0
+                      ? `${formatCooldownRemain(cooldownRemainMs)} 후 가능`
+                      : currentStampBtnLabel,
                 onStamp: (partner) => {
                   void handleStamp(partner);
                 },
