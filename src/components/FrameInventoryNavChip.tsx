@@ -56,14 +56,14 @@ const STORAGE_KEY_PAGE_SIZE = "halla_costume_page_size";
 type FrameInventoryNavChipProps = {
   cardFrames: PublicCardFrameItem[];
   hideChip?: boolean;
-  /** 기본 노출 개수 (관리자 설정이 없을 때 사용) */
+  /** 기본 노출 개수: 5개 설정 */
   defaultPageSize?: number;
 };
 
 export default function FrameInventoryNavChip({
   cardFrames,
   hideChip = false,
-  defaultPageSize = 4,
+  defaultPageSize = 5,
 }: FrameInventoryNavChipProps) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -180,7 +180,7 @@ export default function FrameInventoryNavChip({
     ];
   }, [unlocked]);
 
-  // 페이지 연산
+  // 페이지 연산 (기본 5개 단위)
   const totalPages = Math.max(1, Math.ceil(allDisplayItems.length / effectivePageSize));
   const paginatedItems = useMemo(() => {
     const start = (currentPage - 1) * effectivePageSize;
@@ -284,7 +284,7 @@ export default function FrameInventoryNavChip({
                   </p>
                 ) : (
                   <>
-                    {/* [상단 카드] 정중앙 정렬 학생증 카드 영역 */}
+                    {/* [상단 카드] 중앙 정렬 학생증 카드 영역 */}
                     <div 
                       className="w-full flex flex-col items-center justify-center bg-white border border-gray-200/90 rounded-2xl p-3 shadow-xs select-none touch-pan-y"
                       onTouchStart={onTouchStart}
@@ -370,7 +370,7 @@ export default function FrameInventoryNavChip({
                       </div>
                     </div>
 
-                    {/* [하단 목록 영역] 관리자 N개 페이지네이션 */}
+                    {/* [하단 목록 영역] 5개 단위 페이지네이션 */}
                     <div className="w-full flex flex-col bg-white border border-gray-200/90 rounded-2xl p-3 shadow-xs">
                       <div className="flex items-center justify-between mb-2 px-0.5">
                         <p className="text-xs font-bold text-gray-700">
