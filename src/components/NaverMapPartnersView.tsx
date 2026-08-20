@@ -25,6 +25,7 @@ import { usePartnerMapLocate } from "@/lib/use-partner-map-locate";
 import PartnerMapLocateControl from "@/components/PartnerMapLocateControl";
 import { hasValidPartnerMapCoords } from "@/lib/partner-map-url";
 import { formatHeartCountdown, type MapEvent } from "@/lib/map-events";
+import { supabase } from "@/lib/supabase";
 
 export type { NaverMapPartnerMarker };
 
@@ -66,7 +67,7 @@ function formatEventTimeBadge(endAt: string, timeIcon = "⏰", timeFormat = "D_D
     return `${icon}${pad(totalHours)}:${pad(minutes)}:${pad(seconds)}`;
   }
 
-  // D_DAY_TIME (기본값)
+  // D_DAY_TIME
   if (days > 0) {
     return `${icon}${days}일 ${pad(hours)}:${pad(minutes)}`;
   }
@@ -142,44 +143,68 @@ export default function NaverMapPartnersView({
   const [mapRevealed, setMapRevealed] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  // [핵심] 활성 이벤트 데이터를 자체적으로 로드 및 동기화
-  const [fetchedEvent, setFetchedEvent] = useState<MapEvent | null>(null);
+  // Supabase에서 활성 이벤트를 실시간으로 직접 조회
+  const [activeDbEvent, setActiveDbEvent] = useState<MapEvent | null>(null);
 
   useEffect(() => {
-    let cancelled = false;
-    void fetch("/api/map-events")
-      .then((res) => res.json())
-      .then((data: { events?: MapEvent[] }) => {
-        if (cancelled || !data?.events) return;
-        const active = data.events.find((ev) => ev.is_active) ?? data.events[0] ?? null;
-        if (active) setFetchedEvent(active);
-      })
-      .catch(() => {});
+    let isCancelled = false;
+
+    async function fetchActiveEvent() {
+      try {
+        const { data, error } = await supabase
+          .from("map_events")
+          .select("*")
+          .eq("is_active", true)
+          .order("created_at", { ascending: false })
+          .limit(1);
+
+        if (error) {
+          // fallback to /api/map-events
+          const res = await fetch("/api/map-events");
+          const json = (await res.json()) as { events?: MapEvent[] };
+          if (!isCancelled && json.events?.length) {
+            const ev = json.events.find((e) => e.is_active) ?? json.events[0];
+            setActiveDbEvent(ev);
+          }
+          return;
+        }
+
+        if (!isCancelled && data && data.length > 0) {
+          setActiveDbEvent(data[0] as MapEvent);
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    void fetchActiveEvent();
     return () => {
-      cancelled = true;
+      isCancelled = true;
     };
   }, []);
 
-  // 이벤트 설정 병합
-  const effectiveEventEndAt = favoriteCountdownEndAt || fetchedEvent?.end_at || null;
+  const effectiveEndAt = favoriteCountdownEndAt || activeDbEvent?.end_at || null;
   const effectiveStampLabel =
-    stampAction?.label?.trim() || fetchedEvent?.stamp_btn_label?.trim() || "도장 찍기";
+    activeDbEvent?.stamp_btn_label?.trim() ||
+    stampAction?.label?.trim() ||
+    "도장 찍기";
 
   const effectiveMarkerSettings = useMemo<MapMarkerCustomSettings>(() => {
-    const extra = (fetchedEvent ?? {}) as unknown as {
+    const extra = (activeDbEvent ?? {}) as unknown as {
       marker_border_color?: string;
       marker_time_icon?: string;
       marker_time_format?: string;
     };
+
     return {
-      borderColor: initialMarkerSettings?.borderColor || extra.marker_border_color || null,
-      topIconImg: initialMarkerSettings?.topIconImg || fetchedEvent?.marker_icon_img || null,
-      timeIcon: initialMarkerSettings?.timeIcon || extra.marker_time_icon || "⏰",
-      timeFormat: initialMarkerSettings?.timeFormat || extra.marker_time_format || "D_DAY_TIME",
+      borderColor: extra.marker_border_color || initialMarkerSettings?.borderColor || null,
+      topIconImg: activeDbEvent?.marker_icon_img || initialMarkerSettings?.topIconImg || null,
+      timeIcon: extra.marker_time_icon || initialMarkerSettings?.timeIcon || "🔥",
+      timeFormat: extra.marker_time_format || initialMarkerSettings?.timeFormat || "D_DAY_TIME",
       thumbnailEnabled: initialMarkerSettings?.thumbnailEnabled ?? true,
       bgImg: initialMarkerSettings?.bgImg || null,
     };
-  }, [initialMarkerSettings, fetchedEvent]);
+  }, [initialMarkerSettings, activeDbEvent]);
 
   const markerSettingsRef = useRef(effectiveMarkerSettings);
 
@@ -223,7 +248,6 @@ export default function NaverMapPartnersView({
     markerSettingsRef.current = effectiveMarkerSettings;
   }, [effectiveMarkerSettings]);
 
-  // 도장 버튼 라벨 변경 시 열려있는 카드에도 실시간 반영
   useEffect(() => {
     stampActionRef.current = stampAction;
     const openCard = miniCardElementRef.current;
@@ -249,8 +273,8 @@ export default function NaverMapPartnersView({
   }, [detailButtonLabel]);
 
   useEffect(() => {
-    favoriteCountdownEndAtRef.current = effectiveEventEndAt;
-  }, [effectiveEventEndAt]);
+    favoriteCountdownEndAtRef.current = effectiveEndAt;
+  }, [effectiveEndAt]);
 
   useEffect(() => {
     favoritePartnerIdsRef.current = favoritePartnerIds;
@@ -304,7 +328,7 @@ export default function NaverMapPartnersView({
           if (settings?.timeFormat) {
             badgeText = formatEventTimeBadge(
               endAt,
-              settings.timeIcon || "⏰",
+              settings.timeIcon || "🔥",
               settings.timeFormat,
             );
           } else {
@@ -319,7 +343,7 @@ export default function NaverMapPartnersView({
     tick();
     const timerId = window.setInterval(tick, 1000);
     return () => window.clearInterval(timerId);
-  }, [effectiveEventEndAt, favoritePartnerIds, favoritesEnabled, mapReady, effectiveMarkerSettings]);
+  }, [effectiveEndAt, favoritePartnerIds, favoritesEnabled, mapReady, effectiveMarkerSettings]);
 
   useEffect(() => {
     let cancelled = false;
@@ -585,7 +609,7 @@ export default function NaverMapPartnersView({
               onFavoriteToggleRef.current?.(partner.id);
             }
           : undefined,
-        stamp: activeStampAction?.enabled || fetchedEvent
+        stamp: activeStampAction?.enabled || activeDbEvent
           ? {
               visible: true,
               disabled: Boolean(activeStampAction?.stampedPlaceIds?.has(partner.id)),
