@@ -182,7 +182,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     nowMs,
   );
 
-  // 1초 단위 타이머 갱신 (쿨다운 중이거나 이벤트 종료 시간이 임박했을 때 활성화)
   useEffect(() => {
     const nextEnd = events
       .map((event) => (event.end_at ? Date.parse(event.end_at) : Number.NaN))
@@ -421,9 +420,25 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         distanceError?: boolean;
         distanceMeters?: number;
         radiusMeters?: number;
+        cooldownError?: boolean;
+        cooldownMs?: number;
       };
 
       if (!response.ok) {
+        // ⚡ 쿨다운 에러 처리 분기 (모달 노출)
+        if (payload.cooldownError) {
+          setRewardModal({
+            kind: "lose",
+            title: "잠시 후 도장을 찍을 수 있어요",
+            body: payload.error || "쿨다운 시간 이후에 다시 시도해 주세요.",
+            banner: null,
+            rewardName: null,
+            rewardImg: null,
+            showGiftButton: false,
+          });
+          return;
+        }
+
         if (payload.distanceError) {
           const template =
             payload.messages?.distance ||
@@ -452,7 +467,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         throw new Error(payload.error || "도장을 찍지 못했습니다.");
       }
 
-      // ⚡ 도장 성공 즉시 last_stamped_at을 보장 주입하여 쿨다운 타이머 즉각 발동
       const stampedNow = new Date().toISOString();
       if (payload.progress) {
         setProgress({
@@ -564,11 +578,12 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
   const maxStamps = activeEvent?.max_stamps ?? 0;
   const current = progress?.current_stamps ?? 0;
+  const isCompleted = Boolean(progress?.is_completed || (maxStamps > 0 && current >= maxStamps));
   const completionPreview = activeEvent ? completionRewardsOf(activeEvent)[0] : null;
   const completionBadgeSrc =
     activeEvent?.completion_badge_img?.trim() || completionPreview?.reward_img || null;
 
-  const isStampFeatureActive = !isDefaultTab && Boolean(activeEvent) && isEventLive(activeEvent!) && !progress?.is_completed;
+  const isStampFeatureActive = !isDefaultTab && Boolean(activeEvent) && isEventLive(activeEvent!) && !isCompleted;
 
   const currentStampBtnLabel =
     (activeEvent as unknown as { stamp_btn_label?: string })?.stamp_btn_label?.trim() ||
@@ -607,9 +622,9 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
             <p className="map-event-stamp-bar__title">{activeEvent.title}</p>
             <p className="map-event-stamp-bar__meta">
               {current} / {maxStamps}
-              {progress?.is_completed ? " · 완주" : ""}
+              {isCompleted ? " · 완주" : ""}
               {!isEventLive(activeEvent) ? " · 기간 종료" : ""}
-              {cooldownRemainMs > 0
+              {!isCompleted && cooldownRemainMs > 0
                 ? ` · ${formatCooldownRemain(cooldownRemainMs)} 후 도장 가능`
                 : ""}
             </p>
