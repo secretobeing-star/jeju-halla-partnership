@@ -224,7 +224,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return () => window.removeEventListener("site-stamp-progress-changed", onStampChanged);
   }, [loadProgress]);
 
-  // 👈 좋아요(즐겨찾기)를 누른 매장에만 pinImageUrl 부여 (나머지는 null 처리하여 불꽃 아이콘 미표시)
+  // 좋아요(즐겨찾기)를 누른 매장에만 pinImageUrl 부여[cite: 6]
   const visiblePartners = useMemo(() => {
     const pin =
       activeEvent?.marker_icon_img?.trim() ||
@@ -257,7 +257,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       return;
     }
 
-    // 💖 좋아요(즐겨찾기)하지 않은 매장은 참여 차단
+    // 좋아요(즐겨찾기)하지 않은 매장은 참여 차단[cite: 6]
     const isFavorited = Boolean(props.favoritePartnerIds?.has(partner.id));
     if (props.favoritesEnabled && !isFavorited) {
       setRewardModal({
@@ -277,7 +277,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     const sessionName = sessionStudent?.name?.trim() || "";
     const sessionDepartment = sessionStudent?.department?.trim() || "";
 
-    // 🔒 비로그인 사용자: 커스텀 로그인 안내 팝업창 모달 노출
+    // 비로그인 사용자: 커스텀 로그인 안내 팝업창 모달 노출[cite: 6]
     if (!sessionUserId || !sessionStudent || !sessionName) {
       const loginMsg =
         (activeEvent as unknown as { login_required_message?: string })?.login_required_message?.trim() ||
@@ -561,9 +561,9 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         partners={visiblePartners}
         markerSettings={props.markerSettings}
         stampAction={
-          activeEvent
+          activeEvent && stampEnabled
             ? {
-                enabled: stampEnabled,
+                enabled: true,
                 stampedPlaceIds,
                 label:
                   cooldownRemainMs > 0

@@ -310,7 +310,7 @@ export default function NaverMapPartnersView({
           favoritesEnabledRef.current && favoritePartnerIdsRef.current?.has(partnerId),
         );
 
-        // 👈 오직 좋아요한 마커에만 D-Day 시간 배지 표시
+        // 오직 좋아요한 마커에만 D-Day 시간 배지 표시
         const show = isFavorite && Boolean(endAt);
 
         let badgeText: string | null = null;
@@ -581,7 +581,7 @@ export default function NaverMapPartnersView({
 
       const activeStampAction = stampActionRef.current ?? stampAction;
       const isFav = Boolean(
-        favoritesEnabledRef.current && favoritePartnerIdsRef.current?.has(partner.id),
+        favoritesEnabledRef.current && favoritePartnerIdsRef.current?.has(partner.id)
       );
 
       const card = createPartnerMapMiniCardElement(partner, () => {
@@ -601,14 +601,13 @@ export default function NaverMapPartnersView({
               onFavoriteToggleRef.current?.(partner.id);
             }
           : undefined,
-        stamp: activeStampAction?.enabled || activeDbEvent
+        // 좋아요를 누른 매장에만 도장 버튼 전달 (안 누른 매장은 비활성 버튼도 숨김 처리)
+        stamp: (activeStampAction?.enabled || activeDbEvent) && isFav
           ? {
               visible: true,
-              // 👈 좋아요를 안 눌렀으면 버튼 비활성화 및 안내 라벨 표시
-              disabled: !isFav || Boolean(activeStampAction?.stampedPlaceIds?.has(partner.id)),
-              label: !isFav ? "💖 좋아요 후 도장 가능" : effectiveStampLabel,
+              disabled: Boolean(activeStampAction?.stampedPlaceIds?.has(partner.id)),
+              label: effectiveStampLabel,
               onStamp: () => {
-                if (!isFav) return;
                 activeStampAction?.onStamp(partner);
               },
             }
@@ -667,7 +666,7 @@ export default function NaverMapPartnersView({
 
         const isFav = favoritesEnabled && Boolean(favoritePartnerIds?.has(partner.id));
 
-        // 👈 좋아요를 누른 매장에만 상단 핀(불꽃) 렌더링, 미즐겨찾기는 일반 마커로 출력
+        // 좋아요를 누른 매장에만 상단 핀(불꽃) 렌더링, 미즐겨찾기는 일반 마커로 출력
         const customSettingsForMarker = isFav
           ? effectiveMarkerSettings
           : { ...effectiveMarkerSettings, topIconImg: null };
