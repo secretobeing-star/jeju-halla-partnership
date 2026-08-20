@@ -9,9 +9,9 @@ export const PWA_INSTALL_DISMISS_STORAGE_KEY = "site-pwa-install-dismissed-v4";
 export const PWA_OPEN_DISMISS_STORAGE_KEY = "site-pwa-open-dismissed-v2";
 export const PWA_INSTALLED_STORAGE_KEY = "site-pwa-installed-v1";
 /** User-facing PWA release version (shown in app settings). */
-export const PWA_APP_VERSION = "1.3.2";
+export const PWA_APP_VERSION = "1.3.3";
 /** Bump only when a fresh Android WebAPK mint is required (e.g. Play Protect cache). */
-export const PWA_MANIFEST_ID = "/?pwa=1.3.2";
+export const PWA_MANIFEST_ID = "/?pwa=1.3.3";
 
 export type SitePwaSettingsSource = {
   site_pwa_enabled?: boolean;
@@ -204,7 +204,6 @@ export function buildPwaManifest(settings: SitePwaSettingsSource | null | undefi
     scope,
     display: "standalone" as const,
     display_override: ["standalone", "window-controls-overlay", "minimal-ui"] as const,
-    // orientation 생략 — OS 자동회전 잠금을 따름. "any" 등을 넣으면 Android WebAPK가 잠금을 무시함.
     background_color: backgroundColor,
     theme_color: themeColor,
     lang: "ko",
