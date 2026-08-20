@@ -24,6 +24,9 @@ type EventRow = {
   stamp_active_img: string | null;
   stamp_inactive_img: string | null;
   marker_icon_img: string | null;
+  marker_border_color?: string | null;
+  marker_time_icon?: string | null;
+  marker_time_format?: string | null;
   banner_img: string | null;
   stamp_bar_bg_img?: string | null;
   stamp_bar_bg_color?: string | null;
@@ -56,6 +59,9 @@ function mapEventRow(row: EventRow, extras?: Partial<MapEvent>): MapEvent {
     stamp_active_img: row.stamp_active_img,
     stamp_inactive_img: row.stamp_inactive_img,
     marker_icon_img: row.marker_icon_img,
+    marker_border_color: row.marker_border_color ?? (extras as any)?.marker_border_color ?? null,
+    marker_time_icon: row.marker_time_icon ?? (extras as any)?.marker_time_icon ?? "⏰",
+    marker_time_format: row.marker_time_format ?? (extras as any)?.marker_time_format ?? "D_DAY_TIME",
     banner_img: row.banner_img,
     stamp_bar_bg_img: row.stamp_bar_bg_img ?? null,
     stamp_bar_bg_color: row.stamp_bar_bg_color ?? null,
@@ -159,9 +165,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Supabase 서버 설정이 없습니다." }, { status: 503 });
   }
 
-  let body: Partial<MapEvent> & { partner_ids?: string[] };
+  let body: Partial<MapEvent> & {
+    partner_ids?: string[];
+    marker_border_color?: string;
+    marker_time_icon?: string;
+    marker_time_format?: string;
+  };
   try {
-    body = (await request.json()) as Partial<MapEvent> & { partner_ids?: string[] };
+    body = (await request.json()) as any;
   } catch {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
@@ -187,6 +198,9 @@ export async function POST(request: NextRequest) {
     stamp_active_img: body.stamp_active_img?.trim() || null,
     stamp_inactive_img: body.stamp_inactive_img?.trim() || null,
     marker_icon_img: body.marker_icon_img?.trim() || null,
+    marker_border_color: body.marker_border_color?.trim() || null,
+    marker_time_icon: body.marker_time_icon?.trim() || "⏰",
+    marker_time_format: body.marker_time_format || "D_DAY_TIME",
     banner_img: body.banner_img?.trim() || null,
     stamp_bar_bg_img: body.stamp_bar_bg_img?.trim() || null,
     stamp_bar_bg_color: body.stamp_bar_bg_color?.trim() || null,
