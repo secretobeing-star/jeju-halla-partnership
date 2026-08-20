@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useAppBackHandler } from "@/lib/app-back-stack";
 import { getSiteMemberSession, SITE_MEMBER_SESSION_EVENT } from "@/lib/site-member-session";
@@ -69,6 +69,10 @@ export default function FrameInventoryNavChip({
     activeFrameId: null,
     sources: {},
   });
+  const [swipeState, setSwipeState] = useState<{ frameId: string; startX: number; currentX: number } | null>(null);
+  const [viewMode, setViewMode] = useState<"grid" | "detail">("grid");
+  const [selectedFrame, setSelectedFrame] = useState<PublicCardFrameItem | null>(null);
+  const touchStartRef = useRef<{ frameId: string; startX: number } | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -118,13 +122,68 @@ export default function FrameInventoryNavChip({
     return () => window.removeEventListener("site-frame-inventory-open", onOpen);
   }, [refresh]);
 
-  const close = useCallback(() => setOpen(false), []);
+  const close = useCallback(() => {
+    setOpen(false);
+    setViewMode("grid");
+    setSelectedFrame(null);
+  }, []);
   useAppBackHandler(open, close, "frame-inventory-modal");
 
   const unlocked = useMemo(
     () => cardFrames.filter((frame) => state.unlockedIds.includes(frame.id)),
     [cardFrames, state.unlockedIds],
   );
+
+  // Swipe handlers
+  const handleTouchStart = (e: React.TouchEvent, frameId: string) => {
+    const touch = e.touches[0];
+    touchStartRef.current = { frameId, startX: touch.clientX };
+  };
+
+  const handleTouchMove = (e: React.TouchEvent, frameId: string) => {
+    if (!touchStartRef.current || touchStartRef.current.frameId !== frameId) return;
+    
+    const touch = e.touches[0];
+    const diff = touch.clientX - touchStartRef.current.startX;
+    
+    // Allow both left and right swipe
+    setSwipeState({ frameId, startX: touchStartRef.current.startX, currentX: diff });
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent, frameId: string) => {
+    if (!swipeState || swipeState.frameId !== frameId) {
+      setSwipeState(null);
+      touchStartRef.current = null;
+      return;
+    }
+
+    // Swipe right to select, swipe left to go back to grid
+    if (Math.abs(swipeState.currentX) > 100) {
+      if (viewMode === "grid") {
+        const frame = unlocked.find(f => f.id === frameId);
+        if (frame) {
+          setSelectedFrame(frame);
+          setViewMode("detail");
+        }
+      } else {
+        setViewMode("grid");
+        setSelectedFrame(null);
+      }
+    }
+
+    setSwipeState(null);
+    touchStartRef.current = null;
+  };
+
+  const handleFrameClick = (frame: PublicCardFrameItem) => {
+    setSelectedFrame(frame);
+    setViewMode("detail");
+  };
+
+  const handleBackToGrid = () => {
+    setViewMode("grid");
+    setSelectedFrame(null);
+  };
 
   const modal =
     mounted && open
@@ -139,6 +198,15 @@ export default function FrameInventoryNavChip({
             >
               <div className="site-event-dialog__header">
                 <h2 className="site-event-dialog__title">코스튬 보관함</h2>
+                {viewMode === "detail" && selectedFrame ? (
+                  <button
+                    type="button"
+                    className="px-3 py-1 text-sm rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300"
+                    onClick={handleBackToGrid}
+                  >
+                    ← 목록
+                  </button>
+                ) : null}
                 <button type="button" className="site-event-close ml-auto" onClick={close} aria-label="닫기">
                   <CloseIcon className="h-5 w-5" />
                 </button>
@@ -150,6 +218,53 @@ export default function FrameInventoryNavChip({
                   <p className="site-event-tab-empty">
                     보유한 학생증 코스튬이 없습니다. 선물함이나 시크릿 코드로 해금해 주세요.
                   </p>
+                ) : viewMode === "detail" && selectedFrame ? (
+                  <div className="frame-inventory__detail">
+                    <div className="frame-inventory__detail-card">
+                      {selectedFrame.imageUrl ? (
+                        <img 
+                          src={selectedFrame.imageUrl} 
+                          alt={selectedFrame.name}
+                          className="frame-inventory__detail-image"
+                        />
+                      ) : (
+                        <div className="frame-inventory__detail-image frame-inventory__detail-image--empty">
+                          <span>{selectedFrame.name}</span>
+                        </div>
+                      )}
+                      <div className="frame-inventory__detail-info">
+                        <h3 className="frame-inventory__detail-title">{selectedFrame.name}</h3>
+                        {selectedFrame.description ? (
+                          <p className="frame-inventory__detail-description" style={{ whiteSpace: "pre-line" }}>
+                            {selectedFrame.description}
+                          </p>
+                        ) : null}
+                        <p className="frame-inventory__detail-meta">
+                          {state.sources[selectedFrame.id] ? (
+                            <span className="text-emerald-600">
+                              {state.sources[selectedFrame.id] === "event" ? "이벤트 보상" : "관리자 지급"}
+                            </span>
+                          ) : null}
+                        </p>
+                        <button
+                          type="button"
+                          className={[
+                            "frame-inventory__detail-activate",
+                            state.activeFrameId === selectedFrame.id
+                              ? "frame-inventory__detail-activate--active"
+                              : "",
+                          ]
+                          .filter(Boolean)
+                          .join(" ")}
+                          onClick={() => {
+                            setState(setActiveCardFrame(studentId, selectedFrame.id));
+                          }}
+                        >
+                          {state.activeFrameId === selectedFrame.id ? "적용 중" : "적용하기"}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 ) : (
                   <div className="frame-inventory__grid">
                     <button
@@ -170,7 +285,6 @@ export default function FrameInventoryNavChip({
                       <button
                         key={frame.id}
                         type="button"
-                        title={frame.description || frame.name}
                         className={[
                           "frame-inventory__chip",
                           state.activeFrameId === frame.id
@@ -179,15 +293,23 @@ export default function FrameInventoryNavChip({
                         ]
                           .filter(Boolean)
                           .join(" ")}
-                        onClick={() => {
-                          setState(setActiveCardFrame(studentId, frame.id));
+                        onTouchStart={(e) => handleTouchStart(e, frame.id)}
+                        onTouchMove={(e) => handleTouchMove(e, frame.id)}
+                        onTouchEnd={(e) => handleTouchEnd(e, frame.id)}
+                        onClick={() => handleFrameClick(frame)}
+                        style={{
+                          transform: swipeState?.frameId === frame.id ? `translateX(${swipeState.currentX}px)` : 'translateX(0)',
+                          transition: swipeState ? 'none' : 'transform 0.2s ease-out'
                         }}
                       >
                         {frame.imageUrl ? (
-                          <img src={frame.imageUrl} alt="" />
+                          <img src={frame.imageUrl} alt={frame.name} />
                         ) : (
                           <span>{frame.name}</span>
                         )}
+                        <div className="frame-inventory__chip-info">
+                          <span className="frame-inventory__chip-title">{frame.name}</span>
+                        </div>
                       </button>
                     ))}
                   </div>
