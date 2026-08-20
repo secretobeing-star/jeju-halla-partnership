@@ -37,6 +37,9 @@ type EventForm = {
   stamp_active_img: string;
   stamp_inactive_img: string;
   marker_icon_img: string;
+  marker_border_color: string;
+  marker_time_icon: string;
+  marker_time_format: string;
   banner_img: string;
   stamp_bar_bg_img: string;
   stamp_bar_bg_color: string;
@@ -64,6 +67,9 @@ const EMPTY_FORM: EventForm = {
   stamp_active_img: "",
   stamp_inactive_img: "",
   marker_icon_img: "",
+  marker_border_color: "",
+  marker_time_icon: "⏰",
+  marker_time_format: "D_DAY_TIME",
   banner_img: "",
   stamp_bar_bg_img: "",
   stamp_bar_bg_color: "#ecfdf5",
@@ -78,6 +84,12 @@ const EMPTY_FORM: EventForm = {
 
 function eventToForm(event: MapEvent): EventForm {
   const max = Math.max(1, event.max_stamps || 1);
+  const extra = event as unknown as {
+    marker_border_color?: string;
+    marker_time_icon?: string;
+    marker_time_format?: string;
+  };
+
   return {
     tab_name: event.tab_name,
     title: event.title,
@@ -95,6 +107,9 @@ function eventToForm(event: MapEvent): EventForm {
     stamp_active_img: event.stamp_active_img ?? "",
     stamp_inactive_img: event.stamp_inactive_img ?? "",
     marker_icon_img: event.marker_icon_img ?? "",
+    marker_border_color: extra.marker_border_color ?? "",
+    marker_time_icon: extra.marker_time_icon ?? "⏰",
+    marker_time_format: extra.marker_time_format ?? "D_DAY_TIME",
     banner_img: event.banner_img ?? "",
     stamp_bar_bg_img: event.stamp_bar_bg_img ?? "",
     stamp_bar_bg_color: event.stamp_bar_bg_color?.trim() || "#ecfdf5",
@@ -294,6 +309,9 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
         stamp_active_img: form.stamp_active_img || null,
         stamp_inactive_img: form.stamp_inactive_img || null,
         marker_icon_img: form.marker_icon_img || null,
+        marker_border_color: form.marker_border_color?.trim() || null,
+        marker_time_icon: form.marker_time_icon?.trim() || null,
+        marker_time_format: form.marker_time_format || null,
         banner_img: form.banner_img || null,
         stamp_bar_bg_img: form.stamp_bar_bg_img || null,
         stamp_bar_bg_color: form.stamp_bar_bg_color || null,
@@ -407,6 +425,8 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
   if (loading) {
     return <p className="text-sm text-gray-500">지도 이벤트 설정을 불러오는 중...</p>;
   }
+
+  const markerBorder = form.marker_border_color?.trim() || "#ffffff";
 
   return (
     <div className="space-y-6">
@@ -755,20 +775,20 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
             </div>
           </div>
 
-          {/* 이벤트 탭 전용 상단 마커 아이콘 설정 */}
+          {/* 이벤트 탭 전용 지도 마커 & 시간 디자인 설정 */}
           <div className="rounded-xl border border-blue-100 bg-blue-50/40 p-4">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
-                <p className="text-sm font-semibold text-gray-800">이벤트 탭 상단 마커 아이콘 설정</p>
+                <p className="text-sm font-semibold text-gray-800">이벤트 탭 지도 마커 & 시간 설정</p>
                 <p className="mt-0.5 text-xs text-gray-500">
-                  해당 이벤트 탭 활성화 시 마커 상단(기존 하트 💗 위치)에 들어갈 아이콘입니다.
+                  해당 이벤트 탭 활성화 시 마커 상단 아이콘, 바깥쪽 테두리 색상 및 시간 배지를 개별 커스텀합니다.
                 </p>
               </div>
 
-              {/* 실제 마커와 동일한 비율의 실시간 미리보기 */}
+              {/* 실시간 마커 미리보기 */}
               <div className="flex flex-col items-center">
                 <div className="relative flex flex-col items-center">
-                  {/* 상단 원형 뱃지 (하트 위치) */}
+                  {/* 상단 뱃지 */}
                   <div className="absolute -top-3 z-10 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-pink-50 shadow-sm overflow-hidden">
                     {form.marker_icon_img ? (
                       <img
@@ -781,28 +801,45 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
                     )}
                   </div>
 
-                  {/* 마커 본체 (매장 썸네일 박스 형태) */}
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl border-2 border-white bg-slate-700 text-[10px] text-white shadow-md">
+                  {/* 마커 본체 (테두리 색상 반영) */}
+                  <div
+                    className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-700 text-[10px] text-white shadow-md transition-colors"
+                    style={{
+                      border: `3px solid ${markerBorder}`,
+                    }}
+                  >
                     Store
                   </div>
 
-                  {/* 마커 하단 핀 꼬리 */}
+                  {/* 마커 하단 핀 꼬리 (테두리 색상 반영) */}
                   <div
                     style={{
                       width: 0,
                       height: 0,
                       borderLeft: "5px solid transparent",
                       borderRight: "5px solid transparent",
-                      borderTop: "6px solid #334155",
+                      borderTop: `6px solid ${markerBorder}`,
                       marginTop: "-1px",
                     }}
                   />
+
+                  {/* 하단 카운트다운 시간 배지 미리보기 */}
+                  <div className="mt-1 flex items-center gap-1 rounded-full bg-black/80 px-2 py-0.5 text-[9px] font-medium text-white shadow-sm">
+                    <span>{form.marker_time_icon || "⏰"}</span>
+                    <span>
+                      {form.marker_time_format === "D_DAY"
+                        ? "D-3"
+                        : form.marker_time_format === "TIME_ONLY"
+                          ? "12:30:00"
+                          : "3일 12:30"}
+                    </span>
+                  </div>
                 </div>
                 <span className="mt-1 text-[10px] font-medium text-gray-500">마커 미리보기</span>
               </div>
             </div>
 
-            <div className="mt-4">
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <ImageField
                 label="상단 마커 아이콘 이미지 (하트 대체)"
                 value={form.marker_icon_img}
@@ -813,6 +850,50 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
                 }}
                 onClear={() => setForm((prev) => ({ ...prev, marker_icon_img: "" }))}
               />
+
+              <label className="block text-sm font-medium text-gray-700">
+                마커 바깥쪽 테두리 색상
+                <div className="mt-1.5 flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={asHexColor(form.marker_border_color, "#ffffff")}
+                    onChange={(e) => setForm((prev) => ({ ...prev, marker_border_color: e.target.value }))}
+                    className="h-10 w-16 cursor-pointer rounded-lg border border-gray-300 bg-white p-1"
+                  />
+                  <input
+                    type="text"
+                    value={form.marker_border_color}
+                    onChange={(e) => setForm((prev) => ({ ...prev, marker_border_color: e.target.value }))}
+                    placeholder="#ffffff (비우면 기본 흰색)"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm uppercase"
+                  />
+                </div>
+              </label>
+
+              <label className="block text-sm font-medium text-gray-700">
+                시간 영역 아이콘 (이모지 또는 텍스트)
+                <input
+                  type="text"
+                  value={form.marker_time_icon}
+                  onChange={(e) => setForm((prev) => ({ ...prev, marker_time_icon: e.target.value }))}
+                  placeholder="⏰ 또는 ⏳, 🔥"
+                  className="mt-1.5 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                />
+              </label>
+
+              <label className="block text-sm font-medium text-gray-700">
+                시간 노출 형식
+                <select
+                  value={form.marker_time_format}
+                  onChange={(e) => setForm((prev) => ({ ...prev, marker_time_format: e.target.value }))}
+                  className="mt-1.5 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm bg-white"
+                >
+                  <option value="D_DAY_TIME">남은 일수 + 시간 (예: 3일 12:30)</option>
+                  <option value="TIME_ONLY">남은 시간만 (예: 12:30:00)</option>
+                  <option value="D_DAY">D-Day 형식 (예: D-3)</option>
+                  <option value="NONE">시간 노출 안 함</option>
+                </select>
+              </label>
             </div>
           </div>
 
