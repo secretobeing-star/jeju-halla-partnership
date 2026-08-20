@@ -304,12 +304,11 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return () => window.removeEventListener("site-stamp-progress-changed", onStampChanged);
   }, [loadProgress]);
 
-  // 마커 + 상단 하트 원래대로 롤백 (좋아요 누른 매장에만 커스텀 핀 및 하트 적용)
+  // 마커 및 제휴처 필터링 복구 (좋아요 누른 곳은 커스텀 핀, 안 누른 곳은 기본 핀/매장 이미지 적용)
   const visiblePartners = useMemo(() => {
-    const pin =
-      activeEvent?.marker_icon_img?.trim() ||
-      (!activeEvent ? config.default_map_marker_img.trim() : "") ||
-      null;
+    const defaultPin = config.default_map_marker_img?.trim() || null;
+    const eventPin = activeEvent?.marker_icon_img?.trim() || null;
+
     const allowed = activeEvent?.partner_ids ?? [];
     const filtered =
       activeEvent && allowed.length > 0
@@ -320,7 +319,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       const isFav = Boolean(props.favoritePartnerIds?.has(partner.id));
       return {
         ...partner,
-        pinImageUrl: isFav ? pin : null,
+        pinImageUrl: (isFav ? (eventPin || defaultPin) : defaultPin) || partner.image_url || null,
       };
     });
   }, [activeEvent, config.default_map_marker_img, props.partners, props.favoritePartnerIds]);
@@ -700,7 +699,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         <div className="map-event-stamp-bar" style={stampBarCssVars(activeEvent)}>
           <div className="map-event-stamp-bar__copy">
             <p className="map-event-stamp-bar__title">{activeEvent.title}</p>
-            {/* 완주 문구 및 0/1 숫자 카운터 제거 완료 */}
+            {/* 완주 문구 및 0/1 숫자 카운터 제거 */}
             {(!isCompleted && (!isEventLive(activeEvent) || cooldownRemainMs > 0)) ? (
               <p className="map-event-stamp-bar__meta">
                 {!isEventLive(activeEvent) ? "기간 종료" : ""}
@@ -752,7 +751,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
       {message ? <p className="map-event-message">{message}</p> : null}
 
-      {/* 지도 패널 및 상단 중앙 실시간 타이머 플로팅 뱃지 */}
+      {/* 지도 영역 + 실시간 타이머 플로팅 뱃지 */}
       <div style={{ position: "relative", width: "100%", overflow: "visible" }}>
         {!isDefaultTab && activeEvent && !isCompleted && cooldownRemainMs > 0 && (
           <div
