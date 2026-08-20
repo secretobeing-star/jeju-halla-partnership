@@ -249,8 +249,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
           login_required_message?: string;
           cooldown_popup_title?: string;
           cooldown_popup_message?: string;
-          cooldown_title?: string;
-          cooldown_message?: string;
           win_popup_title?: string;
           completion_popup_title?: string;
         })[];
@@ -304,25 +302,24 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return () => window.removeEventListener("site-stamp-progress-changed", onStampChanged);
   }, [loadProgress]);
 
+  // 마커가 사라지지 않도록 수정한 파트너 목록 생성
   const visiblePartners = useMemo(() => {
     const pin =
       activeEvent?.marker_icon_img?.trim() ||
-      (!activeEvent ? config.default_map_marker_img.trim() : "") ||
+      config.default_map_marker_img?.trim() ||
       null;
+
     const allowed = activeEvent?.partner_ids ?? [];
     const filtered =
       activeEvent && allowed.length > 0
         ? props.partners.filter((partner) => allowed.includes(partner.id))
         : props.partners;
 
-    return filtered.map((partner) => {
-      const isFav = Boolean(props.favoritePartnerIds?.has(partner.id));
-      return {
-        ...partner,
-        pinImageUrl: isFav ? pin : null,
-      };
-    });
-  }, [activeEvent, config.default_map_marker_img, props.partners, props.favoritePartnerIds]);
+    return filtered.map((partner) => ({
+      ...partner,
+      pinImageUrl: pin || partner.image_url || null,
+    }));
+  }, [activeEvent, config.default_map_marker_img, props.partners]);
 
   const stampedPlaceIds = useMemo(
     () => new Set(progress?.stamped_places ?? []),
@@ -699,7 +696,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         <div className="map-event-stamp-bar" style={stampBarCssVars(activeEvent)}>
           <div className="map-event-stamp-bar__copy">
             <p className="map-event-stamp-bar__title">{activeEvent.title}</p>
-            {/* 완주 문구 및 0/1 숫자 제거 완료 */}
+            {/* 완주 문구 및 0/1 숫자 표시 제거 완료 */}
             {(!isCompleted && (!isEventLive(activeEvent) || cooldownRemainMs > 0)) ? (
               <p className="map-event-stamp-bar__meta">
                 {!isEventLive(activeEvent) ? "기간 종료" : ""}
@@ -751,7 +748,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
       {message ? <p className="map-event-message">{message}</p> : null}
 
-      {/* 지도 영역 + 실시간 타이머 플로팅 뱃지 */}
+      {/* 지도 패널 및 상단 중앙 실시간 타이머 플로팅 뱃지 */}
       <div style={{ position: "relative", width: "100%", overflow: "visible" }}>
         {!isDefaultTab && activeEvent && !isCompleted && cooldownRemainMs > 0 && (
           <div
