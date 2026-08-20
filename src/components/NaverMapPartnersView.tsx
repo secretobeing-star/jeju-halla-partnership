@@ -143,7 +143,7 @@ export default function NaverMapPartnersView({
   const [mapRevealed, setMapRevealed] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  // Supabase에서 활성 이벤트를 실시간으로 직접 조회
+  // Supabase에서 활성 이벤트를 실시간으로 직접 조회 (events 테이블 기준)
   const [activeDbEvent, setActiveDbEvent] = useState<MapEvent | null>(null);
 
   useEffect(() => {
@@ -152,14 +152,13 @@ export default function NaverMapPartnersView({
     async function fetchActiveEvent() {
       try {
         const { data, error } = await supabase
-          .from("map_events")
+          .from("events")
           .select("*")
           .eq("is_active", true)
           .order("created_at", { ascending: false })
           .limit(1);
 
         if (error) {
-          // fallback to /api/map-events
           const res = await fetch("/api/map-events");
           const json = (await res.json()) as { events?: MapEvent[] };
           if (!isCancelled && json.events?.length) {
@@ -306,7 +305,6 @@ export default function NaverMapPartnersView({
     }
   }, [favoritePartnerIds, favoritesEnabled, favoritesTerm, mapReady]);
 
-  // 카운트다운 및 시간 배지 1초 간격 실시간 렌더링
   useEffect(() => {
     if (!mapReady) {
       return;
