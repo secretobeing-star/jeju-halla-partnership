@@ -249,16 +249,7 @@ export default function NaverMapPartnersView({
 
   useEffect(() => {
     stampActionRef.current = stampAction;
-    const openCard = miniCardElementRef.current;
-    if (openCard) {
-      const stampBtn = openCard.querySelector<HTMLButtonElement>(".partner-map-mini-card__stamp-btn");
-      if (stampBtn && effectiveStampLabel) {
-        if (!stampBtn.disabled) {
-          stampBtn.textContent = effectiveStampLabel;
-        }
-      }
-    }
-  }, [stampAction, effectiveStampLabel]);
+  }, [stampAction]);
 
   useEffect(() => {
     detailButtonLabelRef.current = detailButtonLabel;
@@ -305,6 +296,7 @@ export default function NaverMapPartnersView({
     }
   }, [favoritePartnerIds, favoritesEnabled, favoritesTerm, mapReady]);
 
+  // 카운트다운 배지: 오직 사용자가 좋아요(즐겨찾기)를 누른 매장에만 노출
   useEffect(() => {
     if (!mapReady) {
       return;
@@ -317,9 +309,9 @@ export default function NaverMapPartnersView({
         const isFavorite = Boolean(
           favoritesEnabledRef.current && favoritePartnerIdsRef.current?.has(partnerId),
         );
-        const hasEventPin = Boolean(settings?.topIconImg);
 
-        const show = (isFavorite || hasEventPin) && Boolean(endAt);
+        // 👈 오직 좋아요한 마커에만 D-Day 시간 배지 표시
+        const show = isFavorite && Boolean(endAt);
 
         let badgeText: string | null = null;
         if (show && endAt) {
@@ -497,7 +489,8 @@ export default function NaverMapPartnersView({
     const validPartners = normalizedPartners.filter((partner) =>
       hasValidPartnerMapCoords(partner.latitude, partner.longitude),
     );
-    const nextSignature = `${getMapPartnerMarkersSignature(validPartners)}:${effectiveStampLabel}:${detailButtonLabel ?? ""}:${effectiveMarkerSettings?.borderColor ?? ""}:${effectiveMarkerSettings?.topIconImg ?? ""}`;
+    const favKey = Array.from(favoritePartnerIds ?? []).sort().join(",");
+    const nextSignature = `${getMapPartnerMarkersSignature(validPartners)}:${effectiveStampLabel}:${detailButtonLabel ?? ""}:${effectiveMarkerSettings?.borderColor ?? ""}:${effectiveMarkerSettings?.topIconImg ?? ""}:${favKey}`;
     const nextOrderKey = validPartners.map((partner) => partner.id).join("|");
     const preserveMapView = nextSignature === mapMarkersSignatureRef.current;
     const orderChanged = nextOrderKey !== mapMarkersOrderRef.current;
@@ -587,6 +580,9 @@ export default function NaverMapPartnersView({
       }
 
       const activeStampAction = stampActionRef.current ?? stampAction;
+      const isFav = Boolean(
+        favoritesEnabledRef.current && favoritePartnerIdsRef.current?.has(partner.id),
+      );
 
       const card = createPartnerMapMiniCardElement(partner, () => {
         miniCardOverlayRef.current?.close();
@@ -594,9 +590,7 @@ export default function NaverMapPartnersView({
         miniCardElementRef.current = null;
         onPartnerClickRef.current?.(partner.id);
       }, {
-        favorited:
-          favoritesEnabledRef.current &&
-          Boolean(favoritePartnerIdsRef.current?.has(partner.id)),
+        favorited: isFav,
         favoritesEnabled: favoritesEnabledRef.current,
         favoritesTerm: favoritesTermRef.current,
         onClose: () => {
@@ -610,9 +604,13 @@ export default function NaverMapPartnersView({
         stamp: activeStampAction?.enabled || activeDbEvent
           ? {
               visible: true,
-              disabled: Boolean(activeStampAction?.stampedPlaceIds?.has(partner.id)),
-              label: effectiveStampLabel,
-              onStamp: () => activeStampAction?.onStamp(partner),
+              // 👈 좋아요를 안 눌렀으면 버튼 비활성화 및 안내 라벨 표시
+              disabled: !isFav || Boolean(activeStampAction?.stampedPlaceIds?.has(partner.id)),
+              label: !isFav ? "💖 좋아요 후 도장 가능" : effectiveStampLabel,
+              onStamp: () => {
+                if (!isFav) return;
+                activeStampAction?.onStamp(partner);
+              },
             }
           : undefined,
         detailLabel: detailButtonLabelRef.current || detailButtonLabel,
@@ -667,11 +665,18 @@ export default function NaverMapPartnersView({
         const position = new window.naver.maps.LatLng(latitude as number, longitude as number);
         bounds.extend(position);
 
+        const isFav = favoritesEnabled && Boolean(favoritePartnerIds?.has(partner.id));
+
+        // 👈 좋아요를 누른 매장에만 상단 핀(불꽃) 렌더링, 미즐겨찾기는 일반 마커로 출력
+        const customSettingsForMarker = isFav
+          ? effectiveMarkerSettings
+          : { ...effectiveMarkerSettings, topIconImg: null };
+
         const markerElement = createPartnerMapMarkerElement(
           partner,
           false,
-          favoritesEnabled && Boolean(favoritePartnerIds?.has(partner.id)),
-          effectiveMarkerSettings,
+          isFav,
+          customSettingsForMarker,
         );
         markerElementsRef.current.set(partner.id, markerElement);
 
@@ -828,6 +833,8 @@ export default function NaverMapPartnersView({
     effectiveMarkerSettings,
     normalizedPartners,
     effectiveStampLabel,
+    favoritePartnerIds,
+    favoritesEnabled,
   ]);
 
   useEffect(() => {
