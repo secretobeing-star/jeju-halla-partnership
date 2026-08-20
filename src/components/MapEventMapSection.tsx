@@ -146,6 +146,10 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const [rewardModal, setRewardModal] = useState<RewardModalState | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
 
+  // 도장 성공 직후 서버 progress가 늦게 갱신되더라도
+  // 30분 쿨다운이 즉시 적용되도록 마지막 도장 시간을 로컬에서도 기억합니다.
+  const [localLastStampedAt, setLocalLastStampedAt] = useState<string | null>(null);
+
   const lastKnownGeoRef = useRef<{ latitude: number; longitude: number } | null>(null);
 
   const refreshLocationCache = useCallback(() => {
@@ -185,13 +189,31 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   }, []);
 
   const cooldownRemainMs = useMemo(() => {
-    if (!activeEvent || !progress?.last_stamped_at) return 0;
+    if (!activeEvent) return 0;
+
+    const progressLastMs = progress?.last_stamped_at
+      ? new Date(progress.last_stamped_at).getTime()
+      : 0;
+
+    const localLastMs = localLastStampedAt
+      ? new Date(localLastStampedAt).getTime()
+      : 0;
+
+    const latestLastStampedAtMs = Math.max(progressLastMs, localLastMs);
+
+    if (!latestLastStampedAtMs) return 0;
+
     return remainingCooldownMs(
-      progress.last_stamped_at,
+      new Date(latestLastStampedAtMs).toISOString(),
       activeEvent.cooldown_minutes ?? 0,
       nowMs,
     );
-  }, [activeEvent, progress?.last_stamped_at, nowMs]);
+  }, [
+    activeEvent,
+    progress?.last_stamped_at,
+    localLastStampedAt,
+    nowMs,
+  ]);
 
   useEffect(() => {
     if (activeTabId === DEFAULT_TAB_ID) return;
@@ -344,11 +366,25 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     if (stampedPlaceIds.has(partner.id)) return;
 
     // 실시간 쿨다운 엄격 검증
-    const currentRealtimeCooldown = remainingCooldownMs(
-      progress?.last_stamped_at,
-      activeEvent?.cooldown_minutes ?? 0,
-      Date.now(),
-    );
+    // 서버 progress와 로컬 기록 중 더 최근 도장 시간을 사용합니다.
+    // 따라서 첫 도장 직후 progress가 늦게 갱신되어도 재도장을 우회할 수 없습니다.
+    const progressLastMs = progress?.last_stamped_at
+      ? new Date(progress.last_stamped_at).getTime()
+      : 0;
+
+    const localLastMs = localLastStampedAt
+      ? new Date(localLastStampedAt).getTime()
+      : 0;
+
+    const latestLastStampedAtMs = Math.max(progressLastMs, localLastMs);
+
+    const currentRealtimeCooldown = latestLastStampedAtMs
+      ? remainingCooldownMs(
+          new Date(latestLastStampedAtMs).toISOString(),
+          activeEvent.cooldown_minutes ?? 0,
+          Date.now(),
+        )
+      : 0;
 
     if (currentRealtimeCooldown > 0) {
       setRewardModal({
@@ -467,11 +503,18 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         throw new Error(payload.error || "도장을 찍지 못했습니다.");
       }
 
+      // 도장 성공 시점은 서버 응답과 관계없이 즉시 로컬에 기록합니다.
+      // 이 값으로 30분 쿨다운을 바로 시작합니다.
+      const stampedNow = new Date().toISOString();
+      setLocalLastStampedAt(stampedNow);
+
       // 서버에서 반환된 progress로 즉시 교체
       if (payload.progress) {
-        setProgress(payload.progress);
+        setProgress({
+          ...payload.progress,
+          last_stamped_at: payload.progress.last_stamped_at || stampedNow,
+        });
       } else {
-        const stampedNow = new Date().toISOString();
         setProgress((prev) =>
           prev
             ? {
@@ -480,7 +523,15 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
                 last_stamped_at: stampedNow,
                 stamped_places: [...(prev.stamped_places || []), partner.id],
               }
-            : null,
+            : {
+                event_id: activeEvent.id,
+                user_id: sessionUserId,
+                current_stamps: 1,
+                max_stamps: activeEvent.max_stamps ?? 0,
+                last_stamped_at: stampedNow,
+                stamped_places: [partner.id],
+                is_completed: false,
+              },
         );
       }
       setNowMs(Date.now());
@@ -684,6 +735,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
                     : cooldownRemainMs > 0
                       ? `${formatCooldownRemain(cooldownRemainMs)} 후 가능`
                       : currentStampBtnLabel,
+                disabled: busy || cooldownRemainMs > 0,
                 onStamp: (partner) => {
                   void handleStamp(partner);
                 },
