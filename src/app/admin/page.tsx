@@ -32,7 +32,7 @@ import AdminCollapsibleSection from "@/components/admin/AdminCollapsibleSection"
 import AdminPermissionsPanel from "@/components/admin/AdminPermissionsPanel";
 import AdminSidebar, { readStoredAdminNav } from "@/components/admin/AdminSidebar";
 import PartnerListSettingsPanel from "@/components/admin/PartnerListSettingsPanel";
-import MapEventAdminPanel from "@/components/admin/MapEventAdminPanel";
+import MapEventAdminPanel from "@/components/MapEventAdminPanel";
 import Pagination from "@/components/Pagination";
 import SiteFeaturesApplier from "@/components/SiteFeaturesApplier";
 import SiteFaviconApplier from "@/components/SiteFaviconApplier";
