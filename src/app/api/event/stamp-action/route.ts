@@ -203,16 +203,31 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "이미 완주한 이벤트입니다." }, { status: 409 });
   }
 
-  // 서버에서 실제 DB의 마지막 도장 시간을 기준으로 쿨다운을 강제합니다.
-  // 이벤트 설정이 30이면 30분, 60이면 60분이 자동 적용됩니다.
+  // 서버에서 쿨다운을 강제합니다.
+  //
+  // 원하는 규칙:
+  // 1) 이벤트 시작(created_at)부터 cooldown_minutes가 지나야 첫 도장 가능
+  // 2) 첫 도장 이후에는 last_stamped_at + cooldown_minutes가 지나야 다음 도장 가능
+  //
+  // events 테이블에는 별도의 start_at 컬럼이 없으므로 현재 스키마에서는
+  // created_at을 이벤트 시작 시각으로 사용합니다.
   const cooldownMinutes = Math.max(0, Number(event.cooldown_minutes) || 0);
+  const cooldownMs = cooldownMinutes * 60_000;
+
   const lastStampedMs = progressRow?.last_stamped_at
     ? Date.parse(String(progressRow.last_stamped_at))
     : NaN;
 
-  if (cooldownMinutes > 0 && Number.isFinite(lastStampedMs)) {
-    const cooldownMs = cooldownMinutes * 60_000;
-    const remainMs = lastStampedMs + cooldownMs - Date.now();
+  const eventCreatedMs = event.created_at
+    ? Date.parse(String(event.created_at))
+    : NaN;
+
+  let cooldownBaseMs = Number.isFinite(lastStampedMs)
+    ? lastStampedMs
+    : eventCreatedMs;
+
+  if (cooldownMinutes > 0 && Number.isFinite(cooldownBaseMs)) {
+    const remainMs = cooldownBaseMs + cooldownMs - Date.now();
 
     if (remainMs > 0) {
       const remainMin = Math.floor(remainMs / 60_000);
@@ -225,6 +240,9 @@ export async function POST(request: NextRequest) {
           error: `${timeText} 후에 도장을 찍을 수 있습니다.`,
           cooldownError: true,
           cooldownMs: remainMs,
+          cooldownFrom: Number.isFinite(lastStampedMs)
+            ? "last_stamped_at"
+            : "event_created_at",
         },
         { status: 429 },
       );
