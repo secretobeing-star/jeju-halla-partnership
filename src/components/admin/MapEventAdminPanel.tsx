@@ -37,6 +37,7 @@ type EventForm = {
   stamp_active_img: string;
   stamp_inactive_img: string;
   marker_icon_img: string;
+  marker_bg_color: string;
   banner_img: string;
   stamp_bar_bg_img: string;
   stamp_bar_bg_color: string;
@@ -64,6 +65,7 @@ const EMPTY_FORM: EventForm = {
   stamp_active_img: "",
   stamp_inactive_img: "",
   marker_icon_img: "",
+  marker_bg_color: "#2563eb",
   banner_img: "",
   stamp_bar_bg_img: "",
   stamp_bar_bg_color: "#ecfdf5",
@@ -95,6 +97,7 @@ function eventToForm(event: MapEvent): EventForm {
     stamp_active_img: event.stamp_active_img ?? "",
     stamp_inactive_img: event.stamp_inactive_img ?? "",
     marker_icon_img: event.marker_icon_img ?? "",
+    marker_bg_color: ((event as unknown as { marker_bg_color?: string }).marker_bg_color?.trim()) || "#2563eb",
     banner_img: event.banner_img ?? "",
     stamp_bar_bg_img: event.stamp_bar_bg_img ?? "",
     stamp_bar_bg_color: event.stamp_bar_bg_color?.trim() || "#ecfdf5",
@@ -137,7 +140,7 @@ function ImageField({
       {label}
       <input
         type="file"
-        accept="image/png,image/jpeg,image/webp,image/gif"
+        accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
         disabled={uploading}
         className="mt-1 block w-full text-xs"
         onChange={(event) => {
@@ -288,6 +291,7 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
         stamp_active_img: form.stamp_active_img || null,
         stamp_inactive_img: form.stamp_inactive_img || null,
         marker_icon_img: form.marker_icon_img || null,
+        marker_bg_color: form.marker_bg_color || null,
         banner_img: form.banner_img || null,
         stamp_bar_bg_img: form.stamp_bar_bg_img || null,
         stamp_bar_bg_color: form.stamp_bar_bg_color || null,
@@ -624,7 +628,6 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
             </label>
           </div>
 
-          {/* 도장 찍기 버튼 라벨 커스텀 */}
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="text-sm font-medium text-gray-700">
               도장 찍기 버튼 문구
@@ -748,6 +751,90 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
               </div>
             </div>
           </div>
+
+          {/* 이벤트 탭 전용 지도 마커 & 테마 커스텀 */}
+          <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-gray-800">이벤트 탭 전용 지도 마커 설정</p>
+                <p className="mt-0.5 text-xs text-gray-500">
+                  해당 탭이 선택되었을 때 지도 핀의 외곽 배경색과 상단 아이콘 이미지를 개별 커스텀합니다.
+                </p>
+              </div>
+
+              {/* 실시간 마커 미리보기 */}
+              <div className="flex flex-col items-center">
+                <div
+                  style={{
+                    width: "42px",
+                    height: "42px",
+                    borderRadius: "50%",
+                    backgroundColor: asHexColor(form.marker_bg_color, "#2563eb"),
+                    border: "2px solid #ffffff",
+                    boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.2)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    overflow: "hidden",
+                  }}
+                >
+                  {form.marker_icon_img ? (
+                    <img
+                      src={form.marker_icon_img}
+                      alt="마커 아이콘"
+                      style={{ width: "24px", height: "24px", objectFit: "contain" }}
+                    />
+                  ) : (
+                    <span className="text-xs font-bold text-white">PIN</span>
+                  )}
+                </div>
+                <div
+                  style={{
+                    width: 0,
+                    height: 0,
+                    borderLeft: "6px solid transparent",
+                    borderRight: "6px solid transparent",
+                    borderTop: `8px solid ${asHexColor(form.marker_bg_color, "#2563eb")}`,
+                    marginTop: "-1px",
+                  }}
+                />
+                <span className="mt-1 text-[10px] text-gray-500">마커 미리보기</span>
+              </div>
+            </div>
+
+            <div className="mt-3 grid gap-4 sm:grid-cols-2">
+              <label className="block text-sm font-medium text-gray-700">
+                마커 바깥쪽 배경색
+                <div className="mt-1 flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={asHexColor(form.marker_bg_color, "#2563eb")}
+                    onChange={(e) => setForm((prev) => ({ ...prev, marker_bg_color: e.target.value }))}
+                    className="h-10 w-16 cursor-pointer rounded-lg border border-gray-300 bg-white p-1"
+                  />
+                  <input
+                    type="text"
+                    value={form.marker_bg_color}
+                    onChange={(e) => setForm((prev) => ({ ...prev, marker_bg_color: e.target.value }))}
+                    placeholder="#2563eb"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm uppercase"
+                  />
+                </div>
+              </label>
+
+              <ImageField
+                label="마커 상단 아이콘 이미지 (PNG/SVG)"
+                value={form.marker_icon_img}
+                uploading={uploadingKey === "marker"}
+                onUpload={async (file) => {
+                  const url = await uploadImage(file, "marker");
+                  if (url) setForm((prev) => ({ ...prev, marker_icon_img: url }));
+                }}
+                onClear={() => setForm((prev) => ({ ...prev, marker_icon_img: "" }))}
+              />
+            </div>
+          </div>
+
           <div className="grid gap-4 sm:grid-cols-2">
             <ImageField
               label="채워진 도장"
@@ -797,16 +884,6 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
                 if (url) setForm((prev) => ({ ...prev, completion_badge_img: url }));
               }}
               onClear={() => setForm((prev) => ({ ...prev, completion_badge_img: "" }))}
-            />
-            <ImageField
-              label="지도 핀 아이콘"
-              value={form.marker_icon_img}
-              uploading={uploadingKey === "marker"}
-              onUpload={async (file) => {
-                const url = await uploadImage(file, "marker");
-                if (url) setForm((prev) => ({ ...prev, marker_icon_img: url }));
-              }}
-              onClear={() => setForm((prev) => ({ ...prev, marker_icon_img: "" }))}
             />
             <ImageField
               label="배너 / 당첨 모달 이미지"
