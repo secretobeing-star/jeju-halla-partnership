@@ -60,6 +60,18 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   if (body.marker_icon_img !== undefined) {
     patch.marker_icon_img = String(body.marker_icon_img ?? "").trim() || null;
   }
+  if (body.marker_border_color !== undefined) {
+    patch.marker_border_color = String(body.marker_border_color ?? "").trim() || null;
+  }
+  if (body.marker_time_icon !== undefined) {
+    patch.marker_time_icon = String(body.marker_time_icon ?? "").trim() || "⏰";
+  }
+  if (body.marker_time_format !== undefined) {
+    patch.marker_time_format = String(body.marker_time_format ?? "").trim() || "D_DAY_TIME";
+  }
+  if (body.stamp_btn_label !== undefined) {
+    patch.stamp_btn_label = String(body.stamp_btn_label ?? "").trim() || null;
+  }
   if (body.banner_img !== undefined) {
     patch.banner_img = String(body.banner_img ?? "").trim() || null;
   }
