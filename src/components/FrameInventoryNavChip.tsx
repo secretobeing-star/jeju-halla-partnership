@@ -56,7 +56,7 @@ const STORAGE_KEY_PAGE_SIZE = "halla_costume_page_size";
 type FrameInventoryNavChipProps = {
   cardFrames: PublicCardFrameItem[];
   hideChip?: boolean;
-  /** 기본 노출 개수: 5개 설정 */
+  /** 기본 노출 개수: 5개 */
   defaultPageSize?: number;
 };
 
@@ -84,7 +84,6 @@ export default function FrameInventoryNavChip({
   const touchStartXRef = useRef<number | null>(null);
   const touchStartYRef = useRef<number | null>(null);
 
-  // 관리자 설정된 페이지 크기 동기화
   const loadAdminPageSize = useCallback(() => {
     if (typeof window === "undefined") return;
     try {
@@ -180,7 +179,7 @@ export default function FrameInventoryNavChip({
     ];
   }, [unlocked]);
 
-  // 페이지 연산 (기본 5개 단위)
+  // 페이지 연산 (기본 5개 단위 고정)
   const totalPages = Math.max(1, Math.ceil(allDisplayItems.length / effectivePageSize));
   const paginatedItems = useMemo(() => {
     const start = (currentPage - 1) * effectivePageSize;
@@ -248,11 +247,11 @@ export default function FrameInventoryNavChip({
     mounted && open
       ? createPortal(
           <div 
-            className="site-event-overlay fixed inset-0 flex items-center justify-center p-4 bg-black/60 z-50 overflow-y-auto" 
+            className="site-event-overlay fixed inset-0 flex items-center justify-center p-3.5 sm:p-4 bg-black/60 z-50 overflow-y-auto" 
             onClick={close}
           >
             <div
-              className="bg-white rounded-3xl w-full max-w-sm md:max-w-xl overflow-hidden shadow-2xl flex flex-col border border-gray-100 animate-in fade-in zoom-in-95 duration-150 m-auto"
+              className="bg-white rounded-3xl w-full max-w-sm md:max-w-2xl overflow-hidden shadow-2xl flex flex-col border border-gray-100 animate-in fade-in zoom-in-95 duration-150 m-auto"
               role="dialog"
               aria-modal="true"
               aria-label="코스튬 보관함"
@@ -274,8 +273,8 @@ export default function FrameInventoryNavChip({
                 </button>
               </div>
 
-              {/* 본문 영역 */}
-              <div className="p-3.5 sm:p-4 bg-gray-50/60 flex flex-col gap-2.5 items-center">
+              {/* 본문 영역: 모바일은 세로 일렬 / md(PC·태블릿·폴드) 이상은 가로 2단 분할 */}
+              <div className="p-3.5 sm:p-5 bg-gray-50/60 flex flex-col md:flex-row gap-3.5 items-stretch">
                 {!studentId ? (
                   <p className="text-center py-8 text-gray-500 text-sm w-full">로그인(학번) 후 이용할 수 있습니다.</p>
                 ) : unlocked.length === 0 ? (
@@ -284,16 +283,16 @@ export default function FrameInventoryNavChip({
                   </p>
                 ) : (
                   <>
-                    {/* [상단 카드] 중앙 정렬 학생증 카드 영역 */}
+                    {/* [좌측/상단 영역] 중앙 정렬 학생증 카드 (스와이프 지원) */}
                     <div 
-                      className="w-full flex flex-col items-center justify-center bg-white border border-gray-200/90 rounded-2xl p-3 shadow-xs select-none touch-pan-y"
+                      className="flex-1 flex flex-col items-center justify-between bg-white border border-gray-200/90 rounded-2xl p-3 sm:p-4 shadow-xs select-none touch-pan-y"
                       onTouchStart={onTouchStart}
                       onTouchEnd={onTouchEnd}
                       onMouseDown={onTouchStart}
                       onMouseUp={onTouchEnd}
                     >
-                      {/* 가로형 학생증 카드 디자인 */}
-                      <div className="relative w-full aspect-[1.62/1] max-w-[340px] rounded-2xl bg-white border border-gray-200/90 shadow-sm p-3.5 text-gray-800 flex flex-col justify-between overflow-hidden cursor-grab active:cursor-grabbing mx-auto">
+                      {/* 가로형 학생증 카드 */}
+                      <div className="relative w-full aspect-[1.62/1] max-w-[340px] rounded-2xl bg-white border border-gray-200/90 shadow-sm p-3.5 text-gray-800 flex flex-col justify-between overflow-hidden cursor-grab active:cursor-grabbing mx-auto my-auto">
                         {currentPreview?.imageUrl ? (
                           <img
                             src={currentPreview.imageUrl}
@@ -370,86 +369,88 @@ export default function FrameInventoryNavChip({
                       </div>
                     </div>
 
-                    {/* [하단 목록 영역] 5개 단위 페이지네이션 */}
-                    <div className="w-full flex flex-col bg-white border border-gray-200/90 rounded-2xl p-3 shadow-xs">
-                      <div className="flex items-center justify-between mb-2 px-0.5">
-                        <p className="text-xs font-bold text-gray-700">
-                          보유 코스튬 ({unlocked.length})
-                        </p>
-                        {totalPages > 1 ? (
-                          <div className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-500">
-                            <button
-                              type="button"
-                              className="px-1.5 py-0.5 rounded bg-gray-100 hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed"
-                              disabled={currentPage <= 1}
-                              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                            >
-                              ◀
-                            </button>
-                            <span>{currentPage} / {totalPages}</span>
-                            <button
-                              type="button"
-                              className="px-1.5 py-0.5 rounded bg-gray-100 hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed"
-                              disabled={currentPage >= totalPages}
-                              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                            >
-                              ▶
-                            </button>
-                          </div>
-                        ) : null}
-                      </div>
+                    {/* [우측/하단 목록 영역] 모바일/PC/태블릿/폴드 공통: 5개 단위 리스트 + 페이지네이션 */}
+                    <div className="w-full md:w-56 flex flex-col justify-between bg-white border border-gray-200/90 rounded-2xl p-3 shadow-xs flex-shrink-0">
+                      <div>
+                        <div className="flex items-center justify-between mb-2 px-0.5">
+                          <p className="text-xs font-bold text-gray-700">
+                            보유 목록 ({unlocked.length})
+                          </p>
+                          {totalPages > 1 ? (
+                            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-500">
+                              <button
+                                type="button"
+                                className="px-1.5 py-0.5 rounded bg-gray-100 hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed"
+                                disabled={currentPage <= 1}
+                                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                              >
+                                ◀
+                              </button>
+                              <span>{currentPage} / {totalPages}</span>
+                              <button
+                                type="button"
+                                className="px-1.5 py-0.5 rounded bg-gray-100 hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed"
+                                disabled={currentPage >= totalPages}
+                                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                              >
+                                ▶
+                              </button>
+                            </div>
+                          ) : null}
+                        </div>
 
-                      <div className="flex flex-col gap-1.5 pr-0.5">
-                        {paginatedItems.map((item) => {
-                          const isSelected = selectedFrameId === item.id;
-                          const isWearing = state.activeFrameId === item.id;
+                        <div className="flex flex-col gap-1.5 pr-0.5">
+                          {paginatedItems.map((item) => {
+                            const isSelected = selectedFrameId === item.id;
+                            const isWearing = state.activeFrameId === item.id;
 
-                          return (
-                            <button
-                              key={item.id ?? "default-style"}
-                              type="button"
-                              className={`w-full flex items-center gap-2.5 p-2 rounded-xl border text-left transition-all ${
-                                isSelected
-                                  ? "border-emerald-500 bg-emerald-50/60 shadow-xs ring-1 ring-emerald-500/30"
-                                  : "border-gray-200 bg-gray-50/50 hover:bg-gray-100/70"
-                              }`}
-                              onClick={() => setSelectedFrameId(item.id)}
-                            >
-                              {/* 썸네일 아이콘 */}
-                              {item.isDefault ? (
-                                <div className="w-9 h-9 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center text-[11px] font-bold text-gray-600 flex-shrink-0">
-                                  기본
-                                </div>
-                              ) : (
-                                <div className="w-9 h-9 rounded-lg bg-white border border-gray-200 flex items-center justify-center p-0.5 overflow-hidden flex-shrink-0">
-                                  {(item as PublicCardFrameItem).imageUrl ? (
-                                    <img
-                                      src={(item as PublicCardFrameItem).imageUrl}
-                                      alt={item.name}
-                                      className="w-full h-full object-contain"
-                                    />
+                            return (
+                              <button
+                                key={item.id ?? "default-style"}
+                                type="button"
+                                className={`w-full flex items-center gap-2.5 p-2 rounded-xl border text-left transition-all ${
+                                  isSelected
+                                    ? "border-emerald-500 bg-emerald-50/60 shadow-xs ring-1 ring-emerald-500/30"
+                                    : "border-gray-200 bg-gray-50/50 hover:bg-gray-100/70"
+                                }`}
+                                onClick={() => setSelectedFrameId(item.id)}
+                              >
+                                {/* 썸네일 */}
+                                {item.isDefault ? (
+                                  <div className="w-9 h-9 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center text-[11px] font-bold text-gray-600 flex-shrink-0">
+                                    기본
+                                  </div>
+                                ) : (
+                                  <div className="w-9 h-9 rounded-lg bg-white border border-gray-200 flex items-center justify-center p-0.5 overflow-hidden flex-shrink-0">
+                                    {(item as PublicCardFrameItem).imageUrl ? (
+                                      <img
+                                        src={(item as PublicCardFrameItem).imageUrl}
+                                        alt={item.name}
+                                        className="w-full h-full object-contain"
+                                      />
+                                    ) : (
+                                      <span className="text-[8px] text-gray-400 text-center line-clamp-1">{item.name}</span>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* 텍스트 정보 */}
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-bold text-gray-800 truncate leading-tight">
+                                    {item.name}
+                                  </p>
+                                  {isWearing ? (
+                                    <span className="text-[10px] font-bold text-emerald-600 leading-none">착용 중</span>
                                   ) : (
-                                    <span className="text-[8px] text-gray-400 text-center line-clamp-1">{item.name}</span>
+                                    <span className="text-[10px] text-gray-400 leading-none">
+                                      {item.isDefault ? "미착용" : "보유"}
+                                    </span>
                                   )}
                                 </div>
-                              )}
-
-                              {/* 아이템 이름 및 상태 */}
-                              <div className="flex-1 min-w-0">
-                                <p className="text-xs font-bold text-gray-800 truncate leading-tight">
-                                  {item.name}
-                                </p>
-                                {isWearing ? (
-                                  <span className="text-[10px] font-bold text-emerald-600 leading-none">착용 중</span>
-                                ) : (
-                                  <span className="text-[10px] text-gray-400 leading-none">
-                                    {item.isDefault ? "미착용" : "보유"}
-                                  </span>
-                                )}
-                              </div>
-                            </button>
-                          );
-                        })}
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
                     </div>
                   </>
