@@ -76,16 +76,16 @@ export default function FrameInventoryNavChip({
     setMounted(true);
     const session = getSiteMemberSession();
     setStudentId(session?.student?.studentId?.trim() || "");
-    setStudentName(session?.student?.name?.trim() || "학생");
-    setDepartment(session?.student?.department?.trim() || "제주한라대학교");
+    setStudentName(session?.student?.name?.trim() || "김주호");
+    setDepartment(session?.student?.department?.trim() || "유아교육과");
   }, []);
 
   const refresh = useCallback(() => {
     const session = getSiteMemberSession();
     const id = session?.student?.studentId?.trim() || "";
     setStudentId(id);
-    setStudentName(session?.student?.name?.trim() || "학생");
-    setDepartment(session?.student?.department?.trim() || "제주한라대학교");
+    setStudentName(session?.student?.name?.trim() || "김주호");
+    setDepartment(session?.student?.department?.trim() || "유아교육과");
     if (!id) {
       setState({ unlockedIds: [], activeFrameId: null, sources: {} });
       setOpen(false);
@@ -152,7 +152,7 @@ export default function FrameInventoryNavChip({
       ? createPortal(
           <div className="site-event-overlay flex items-center justify-center p-3 sm:p-4 bg-black/60 z-50 fixed inset-0" onClick={close}>
             <div
-              className="bg-white rounded-3xl w-full max-w-md md:max-w-3xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] border border-gray-100"
+              className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl flex flex-col border border-gray-100 animate-in fade-in zoom-in-95 duration-150"
               role="dialog"
               aria-modal="true"
               aria-label="코스튬 보관함"
@@ -175,67 +175,84 @@ export default function FrameInventoryNavChip({
               </div>
 
               {/* 본문 영역 */}
-              <div className="p-4 sm:p-5 flex-1 overflow-y-auto bg-gray-50/50">
+              <div className="p-4 flex flex-col gap-3.5 bg-gray-50/60">
                 {!studentId ? (
-                  <p className="text-center py-16 text-gray-500 text-sm">로그인(학번) 후 이용할 수 있습니다.</p>
+                  <p className="text-center py-12 text-gray-500 text-sm">로그인(학번) 후 이용할 수 있습니다.</p>
                 ) : unlocked.length === 0 ? (
-                  <p className="text-center py-16 text-gray-500 text-sm">
+                  <p className="text-center py-12 text-gray-500 text-sm">
                     보유한 학생증 코스튬이 없습니다.<br />이벤트 완료나 선물함에서 코스튬을 획득해 보세요!
                   </p>
                 ) : (
-                  <div className="flex flex-col md:flex-row gap-4 h-full">
-                    {/* [메인 프리뷰 영역] 실제 모바일 학생증 카드 */}
-                    <div className="flex-1 flex flex-col items-center bg-white border border-gray-200/80 rounded-2xl p-4 sm:p-5 shadow-xs">
-                      {/* 학생증 카드 미니어처 */}
-                      <div className="relative w-[180px] sm:w-[210px] aspect-[1/1.42] rounded-2xl bg-gradient-to-br from-emerald-600 to-emerald-900 p-3.5 text-white shadow-md flex flex-col justify-between overflow-hidden my-auto">
+                  <>
+                    {/* [상단 카드] 실제 모바일 학생증 가로형 프리뷰 */}
+                    <div className="bg-white border border-gray-200/90 rounded-2xl p-4 shadow-xs flex flex-col items-center">
+                      {/* 가로형 학생증 카드 디자인 */}
+                      <div className="relative w-full aspect-[1.58/1] rounded-2xl bg-white border border-gray-200/90 shadow-sm p-4 text-gray-800 flex flex-col justify-between overflow-hidden">
                         {/* 착용 프레임 이미지 오버레이 */}
                         {currentPreview?.imageUrl ? (
                           <img
                             src={currentPreview.imageUrl}
                             alt={currentPreview.name}
-                            className="absolute inset-0 w-full h-full object-cover pointer-events-none z-10"
+                            className="absolute inset-0 w-full h-full object-fill pointer-events-none z-10"
                           />
                         ) : null}
 
-                        {/* 카드 상단 로고 & 칩 */}
-                        <div className="flex items-center justify-between z-0">
-                          <span className="text-[9px] font-black tracking-wider opacity-90">STUDENT CARD</span>
-                          <div className="w-3 h-3 rounded-full bg-white/20 border border-white/30" />
-                        </div>
+                        {/* 학교 워터마크 배경 */}
+                        <div className="absolute inset-0 bg-gradient-to-br from-white/90 via-emerald-50/20 to-white/90 z-0 pointer-events-none" />
 
-                        {/* 카드 중앙 인적사항 */}
-                        <div className="flex flex-col items-center my-auto z-0 text-center">
-                          <div className="w-12 h-12 rounded-full bg-white/20 border border-white/40 flex items-center justify-center text-sm font-bold mb-1.5 shadow-xs">
-                            {studentName.slice(0, 1) || "학"}
+                        {/* 학생증 내부 컨텐츠 */}
+                        <div className="relative z-0 flex h-full gap-3.5 items-center">
+                          {/* 증명사진 박스 */}
+                          <div className="w-[32%] aspect-[3/4] rounded-xl bg-gray-100 border border-gray-200 flex items-center justify-center text-gray-400 text-xs font-medium flex-shrink-0">
+                            사진
                           </div>
-                          <span className="text-sm font-extrabold tracking-tight drop-shadow-xs">{studentName}</span>
-                          <span className="text-[10px] opacity-85 font-mono">{studentId || "20260000"}</span>
-                          <span className="text-[9px] opacity-75 mt-0.5 max-w-[140px] truncate">{department}</span>
-                        </div>
 
-                        {/* 카드 하단 정보 */}
-                        <div className="flex justify-between items-end text-[8px] opacity-70 z-0 font-medium">
-                          <span>제주한라대학교</span>
-                          <span>{currentPreview ? "CUSTOM" : "STANDARD"}</span>
+                          {/* 인적사항 목록 */}
+                          <div className="flex-1 flex flex-col justify-center">
+                            <div className="flex items-center gap-1.5 mb-1.5">
+                              <span className="text-[11px] font-bold text-emerald-800 tracking-tight">제주한라대학교</span>
+                            </div>
+
+                            <h3 className="text-base font-black text-gray-900 tracking-tight mb-2">
+                              {studentName}
+                            </h3>
+
+                            <div className="space-y-1 text-xs">
+                              <div className="flex items-center text-gray-600">
+                                <span className="w-10 text-gray-400 font-medium text-[11px]">학과</span>
+                                <span className="font-semibold text-gray-800 text-[11px] truncate">{department}</span>
+                              </div>
+                              <div className="flex items-center text-gray-600">
+                                <span className="w-10 text-gray-400 font-medium text-[11px]">학번</span>
+                                <span className="font-mono font-semibold text-gray-800 text-[11px]">{studentId || "202427055"}</span>
+                              </div>
+                              <div className="flex items-center text-gray-600">
+                                <span className="w-10 text-gray-400 font-medium text-[11px]">상태</span>
+                                <span className="font-semibold text-gray-800 text-[11px]">재학</span>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       </div>
 
                       {/* 프레임 정보 및 착용 버튼 */}
                       <div className="w-full pt-3 mt-3 border-t border-gray-100 text-center">
-                        <div className="mb-2.5">
-                          <div className="flex items-center justify-center gap-1.5 mb-0.5">
-                            <h3 className="font-bold text-gray-900 text-sm sm:text-base truncate">
+                        <div className="mb-2">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <h4 className="font-bold text-gray-900 text-sm">
                               {currentPreview?.name || "기본 학생증"}
-                            </h3>
+                            </h4>
                             {currentPreview && state.sources[currentPreview.id] ? (
-                              <span className="px-2 py-0.5 text-[10px] font-medium rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200">
+                              <span className="px-1.5 py-0.5 text-[9px] font-medium rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200">
                                 {state.sources[currentPreview.id] === "event" ? "이벤트" : "지급"}
                               </span>
                             ) : null}
                           </div>
-                          <p className="text-xs text-gray-500 line-clamp-1">
-                            {currentPreview?.description || "코스튬이 적용되지 않은 기본 학생증 스타일입니다."}
-                          </p>
+                          {currentPreview?.description ? (
+                            <p className="text-[11px] text-gray-400 truncate mt-0.5">
+                              {currentPreview.description}
+                            </p>
+                          ) : null}
                         </div>
 
                         <button
@@ -252,31 +269,31 @@ export default function FrameInventoryNavChip({
                       </div>
                     </div>
 
-                    {/* [목록 영역] 크기를 대폭 키운 썸네일 리스트 (모바일 가로 / PC 세로) */}
-                    <div className="md:w-64 flex flex-col flex-shrink-0 bg-white border border-gray-200/80 rounded-2xl p-3.5 shadow-xs">
-                      <p className="text-xs font-bold text-gray-700 mb-2.5 px-1 text-left">
+                    {/* [하단 가로 스크롤 목록] 큼직하고 컴팩트한 사각 칩 */}
+                    <div className="bg-white border border-gray-200/90 rounded-2xl p-3.5 shadow-xs">
+                      <p className="text-xs font-bold text-gray-700 mb-2 px-0.5 text-left">
                         보유 코스튬 ({unlocked.length})
                       </p>
-                      <div className="flex md:flex-col gap-2.5 overflow-x-auto md:overflow-y-auto pb-1 md:pb-0 md:max-h-[380px] no-scrollbar">
-                        {/* 기본 스타일 선택 */}
+                      <div className="flex gap-2.5 overflow-x-auto pb-1 no-scrollbar">
+                        {/* 기본 프레임 선택 버튼 */}
                         <button
                           type="button"
-                          className={`flex-shrink-0 flex items-center gap-3 p-2.5 rounded-xl border text-left transition-all min-w-[130px] md:min-w-0 ${
+                          className={`flex-shrink-0 flex items-center gap-2.5 p-2 rounded-xl border text-left transition-all min-w-[130px] ${
                             selectedFrameId === null
                               ? "border-emerald-500 bg-emerald-50/60 shadow-xs ring-2 ring-emerald-500/20"
                               : "border-gray-200 bg-gray-50/50 hover:bg-gray-100/70"
                           }`}
                           onClick={() => setSelectedFrameId(null)}
                         >
-                          <div className="w-12 h-12 rounded-xl bg-gray-200/80 flex items-center justify-center text-xs font-bold text-gray-600 flex-shrink-0">
+                          <div className="w-10 h-10 rounded-lg bg-gray-200/80 flex items-center justify-center text-xs font-bold text-gray-600 flex-shrink-0">
                             기본
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-xs font-bold text-gray-800 truncate">기본 스타일</p>
                             {state.activeFrameId === null ? (
-                              <span className="text-[11px] font-bold text-emerald-600">착용 중</span>
+                              <span className="text-[10px] font-bold text-emerald-600">착용 중</span>
                             ) : (
-                              <span className="text-[11px] text-gray-400">미착용</span>
+                              <span className="text-[10px] text-gray-400">미착용</span>
                             )}
                           </div>
                         </button>
@@ -289,26 +306,26 @@ export default function FrameInventoryNavChip({
                             <button
                               key={frame.id}
                               type="button"
-                              className={`flex-shrink-0 relative flex items-center gap-3 p-2.5 rounded-xl border text-left transition-all min-w-[140px] md:min-w-0 ${
+                              className={`flex-shrink-0 relative flex items-center gap-2.5 p-2 rounded-xl border text-left transition-all min-w-[140px] ${
                                 isSelected
                                   ? "border-emerald-500 bg-emerald-50/60 shadow-xs ring-2 ring-emerald-500/20"
                                   : "border-gray-200 bg-gray-50/50 hover:bg-gray-100/70"
                               }`}
                               onClick={() => setSelectedFrameId(frame.id)}
                             >
-                              <div className="w-12 h-12 rounded-xl bg-white border border-gray-200 flex items-center justify-center p-1 overflow-hidden flex-shrink-0">
+                              <div className="w-10 h-10 rounded-lg bg-white border border-gray-200 flex items-center justify-center p-0.5 overflow-hidden flex-shrink-0">
                                 {frame.imageUrl ? (
                                   <img src={frame.imageUrl} alt={frame.name} className="w-full h-full object-contain" />
                                 ) : (
-                                  <span className="text-[10px] text-gray-400 text-center line-clamp-1">{frame.name}</span>
+                                  <span className="text-[9px] text-gray-400 text-center line-clamp-1">{frame.name}</span>
                                 )}
                               </div>
                               <div className="flex-1 min-w-0">
                                 <p className="text-xs font-bold text-gray-800 truncate">{frame.name}</p>
                                 {isWearing ? (
-                                  <span className="text-[11px] font-bold text-emerald-600">착용 중</span>
+                                  <span className="text-[10px] font-bold text-emerald-600">착용 중</span>
                                 ) : (
-                                  <span className="text-[11px] text-gray-400">보유</span>
+                                  <span className="text-[10px] text-gray-400">보유</span>
                                 )}
                               </div>
                             </button>
@@ -316,7 +333,7 @@ export default function FrameInventoryNavChip({
                         })}
                       </div>
                     </div>
-                  </div>
+                  </>
                 )}
               </div>
             </div>
