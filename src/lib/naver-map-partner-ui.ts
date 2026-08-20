@@ -169,12 +169,13 @@ export function createPartnerMapMarkerElement(
     button.style.backgroundPosition = "center";
   }
 
+  // 1. 마커 본체: 항상 제휴처 고유 이미지(imageUrl)를 표시 (pinImageUrl로 인한 덮어쓰기 방지)
   if (markerSettings?.thumbnailEnabled === false) {
     const fallback = createPartnerMapInitialFallbackElement("partner-map-marker__fallback", partner.name);
     button.appendChild(fallback);
   } else {
     const img = document.createElement("img");
-    img.src = resolvePartnerMapImageUrl(partner.pinImageUrl, partner.imageUrl);
+    img.src = resolvePartnerMapImageUrl(partner.imageUrl);
     img.alt = "";
     img.loading = "lazy";
     img.decoding = "async";
@@ -197,13 +198,15 @@ export function createPartnerMapMarkerElement(
 
   shell.appendChild(button);
 
-  // 상단 뱃지 렌더링: 이벤트 탭 전용 아이콘이 있으면 항상 표시, 없을 때는 즐겨찾기 시에만 하트 표시
-  if (markerSettings?.topIconImg) {
+  // 2. 상단 원형 뱃지: 이벤트 아이콘(pinImageUrl 또는 markerSettings.topIconImg)이 있으면 불꽃 등 아이콘을 부착
+  const topBadgeIconUrl = markerSettings?.topIconImg || partner.pinImageUrl;
+
+  if (topBadgeIconUrl) {
     const customBadge = document.createElement("span");
     customBadge.className = "partner-map-marker__favorite-badge";
     customBadge.setAttribute("aria-hidden", "true");
     const badgeImg = document.createElement("img");
-    badgeImg.src = markerSettings.topIconImg;
+    badgeImg.src = topBadgeIconUrl;
     badgeImg.alt = "";
     badgeImg.className = "partner-map-marker__favorite-badge-img";
     badgeImg.style.width = "100%";
@@ -242,7 +245,6 @@ export function updatePartnerMapMarkerFavorite(
   markerShell.classList.toggle("partner-map-marker-shell--favorited", favorited);
 
   const existingBadge = markerShell.querySelector(".partner-map-marker__favorite-badge");
-  // 커스텀 이미지 뱃지(img)가 이미 들어있는 경우는 하트로 덮어쓰지 않음
   if (existingBadge?.querySelector("img")) {
     return;
   }
@@ -280,7 +282,7 @@ export function getMapPartnerMarkersSignature(partners: readonly NaverMapPartner
   return partners
     .map(
       (partner) =>
-        `${partner.id}:${partner.latitude}:${partner.longitude}:${resolvePartnerMapImageUrl(partner.pinImageUrl, partner.imageUrl)}`,
+        `${partner.id}:${partner.latitude}:${partner.longitude}:${resolvePartnerMapImageUrl(partner.imageUrl)}:${partner.pinImageUrl ?? ""}`,
     )
     .sort()
     .join("|");
