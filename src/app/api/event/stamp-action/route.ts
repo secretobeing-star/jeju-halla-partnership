@@ -181,12 +181,19 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { data: progressRow } = await admin
+  const { data: progressRow, error: progressError } = await admin
     .from("user_event_progress")
     .select("*")
     .eq("user_id", userId)
     .eq("event_id", eventId)
     .maybeSingle();
+
+  if (progressError) {
+    return NextResponse.json(
+      { error: `이벤트 진행 정보를 확인하지 못했습니다: ${progressError.message}` },
+      { status: 500 },
+    );
+  }
 
   const stampedPlaces = asStringArray(progressRow?.stamped_places);
   if (stampedPlaces.includes(placeId)) {
@@ -196,15 +203,23 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "이미 완주한 이벤트입니다." }, { status: 409 });
   }
 
-  // ⚡ 쿨다운 검증 로직 보강
+  // 서버에서 실제 DB의 마지막 도장 시간을 기준으로 쿨다운을 강제합니다.
+  // 이벤트 설정이 30이면 30분, 60이면 60분이 자동 적용됩니다.
   const cooldownMinutes = Math.max(0, Number(event.cooldown_minutes) || 0);
-  if (cooldownMinutes > 0 && progressRow?.last_stamped_at) {
-    const last = Date.parse(String(progressRow.last_stamped_at));
-    const remainMs = last + cooldownMinutes * 60_000 - Date.now();
-    if (Number.isFinite(last) && remainMs > 0) {
+  const lastStampedMs = progressRow?.last_stamped_at
+    ? Date.parse(String(progressRow.last_stamped_at))
+    : NaN;
+
+  if (cooldownMinutes > 0 && Number.isFinite(lastStampedMs)) {
+    const cooldownMs = cooldownMinutes * 60_000;
+    const remainMs = lastStampedMs + cooldownMs - Date.now();
+
+    if (remainMs > 0) {
       const remainMin = Math.floor(remainMs / 60_000);
-      const remainSec = Math.ceil((remainMs % 60_000) / 1000);
-      const timeText = remainMin > 0 ? `${remainMin}분 ${remainSec}초` : `${remainSec}초`;
+      const remainSec = Math.max(1, Math.ceil((remainMs % 60_000) / 1000));
+      const timeText =
+        remainMin > 0 ? `${remainMin}분 ${remainSec}초` : `${remainSec}초`;
+
       return NextResponse.json(
         {
           error: `${timeText} 후에 도장을 찍을 수 있습니다.`,
@@ -264,14 +279,66 @@ export async function POST(request: NextRequest) {
     updated_at: nowIso,
   };
 
-  const { data: savedProgress, error: saveError } = progressRow?.id
-    ? await admin
-        .from("user_event_progress")
-        .update(progressPayload)
-        .eq("id", progressRow.id)
-        .select("*")
-        .maybeSingle()
-    : await admin.from("user_event_progress").insert(progressPayload).select("*").maybeSingle();
+  let savedProgress: Record<string, unknown> | null = null;
+  let saveError: { message: string } | null = null;
+
+  if (progressRow?.id) {
+    // 이미 진행 행이 있다면, 처음 읽었던 last_stamped_at이 그대로일 때만
+    // 저장합니다. 다른 요청이 먼저 저장했다면 이 UPDATE가 0행이 되어
+    // 중복 도장을 막을 수 있습니다.
+    let guardedUpdate = admin
+      .from("user_event_progress")
+      .update(progressPayload)
+      .eq("id", progressRow.id);
+
+    if (progressRow.last_stamped_at) {
+      guardedUpdate = guardedUpdate.eq(
+        "last_stamped_at",
+        progressRow.last_stamped_at,
+      );
+    } else {
+      guardedUpdate = guardedUpdate.is("last_stamped_at", null);
+    }
+
+    const result = await guardedUpdate
+      .select("*")
+      .maybeSingle();
+
+    savedProgress = (result.data as Record<string, unknown> | null) ?? null;
+    saveError = result.error
+      ? { message: result.error.message }
+      : null;
+
+    if (!saveError && !savedProgress) {
+      return NextResponse.json(
+        {
+          error: "도장이 이미 처리되었거나 쿨다운이 시작되었습니다. 잠시 후 다시 확인해 주세요.",
+          cooldownError: true,
+        },
+        { status: 429 },
+      );
+    }
+  } else {
+    const result = await admin
+      .from("user_event_progress")
+      .insert(progressPayload)
+      .select("*")
+      .maybeSingle();
+
+    savedProgress = (result.data as Record<string, unknown> | null) ?? null;
+    saveError = result.error
+      ? { message: result.error.message }
+      : null;
+
+    if (!saveError && !savedProgress) {
+      return NextResponse.json(
+        {
+          error: "도장 저장에 실패했습니다.",
+        },
+        { status: 500 },
+      );
+    }
+  }
 
   if (saveError) {
     return NextResponse.json({ error: saveError.message }, { status: 500 });
