@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useAppBackHandler } from "@/lib/app-back-stack";
 import { getSiteMemberSession, SITE_MEMBER_SESSION_EVENT } from "@/lib/site-member-session";
@@ -72,6 +72,10 @@ export default function FrameInventoryNavChip({
   });
   const [selectedFrameId, setSelectedFrameId] = useState<string | null>(null);
 
+  // 스와이프 제스처 관련 ref
+  const touchStartXRef = useRef<number | null>(null);
+  const touchStartYRef = useRef<number | null>(null);
+
   useEffect(() => {
     setMounted(true);
     const session = getSiteMemberSession();
@@ -135,6 +139,9 @@ export default function FrameInventoryNavChip({
     [cardFrames, state.unlockedIds],
   );
 
+  // 전체 탐색 가능한 아이템 리스트 (기본 스타일 null + 해금된 프레임들)
+  const selectableList = useMemo(() => [null, ...unlocked.map((f) => f.id)], [unlocked]);
+
   const currentPreview = useMemo(() => {
     if (!selectedFrameId) return null;
     return unlocked.find((f) => f.id === selectedFrameId) ?? null;
@@ -145,6 +152,49 @@ export default function FrameInventoryNavChip({
     window.dispatchEvent(new Event("site-card-frame-changed"));
   };
 
+  // 좌우 스와이프 로직
+  const handlePrev = useCallback(() => {
+    const currentIndex = selectableList.indexOf(selectedFrameId);
+    if (currentIndex > 0) {
+      setSelectedFrameId(selectableList[currentIndex - 1]);
+    }
+  }, [selectableList, selectedFrameId]);
+
+  const handleNext = useCallback(() => {
+    const currentIndex = selectableList.indexOf(selectedFrameId);
+    if (currentIndex < selectableList.length - 1) {
+      setSelectedFrameId(selectableList[currentIndex + 1]);
+    }
+  }, [selectableList, selectedFrameId]);
+
+  const onTouchStart = (e: React.TouchEvent | React.MouseEvent) => {
+    const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
+    const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
+    touchStartXRef.current = clientX;
+    touchStartYRef.current = clientY;
+  };
+
+  const onTouchEnd = (e: React.TouchEvent | React.MouseEvent) => {
+    if (touchStartXRef.current === null || touchStartYRef.current === null) return;
+    const clientX = "changedTouches" in e ? e.changedTouches[0].clientX : e.clientX;
+    const clientY = "changedTouches" in e ? e.changedTouches[0].clientY : e.clientY;
+
+    const diffX = touchStartXRef.current - clientX;
+    const diffY = touchStartYRef.current - clientY;
+
+    // 세로 스크롤 의도가 아니고, 가로 이동이 40px 이상일 때 스와이프 인정
+    if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 40) {
+      if (diffX > 0) {
+        handleNext(); // 오른쪽에서 왼쪽으로 밀면 다음 코스튬
+      } else {
+        handlePrev(); // 왼쪽에서 오른쪽으로 밀면 이전 코스튬
+      }
+    }
+
+    touchStartXRef.current = null;
+    touchStartYRef.current = null;
+  };
+
   const isCurrentEquipped = state.activeFrameId === (currentPreview?.id ?? null);
 
   const modal =
@@ -152,7 +202,7 @@ export default function FrameInventoryNavChip({
       ? createPortal(
           <div className="site-event-overlay flex items-center justify-center p-3 sm:p-4 bg-black/60 z-50 fixed inset-0" onClick={close}>
             <div
-              className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl flex flex-col border border-gray-100 animate-in fade-in zoom-in-95 duration-150"
+              className="bg-white rounded-3xl w-full max-w-md md:max-w-2xl overflow-hidden shadow-2xl flex flex-col border border-gray-100 animate-in fade-in zoom-in-95 duration-150 max-h-[92vh]"
               role="dialog"
               aria-modal="true"
               aria-label="코스튬 보관함"
@@ -175,7 +225,7 @@ export default function FrameInventoryNavChip({
               </div>
 
               {/* 본문 영역 */}
-              <div className="p-4 flex flex-col gap-3.5 bg-gray-50/60">
+              <div className="p-3.5 sm:p-5 flex-1 overflow-y-auto bg-gray-50/60">
                 {!studentId ? (
                   <p className="text-center py-12 text-gray-500 text-sm">로그인(학번) 후 이용할 수 있습니다.</p>
                 ) : unlocked.length === 0 ? (
@@ -183,11 +233,17 @@ export default function FrameInventoryNavChip({
                     보유한 학생증 코스튬이 없습니다.<br />이벤트 완료나 선물함에서 코스튬을 획득해 보세요!
                   </p>
                 ) : (
-                  <>
-                    {/* [상단 카드] 실제 모바일 학생증 가로형 프리뷰 */}
-                    <div className="bg-white border border-gray-200/90 rounded-2xl p-4 shadow-xs flex flex-col items-center">
+                  <div className="flex flex-col md:flex-row gap-3.5 sm:gap-4 h-full">
+                    {/* [메인 영역] 학생증 프리뷰 카드 (터치/마우스 좌우 스와이프 적용) */}
+                    <div 
+                      className="flex-1 flex flex-col items-center bg-white border border-gray-200/90 rounded-2xl p-3.5 sm:p-4 shadow-xs select-none touch-pan-y"
+                      onTouchStart={onTouchStart}
+                      onTouchEnd={onTouchEnd}
+                      onMouseDown={onTouchStart}
+                      onMouseUp={onTouchEnd}
+                    >
                       {/* 가로형 학생증 카드 디자인 */}
-                      <div className="relative w-full aspect-[1.58/1] rounded-2xl bg-white border border-gray-200/90 shadow-sm p-4 text-gray-800 flex flex-col justify-between overflow-hidden">
+                      <div className="relative w-full aspect-[1.58/1] rounded-2xl bg-white border border-gray-200/90 shadow-sm p-4 text-gray-800 flex flex-col justify-between overflow-hidden cursor-grab active:cursor-grabbing">
                         {/* 착용 프레임 이미지 오버레이 */}
                         {currentPreview?.imageUrl ? (
                           <img
@@ -236,7 +292,7 @@ export default function FrameInventoryNavChip({
                       </div>
 
                       {/* 프레임 정보 및 착용 버튼 */}
-                      <div className="w-full pt-3 mt-3 border-t border-gray-100 text-center">
+                      <div className="w-full pt-3 mt-2.5 border-t border-gray-100 text-center">
                         <div className="mb-2">
                           <div className="flex items-center justify-center gap-1.5">
                             <h4 className="font-bold text-gray-900 text-sm">
@@ -269,16 +325,16 @@ export default function FrameInventoryNavChip({
                       </div>
                     </div>
 
-                    {/* [하단 가로 스크롤 목록] 큼직하고 컴팩트한 사각 칩 */}
-                    <div className="bg-white border border-gray-200/90 rounded-2xl p-3.5 shadow-xs">
+                    {/* [목록 영역: 모바일은 하단 가로 일자 칩 / PC·태블릿·폴드는 우측 세로 스크롤] */}
+                    <div className="md:w-56 flex flex-col flex-shrink-0 bg-white border border-gray-200/90 rounded-2xl p-3 shadow-xs">
                       <p className="text-xs font-bold text-gray-700 mb-2 px-0.5 text-left">
                         보유 코스튬 ({unlocked.length})
                       </p>
-                      <div className="flex gap-2.5 overflow-x-auto pb-1 no-scrollbar">
-                        {/* 기본 프레임 선택 버튼 */}
+                      <div className="flex md:flex-col gap-2 overflow-x-auto md:overflow-y-auto pb-1 md:pb-0 md:max-h-[360px] no-scrollbar">
+                        {/* 기본 스타일 선택 버튼 */}
                         <button
                           type="button"
-                          className={`flex-shrink-0 flex items-center gap-2.5 p-2 rounded-xl border text-left transition-all min-w-[130px] ${
+                          className={`flex-shrink-0 flex items-center gap-2.5 p-2 rounded-xl border text-left transition-all min-w-[130px] md:min-w-0 ${
                             selectedFrameId === null
                               ? "border-emerald-500 bg-emerald-50/60 shadow-xs ring-2 ring-emerald-500/20"
                               : "border-gray-200 bg-gray-50/50 hover:bg-gray-100/70"
@@ -306,7 +362,7 @@ export default function FrameInventoryNavChip({
                             <button
                               key={frame.id}
                               type="button"
-                              className={`flex-shrink-0 relative flex items-center gap-2.5 p-2 rounded-xl border text-left transition-all min-w-[140px] ${
+                              className={`flex-shrink-0 relative flex items-center gap-2.5 p-2 rounded-xl border text-left transition-all min-w-[140px] md:min-w-0 ${
                                 isSelected
                                   ? "border-emerald-500 bg-emerald-50/60 shadow-xs ring-2 ring-emerald-500/20"
                                   : "border-gray-200 bg-gray-50/50 hover:bg-gray-100/70"
@@ -333,7 +389,7 @@ export default function FrameInventoryNavChip({
                         })}
                       </div>
                     </div>
-                  </>
+                  </div>
                 )}
               </div>
             </div>
