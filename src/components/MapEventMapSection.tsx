@@ -146,25 +146,25 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const [rewardModal, setRewardModal] = useState<RewardModalState | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
 
-  // ⚡ 최신 위치 정보를 항상 메모리에 보유 (클릭 시 비동기 딜레이 0초 달성)
   const lastKnownGeoRef = useRef<{ latitude: number; longitude: number } | null>(null);
 
   const refreshLocationCache = useCallback(() => {
     void getCurrentGeolocation({
-      enableHighAccuracy: false,
-      maximumAge: 180_000,
-      timeout: 3_000,
+      enableHighAccuracy: true,
+      maximumAge: 60_000,
+      timeout: 4_000,
     })
       .then((geo) => {
-        lastKnownGeoRef.current = { latitude: geo.latitude, longitude: geo.longitude };
+        if (geo.latitude && geo.longitude) {
+          lastKnownGeoRef.current = { latitude: geo.latitude, longitude: geo.longitude };
+        }
       })
       .catch(() => {});
   }, []);
 
   useEffect(() => {
     refreshLocationCache();
-    // 30초마다 백그라운드에서 최신 위치 갱신
-    const interval = window.setInterval(refreshLocationCache, 30_000);
+    const interval = window.setInterval(refreshLocationCache, 20_000);
     return () => window.clearInterval(interval);
   }, [refreshLocationCache]);
 
@@ -362,23 +362,32 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       return;
     }
 
-    // ⚡ 즉시 중복 클릭 방지 플래그 On
     setBusy(true);
     setMessage(null);
 
-    // ⚡ 메모리 캐시 우선 확인 (없을 시에만 빠른 비동기 조회)
+    // ⚡ 캐시된 위치 확인 및 없으면 실시간 정밀 조회 (0,0 오류 방지)
     let geo = lastKnownGeoRef.current;
-    if (!geo) {
+    if (!geo || !geo.latitude || !geo.longitude) {
       try {
         const fetched = await getCurrentGeolocation({
-          enableHighAccuracy: false,
-          maximumAge: 180_000,
-          timeout: 1500,
+          enableHighAccuracy: true,
+          maximumAge: 30_000,
+          timeout: 4000,
         });
         geo = { latitude: fetched.latitude, longitude: fetched.longitude };
         lastKnownGeoRef.current = geo;
       } catch {
-        geo = { latitude: 0, longitude: 0 };
+        setRewardModal({
+          kind: "distance",
+          title: "위치 권한 확인",
+          body: "현재 위치 정보를 가져올 수 없습니다. 브라우저/기기의 GPS 및 위치 권한을 확인해 주세요.",
+          banner: activeEvent.banner_img || null,
+          rewardName: null,
+          rewardImg: null,
+          showGiftButton: false,
+        });
+        setBusy(false);
+        return;
       }
     }
 
@@ -510,7 +519,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         });
       }
 
-      // ⚡ 백그라운드 비동기 로그 전송
       setTimeout(() => {
         sendMapStampLog({
           action: popupKind === "completion" ? "스탬프 완주" : "도장 찍기",
