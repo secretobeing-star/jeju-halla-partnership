@@ -160,16 +160,20 @@ export function createPartnerMapMarkerElement(
     event.stopPropagation();
   });
 
-  if (markerSettings?.borderColor) {
-    button.style.borderColor = markerSettings.borderColor;
+  // 테두리 색상 적용 (본체 테두리)
+  const customBorderColor = markerSettings?.borderColor?.trim();
+  if (customBorderColor) {
+    button.style.borderColor = customBorderColor;
+    button.style.boxShadow = `0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 0 0 1px ${customBorderColor}`;
   }
+
   if (markerSettings?.bgImg) {
     button.style.backgroundImage = `url(${JSON.stringify(markerSettings.bgImg)})`;
     button.style.backgroundSize = "cover";
     button.style.backgroundPosition = "center";
   }
 
-  // 1. 마커 본체: 항상 제휴처 고유 이미지(imageUrl)를 표시 (pinImageUrl로 인한 덮어쓰기 방지)
+  // 마커 본체는 항상 매장 고유 이미지(imageUrl)만 사용
   if (markerSettings?.thumbnailEnabled === false) {
     const fallback = createPartnerMapInitialFallbackElement("partner-map-marker__fallback", partner.name);
     button.appendChild(fallback);
@@ -191,14 +195,18 @@ export function createPartnerMapMarkerElement(
     button.appendChild(img);
   }
 
+  // 하단 꼬리핀 (테두리 색상에 맞춰 꼬리 색상도 동기화)
   const tail = document.createElement("span");
   tail.className = "partner-map-marker__tail";
   tail.setAttribute("aria-hidden", "true");
+  if (customBorderColor) {
+    tail.style.borderTopColor = customBorderColor;
+  }
   button.appendChild(tail);
 
   shell.appendChild(button);
 
-  // 2. 상단 원형 뱃지: 이벤트 아이콘(pinImageUrl 또는 markerSettings.topIconImg)이 있으면 불꽃 등 아이콘을 부착
+  // 상단 원형 뱃지 (하트 대체 불꽃 아이콘)
   const topBadgeIconUrl = markerSettings?.topIconImg || partner.pinImageUrl;
 
   if (topBadgeIconUrl) {
@@ -260,6 +268,7 @@ export function updatePartnerMapMarkerFavorite(
   existingBadge?.remove();
 }
 
+/** 시간 배지 업데이트 (HTML 이모지 및 텍스트 렌더링 지원) */
 export function upsertPartnerMapCountdownBadge(markerShell: HTMLElement, text: string | null) {
   let badge = markerShell.querySelector(".partner-map-marker__countdown");
   if (!text) {
@@ -486,7 +495,7 @@ export function createPartnerMapMiniCardElement(
     stampButton.disabled = Boolean(options.stamp.disabled);
     stampButton.textContent = options.stamp.disabled
       ? "이미 찍은 장소"
-      : options.stamp.label || "도장 찍기";
+      : options.stamp.label?.trim() || "도장 찍기";
     stampButton.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();

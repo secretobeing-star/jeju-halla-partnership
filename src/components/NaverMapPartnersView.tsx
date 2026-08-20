@@ -183,7 +183,7 @@ export default function NaverMapPartnersView({
     markerSettingsRef.current = markerSettings;
   }, [markerSettings]);
 
-  // 도장 버튼 라벨 변경 시 열려있는 카드에도 즉시 반영
+  // 도장 버튼 라벨 변경 시 열려있는 카드에도 실시간 반영
   useEffect(() => {
     stampActionRef.current = stampAction;
     const openCard = miniCardElementRef.current;
