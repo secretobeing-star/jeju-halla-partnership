@@ -51,23 +51,27 @@ function CloseIcon({ className = "h-5 w-5" }: { className?: string }) {
   );
 }
 
+const STORAGE_KEY_PAGE_SIZE = "halla_costume_page_size";
+
 type FrameInventoryNavChipProps = {
   cardFrames: PublicCardFrameItem[];
   hideChip?: boolean;
-  /** 관리자 설정: 한 페이지당 노출할 코스튬 아이템 개수 (기본값: 4) */
-  pageSize?: number;
+  /** 기본 노출 개수 (관리자 설정이 없을 때 사용) */
+  defaultPageSize?: number;
 };
 
 export default function FrameInventoryNavChip({
   cardFrames,
   hideChip = false,
-  pageSize = 4,
+  defaultPageSize = 4,
 }: FrameInventoryNavChipProps) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [studentId, setStudentId] = useState("");
   const [studentName, setStudentName] = useState("");
   const [department, setDepartment] = useState("");
+  const [effectivePageSize, setEffectivePageSize] = useState(defaultPageSize);
+
   const [state, setState] = useState<CardFrameUserState>({
     unlockedIds: [],
     activeFrameId: null,
@@ -80,13 +84,32 @@ export default function FrameInventoryNavChip({
   const touchStartXRef = useRef<number | null>(null);
   const touchStartYRef = useRef<number | null>(null);
 
+  // 관리자 설정된 페이지 크기 동기화
+  const loadAdminPageSize = useCallback(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY_PAGE_SIZE);
+      if (stored) {
+        const parsed = parseInt(stored, 10);
+        if (!isNaN(parsed) && parsed > 0) {
+          setEffectivePageSize(parsed);
+          return;
+        }
+      }
+    } catch {
+      // ignore
+    }
+    setEffectivePageSize(defaultPageSize);
+  }, [defaultPageSize]);
+
   useEffect(() => {
     setMounted(true);
     const session = getSiteMemberSession();
     setStudentId(session?.student?.studentId?.trim() || "");
     setStudentName(session?.student?.name?.trim() || "김주호");
     setDepartment(session?.student?.department?.trim() || "유아교육과");
-  }, []);
+    loadAdminPageSize();
+  }, [loadAdminPageSize]);
 
   const refresh = useCallback(() => {
     const session = getSiteMemberSession();
@@ -94,6 +117,8 @@ export default function FrameInventoryNavChip({
     setStudentId(id);
     setStudentName(session?.student?.name?.trim() || "김주호");
     setDepartment(session?.student?.department?.trim() || "유아교육과");
+    loadAdminPageSize();
+
     if (!id) {
       setState({ unlockedIds: [], activeFrameId: null, sources: {} });
       setOpen(false);
@@ -103,16 +128,18 @@ export default function FrameInventoryNavChip({
       setState(nextState);
       setSelectedFrameId((prev) => prev ?? nextState.activeFrameId ?? null);
     });
-  }, [cardFrames]);
+  }, [cardFrames, loadAdminPageSize]);
 
   useEffect(() => {
     refresh();
     const onRefresh = () => refresh();
     window.addEventListener("site-frame-inventory-refresh", onRefresh);
+    window.addEventListener("site-frame-settings-updated", onRefresh);
     window.addEventListener("focus", onRefresh);
     window.addEventListener(SITE_MEMBER_SESSION_EVENT, onRefresh);
     return () => {
       window.removeEventListener("site-frame-inventory-refresh", onRefresh);
+      window.removeEventListener("site-frame-settings-updated", onRefresh);
       window.removeEventListener("focus", onRefresh);
       window.removeEventListener(SITE_MEMBER_SESSION_EVENT, onRefresh);
     };
@@ -143,29 +170,22 @@ export default function FrameInventoryNavChip({
     [cardFrames, state.unlockedIds],
   );
 
-  // 기본 스타일(null)을 포함한 전체 아이템 리스트 (순번 매김용)
   const allDisplayItems = useMemo(() => {
     return [
-      { id: null, name: "기본 스타일", isDefault: true, indexNum: 0 },
-      ...unlocked.map((frame, idx) => ({
+      { id: null, name: "기본 스타일", isDefault: true },
+      ...unlocked.map((frame) => ({
         ...frame,
         isDefault: false,
-        indexNum: idx + 1,
       })),
     ];
   }, [unlocked]);
 
-  // 페이지네이션 연산
-  const totalPages = Math.max(1, Math.ceil(allDisplayItems.length / pageSize));
+  // 페이지 연산
+  const totalPages = Math.max(1, Math.ceil(allDisplayItems.length / effectivePageSize));
   const paginatedItems = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return allDisplayItems.slice(start, start + pageSize);
-  }, [allDisplayItems, currentPage, pageSize]);
-
-  // 선택된 아이템 정보
-  const currentItemInfo = useMemo(() => {
-    return allDisplayItems.find((item) => item.id === selectedFrameId) || allDisplayItems[0];
-  }, [allDisplayItems, selectedFrameId]);
+    const start = (currentPage - 1) * effectivePageSize;
+    return allDisplayItems.slice(start, start + effectivePageSize);
+  }, [allDisplayItems, currentPage, effectivePageSize]);
 
   const currentPreview = useMemo(() => {
     if (!selectedFrameId) return null;
@@ -177,26 +197,23 @@ export default function FrameInventoryNavChip({
     window.dispatchEvent(new Event("site-card-frame-changed"));
   };
 
-  // 좌우 스와이프 로직
   const handlePrev = useCallback(() => {
     const currentIndex = allDisplayItems.findIndex((item) => item.id === selectedFrameId);
     if (currentIndex > 0) {
       const prevItem = allDisplayItems[currentIndex - 1];
       setSelectedFrameId(prevItem.id);
-      // 필요 시 페이지 동기화
-      setCurrentPage(Math.floor((currentIndex - 1) / pageSize) + 1);
+      setCurrentPage(Math.floor((currentIndex - 1) / effectivePageSize) + 1);
     }
-  }, [allDisplayItems, selectedFrameId, pageSize]);
+  }, [allDisplayItems, selectedFrameId, effectivePageSize]);
 
   const handleNext = useCallback(() => {
     const currentIndex = allDisplayItems.findIndex((item) => item.id === selectedFrameId);
     if (currentIndex < allDisplayItems.length - 1) {
       const nextItem = allDisplayItems[currentIndex + 1];
       setSelectedFrameId(nextItem.id);
-      // 필요 시 페이지 동기화
-      setCurrentPage(Math.floor((currentIndex + 1) / pageSize) + 1);
+      setCurrentPage(Math.floor((currentIndex + 1) / effectivePageSize) + 1);
     }
-  }, [allDisplayItems, selectedFrameId, pageSize]);
+  }, [allDisplayItems, selectedFrameId, effectivePageSize]);
 
   const onTouchStart = (e: React.TouchEvent | React.MouseEvent) => {
     const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
@@ -230,16 +247,19 @@ export default function FrameInventoryNavChip({
   const modal =
     mounted && open
       ? createPortal(
-          <div className="site-event-overlay flex items-center justify-center p-3 sm:p-4 bg-black/60 z-50 fixed inset-0" onClick={close}>
+          <div 
+            className="site-event-overlay fixed inset-0 flex items-center justify-center p-4 bg-black/60 z-50 overflow-y-auto" 
+            onClick={close}
+          >
             <div
-              className="bg-white rounded-3xl w-full max-w-sm md:max-w-xl overflow-hidden shadow-2xl flex flex-col border border-gray-100 animate-in fade-in zoom-in-95 duration-150 h-fit max-h-[90vh]"
+              className="bg-white rounded-3xl w-full max-w-sm md:max-w-xl overflow-hidden shadow-2xl flex flex-col border border-gray-100 animate-in fade-in zoom-in-95 duration-150 m-auto"
               role="dialog"
               aria-modal="true"
               aria-label="코스튬 보관함"
               onClick={(e) => e.stopPropagation()}
             >
               {/* 상단 헤더 */}
-              <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 bg-white">
+              <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 bg-white">
                 <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
                   <FrameBoxIcon className="w-5 h-5 text-emerald-600" />
                   코스튬 보관함
@@ -255,7 +275,7 @@ export default function FrameInventoryNavChip({
               </div>
 
               {/* 본문 영역 */}
-              <div className="p-3.5 sm:p-4 flex-1 overflow-y-auto bg-gray-50/60 flex flex-col gap-2.5 items-center">
+              <div className="p-3.5 sm:p-4 bg-gray-50/60 flex flex-col gap-2.5 items-center">
                 {!studentId ? (
                   <p className="text-center py-8 text-gray-500 text-sm w-full">로그인(학번) 후 이용할 수 있습니다.</p>
                 ) : unlocked.length === 0 ? (
@@ -272,7 +292,7 @@ export default function FrameInventoryNavChip({
                       onMouseDown={onTouchStart}
                       onMouseUp={onTouchEnd}
                     >
-                      {/* 가로형 학생증 카드 디자인 (완벽한 중앙 배치) */}
+                      {/* 가로형 학생증 카드 디자인 */}
                       <div className="relative w-full aspect-[1.62/1] max-w-[340px] rounded-2xl bg-white border border-gray-200/90 shadow-sm p-3.5 text-gray-800 flex flex-col justify-between overflow-hidden cursor-grab active:cursor-grabbing mx-auto">
                         {currentPreview?.imageUrl ? (
                           <img
@@ -320,11 +340,6 @@ export default function FrameInventoryNavChip({
                       <div className="w-full pt-2.5 mt-2 border-t border-gray-100 text-center">
                         <div className="mb-2">
                           <div className="flex items-center justify-center gap-1.5">
-                            {currentItemInfo.indexNum > 0 ? (
-                              <span className="px-1.5 py-0.5 text-[10px] font-black rounded-md bg-gray-800 text-white">
-                                #{String(currentItemInfo.indexNum).padStart(2, "0")}
-                              </span>
-                            ) : null}
                             <h4 className="font-bold text-gray-900 text-xs sm:text-sm">
                               {currentPreview?.name || "기본 학생증"}
                             </h4>
@@ -355,7 +370,7 @@ export default function FrameInventoryNavChip({
                       </div>
                     </div>
 
-                    {/* [하단 목록 영역] 번호 부여 & N개당 페이지네이션 */}
+                    {/* [하단 목록 영역] 관리자 N개 페이지네이션 */}
                     <div className="w-full flex flex-col bg-white border border-gray-200/90 rounded-2xl p-3 shadow-xs">
                       <div className="flex items-center justify-between mb-2 px-0.5">
                         <p className="text-xs font-bold text-gray-700">
@@ -400,14 +415,13 @@ export default function FrameInventoryNavChip({
                               }`}
                               onClick={() => setSelectedFrameId(item.id)}
                             >
-                              {/* 코스튬 순번 번호 배지 */}
-                              <div className="w-8 h-8 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center text-[10px] font-black text-gray-600 flex-shrink-0">
-                                {item.isDefault ? "기본" : `#${String(item.indexNum).padStart(2, "0")}`}
-                              </div>
-
-                              {/* 썸네일 이미지 */}
-                              {!item.isDefault ? (
-                                <div className="w-8 h-8 rounded-lg bg-white border border-gray-200 flex items-center justify-center p-0.5 overflow-hidden flex-shrink-0">
+                              {/* 썸네일 아이콘 */}
+                              {item.isDefault ? (
+                                <div className="w-9 h-9 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center text-[11px] font-bold text-gray-600 flex-shrink-0">
+                                  기본
+                                </div>
+                              ) : (
+                                <div className="w-9 h-9 rounded-lg bg-white border border-gray-200 flex items-center justify-center p-0.5 overflow-hidden flex-shrink-0">
                                   {(item as PublicCardFrameItem).imageUrl ? (
                                     <img
                                       src={(item as PublicCardFrameItem).imageUrl}
@@ -418,9 +432,9 @@ export default function FrameInventoryNavChip({
                                     <span className="text-[8px] text-gray-400 text-center line-clamp-1">{item.name}</span>
                                   )}
                                 </div>
-                              ) : null}
+                              )}
 
-                              {/* 정보 */}
+                              {/* 아이템 이름 및 상태 */}
                               <div className="flex-1 min-w-0">
                                 <p className="text-xs font-bold text-gray-800 truncate leading-tight">
                                   {item.name}
