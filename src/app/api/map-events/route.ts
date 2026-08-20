@@ -44,6 +44,10 @@ type EventRow = {
 };
 
 function mapEventRow(row: EventRow, extras?: Partial<MapEvent>): MapEvent {
+  const winMsg = row.win_message ?? row.win_popup_message ?? extras?.win_message ?? extras?.win_popup_message ?? null;
+  const loseMsg = row.lose_message ?? row.lose_popup_message ?? extras?.lose_message ?? extras?.lose_popup_message ?? null;
+  const compMsg = row.completion_message ?? row.completion_popup_message ?? extras?.completion_message ?? extras?.completion_popup_message ?? null;
+
   return {
     id: row.id,
     tab_name: row.tab_name ?? "",
@@ -68,14 +72,17 @@ function mapEventRow(row: EventRow, extras?: Partial<MapEvent>): MapEvent {
     completion_badge_img: row.completion_badge_img ?? null,
     guide_text: row.guide_text ?? null,
     distance_error_message: row.distance_error_message ?? extras?.distance_error_message ?? null,
-    win_popup_message: row.win_popup_message ?? row.win_message ?? extras?.win_popup_message ?? null,
-    lose_popup_message: row.lose_popup_message ?? row.lose_message ?? extras?.lose_popup_message ?? null,
-    completion_popup_message: row.completion_popup_message ?? row.completion_message ?? extras?.completion_popup_message ?? null,
+    win_popup_message: winMsg,
+    lose_popup_message: loseMsg,
+    completion_popup_message: compMsg,
+    win_message: winMsg,
+    lose_message: loseMsg,
+    completion_message: compMsg,
     stamp_btn_label: row.stamp_btn_label ?? extras?.stamp_btn_label ?? null,
     sort_order: Number(row.sort_order) || 0,
     partner_ids: extras?.partner_ids ?? [],
     rewards: extras?.rewards ?? [],
-  } as MapEvent;
+  } as unknown as MapEvent;
 }
 
 export async function GET(request: NextRequest) {
@@ -207,9 +214,9 @@ export async function POST(request: NextRequest) {
     completion_badge_img: body.completion_badge_img?.trim() || null,
     guide_text: body.guide_text?.trim() || null,
     distance_error_message: body.distance_error_message?.trim() || null,
-    win_popup_message: body.win_popup_message?.trim() || null,
-    lose_popup_message: body.lose_popup_message?.trim() || null,
-    completion_popup_message: body.completion_popup_message?.trim() || null,
+    win_popup_message: body.win_popup_message?.trim() || body.win_message?.trim() || null,
+    lose_popup_message: body.lose_popup_message?.trim() || body.lose_message?.trim() || null,
+    completion_popup_message: body.completion_popup_message?.trim() || body.completion_message?.trim() || null,
     stamp_btn_label: body.stamp_btn_label?.trim() || null,
     sort_order: Number(body.sort_order) || 0,
     updated_at: new Date().toISOString(),
