@@ -182,6 +182,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     nowMs,
   );
 
+  // 1초 단위 타이머 갱신 (쿨다운 중이거나 이벤트 종료 시간이 임박했을 때 활성화)
   useEffect(() => {
     const nextEnd = events
       .map((event) => (event.end_at ? Date.parse(event.end_at) : Number.NaN))
@@ -365,7 +366,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     setBusy(true);
     setMessage(null);
 
-    // ⚡ 캐시된 위치 확인 및 없으면 실시간 정밀 조회 (0,0 오류 방지)
     let geo = lastKnownGeoRef.current;
     if (!geo || !geo.latitude || !geo.longitude) {
       try {
@@ -452,7 +452,26 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         throw new Error(payload.error || "도장을 찍지 못했습니다.");
       }
 
-      if (payload.progress) setProgress(payload.progress);
+      // ⚡ 도장 성공 즉시 last_stamped_at을 보장 주입하여 쿨다운 타이머 즉각 발동
+      const stampedNow = new Date().toISOString();
+      if (payload.progress) {
+        setProgress({
+          ...payload.progress,
+          last_stamped_at: payload.progress.last_stamped_at || stampedNow,
+        });
+      } else {
+        setProgress((prev) =>
+          prev
+            ? {
+                ...prev,
+                current_stamps: prev.current_stamps + 1,
+                last_stamped_at: stampedNow,
+                stamped_places: [...(prev.stamped_places || []), partner.id],
+              }
+            : null,
+        );
+      }
+      setNowMs(Date.now());
 
       const maxStamps = activeEvent.max_stamps || 5;
       const nextStampCount = payload.progress?.current_stamps ?? (progress?.current_stamps ?? 0) + 1;
