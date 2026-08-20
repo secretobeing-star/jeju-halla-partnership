@@ -45,6 +45,7 @@ type EventForm = {
   stamp_bar_bg_color: string;
   completion_badge_img: string;
   guide_text: string;
+  login_required_message: string;
   distance_error_message: string;
   win_message: string;
   lose_message: string;
@@ -75,6 +76,7 @@ const EMPTY_FORM: EventForm = {
   stamp_bar_bg_color: "#ecfdf5",
   completion_badge_img: "",
   guide_text: "",
+  login_required_message: "로그인 후 이벤트 도장을 찍고 보상을 받을 수 있습니다. 로그인하시겠습니까?",
   distance_error_message: "제휴처와의 거리가 {distance}m 남았습니다. 지정된 반경({radius}m) 내에서 도장을 찍어주세요.",
   win_message: "선물함으로 보상이 지급되었습니다!",
   lose_message: "",
@@ -88,6 +90,7 @@ function eventToForm(event: MapEvent): EventForm {
     marker_border_color?: string;
     marker_time_icon?: string;
     marker_time_format?: string;
+    login_required_message?: string;
   };
 
   return {
@@ -115,6 +118,9 @@ function eventToForm(event: MapEvent): EventForm {
     stamp_bar_bg_color: event.stamp_bar_bg_color?.trim() || "#ecfdf5",
     completion_badge_img: event.completion_badge_img ?? "",
     guide_text: event.guide_text ?? "",
+    login_required_message:
+      extra.login_required_message ??
+      "로그인 후 이벤트 도장을 찍고 보상을 받을 수 있습니다. 로그인하시겠습니까?",
     distance_error_message:
       event.distance_error_message ??
       "제휴처와의 거리가 {distance}m 남았습니다. 지정된 반경({radius}m) 내에서 도장을 찍어주세요.",
@@ -317,6 +323,7 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
         stamp_bar_bg_color: form.stamp_bar_bg_color || null,
         completion_badge_img: form.completion_badge_img || null,
         guide_text: form.guide_text || null,
+        login_required_message: form.login_required_message?.trim() || null,
         distance_error_message: form.distance_error_message?.trim() || null,
         win_popup_message: form.win_message?.trim() || null,
         lose_popup_message: form.lose_message?.trim() || null,
@@ -664,6 +671,21 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
               </span>
             </label>
             <label className="text-sm font-medium text-gray-700">
+              비로그인 안내 문구 (로그인 유도 팝업)
+              <input
+                value={form.login_required_message}
+                onChange={(e) => setForm((prev) => ({ ...prev, login_required_message: e.target.value }))}
+                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                placeholder="로그인 후 이벤트에 참여할 수 있습니다."
+              />
+              <span className="mt-1 block text-xs font-normal text-gray-500">
+                비로그인 사용자가 도장 찍기를 누르면 노출되는 팝업/확인창 문구입니다.
+              </span>
+            </label>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="text-sm font-medium text-gray-700">
               거리 초과 안내 문구
               <input
                 value={form.distance_error_message}
@@ -675,17 +697,17 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
                 {`{distance}`}와 {`{radius}`}는 실제 거리/반경 숫자로 자동 치환됩니다.
               </span>
             </label>
+            <label className="text-sm font-medium text-gray-700">
+              안내 문구 (가이드)
+              <input
+                value={form.guide_text}
+                onChange={(e) => setForm((prev) => ({ ...prev, guide_text: e.target.value }))}
+                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                placeholder="이벤트 유의사항 및 참여 안내"
+              />
+            </label>
           </div>
 
-          <label className="text-sm font-medium text-gray-700">
-            안내 문구
-            <textarea
-              rows={2}
-              value={form.guide_text}
-              onChange={(e) => setForm((prev) => ({ ...prev, guide_text: e.target.value }))}
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-            />
-          </label>
           <div className="grid gap-4 sm:grid-cols-3">
             <label className="text-sm font-medium text-gray-700">
               당첨 문구
@@ -712,6 +734,7 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
               />
             </label>
           </div>
+
           <div>
             <p className="mb-2 text-sm font-medium text-gray-700">회차별 당첨 확률 (%)</p>
             <div className="grid gap-2 sm:grid-cols-4">
