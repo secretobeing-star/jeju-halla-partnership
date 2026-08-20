@@ -85,7 +85,6 @@ export function createPartnerMapHtmlIcon(
   };
 }
 
-
 export function truncatePartnerMapText(text: string | null | undefined, max = 56): string {
   const line = text?.trim().split("\n")[0]?.trim() ?? "";
   if (!line) {
@@ -122,12 +121,12 @@ function bindPartnerMapImageFallback(
 }
 
 export type MapMarkerCustomSettings = {
-  borderColor: string | null;
-  bgImg: string | null;
-  thumbnailEnabled: boolean;
-  topIconImg: string | null;
-  timeIcon: string | null;
-  timeFormat: string | null;
+  borderColor?: string | null;
+  bgImg?: string | null;
+  thumbnailEnabled?: boolean;
+  topIconImg?: string | null;
+  timeIcon?: string | null;
+  timeFormat?: string | null;
 };
 
 export function createPartnerMapMarkerElement(
@@ -198,20 +197,22 @@ export function createPartnerMapMarkerElement(
 
   shell.appendChild(button);
 
-  if (favorited) {
-    if (markerSettings?.topIconImg) {
-      const customBadge = document.createElement("span");
-      customBadge.className = "partner-map-marker__favorite-badge";
-      customBadge.setAttribute("aria-hidden", "true");
-      const badgeImg = document.createElement("img");
-      badgeImg.src = markerSettings.topIconImg;
-      badgeImg.alt = "";
-      badgeImg.className = "partner-map-marker__favorite-badge-img";
-      customBadge.appendChild(badgeImg);
-      shell.appendChild(customBadge);
-    } else {
-      shell.appendChild(createPartnerMapFavoriteBadgeElement());
-    }
+  // 상단 뱃지 렌더링: 이벤트 탭 전용 아이콘이 있으면 항상 표시, 없을 때는 즐겨찾기 시에만 하트 표시
+  if (markerSettings?.topIconImg) {
+    const customBadge = document.createElement("span");
+    customBadge.className = "partner-map-marker__favorite-badge";
+    customBadge.setAttribute("aria-hidden", "true");
+    const badgeImg = document.createElement("img");
+    badgeImg.src = markerSettings.topIconImg;
+    badgeImg.alt = "";
+    badgeImg.className = "partner-map-marker__favorite-badge-img";
+    badgeImg.style.width = "100%";
+    badgeImg.style.height = "100%";
+    badgeImg.style.objectFit = "contain";
+    customBadge.appendChild(badgeImg);
+    shell.appendChild(customBadge);
+  } else if (favorited) {
+    shell.appendChild(createPartnerMapFavoriteBadgeElement());
   }
 
   return shell;
@@ -241,11 +242,15 @@ export function updatePartnerMapMarkerFavorite(
   markerShell.classList.toggle("partner-map-marker-shell--favorited", favorited);
 
   const existingBadge = markerShell.querySelector(".partner-map-marker__favorite-badge");
+  // 커스텀 이미지 뱃지(img)가 이미 들어있는 경우는 하트로 덮어쓰지 않음
+  if (existingBadge?.querySelector("img")) {
+    return;
+  }
+
   if (favorited) {
     if (existingBadge) {
       return;
     }
-
     markerShell.appendChild(createPartnerMapFavoriteBadgeElement());
     return;
   }
