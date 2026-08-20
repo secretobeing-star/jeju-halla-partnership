@@ -10740,6 +10740,16 @@ html.pwa-fold-tablet-lg.dark-mode .tablet-split-detail-pane {
   border: 1px solid #e5e7eb;
   border-radius: 0.75rem;
   background: #fff;
+  touch-action: pan-y;
+  position: relative;
+  overflow: hidden;
+}
+
+.gift-inbox__card {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  width: 100%;
 }
 
 .gift-inbox__thumb {
@@ -10763,6 +10773,13 @@ html.pwa-fold-tablet-lg.dark-mode .tablet-split-detail-pane {
   font-size: 0.9rem;
   font-weight: 700;
   color: #111827;
+}
+
+.gift-inbox__description {
+  margin: 0.15rem 0 0;
+  font-size: 0.8rem;
+  color: #4b5563;
+  line-height: 1.4;
 }
 
 .gift-inbox__msg,

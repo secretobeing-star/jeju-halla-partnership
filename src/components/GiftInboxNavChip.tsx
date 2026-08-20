@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useAppBackHandler } from "@/lib/app-back-stack";
 import { getSiteMemberSession, SITE_MEMBER_SESSION_EVENT } from "@/lib/site-member-session";
@@ -67,6 +67,9 @@ export default function GiftInboxNavChip({ hideChip = false }: GiftInboxNavChipP
   const [message, setMessage] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [swipeState, setSwipeState] = useState<{ itemId: string; startX: number; currentX: number } | null>(null);
+  const [activeTab, setActiveTab] = useState<"event" | "admin">("event");
+  const touchStartRef = useRef<{ itemId: string; startX: number } | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -269,6 +272,88 @@ export default function GiftInboxNavChip({ hideChip = false }: GiftInboxNavChipP
     }
   }
 
+  async function deleteEventGift(giftId: string) {
+    if (!studentId) {
+      return;
+    }
+    setDeletingId(giftId);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/gift?userId=${encodeURIComponent(studentId)}&giftId=${encodeURIComponent(giftId)}`, {
+        method: "DELETE",
+      });
+      const payload = (await response.json()) as {
+        error?: string;
+        ok?: boolean;
+      };
+      if (!response.ok || payload.error) {
+        setMessage(payload.error || "삭제에 실패했습니다.");
+        return;
+      }
+      setMessage("선물이 삭제되었습니다.");
+      setDeleteConfirmId(null);
+      await refresh();
+    } catch {
+      setMessage("삭제에 실패했습니다.");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  // Swipe handlers
+  const handleTouchStart = (e: React.TouchEvent, itemId: string) => {
+    const touch = e.touches[0];
+    touchStartRef.current = { itemId, startX: touch.clientX };
+  };
+
+  const handleTouchMove = (e: React.TouchEvent, itemId: string) => {
+    if (!touchStartRef.current || touchStartRef.current.itemId !== itemId) return;
+    
+    const touch = e.touches[0];
+    const diff = touch.clientX - touchStartRef.current.startX;
+    
+    // Only allow right swipe (positive diff)
+    if (diff > 0) {
+      setSwipeState({ itemId, startX: touchStartRef.current.startX, currentX: diff });
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent, itemId: string) => {
+    if (!swipeState || swipeState.itemId !== itemId) {
+      setSwipeState(null);
+      touchStartRef.current = null;
+      return;
+    }
+
+    // If swipe distance > 100px, trigger delete
+    if (swipeState.currentX > 100) {
+      const gift = eventGifts.find(g => g.id === itemId);
+      if (gift) {
+        setDeleteConfirmId(itemId);
+      } else {
+        const reward = rewards.find(r => r.id === itemId);
+        if (reward) {
+          setDeleteConfirmId(itemId);
+        }
+      }
+    }
+
+    setSwipeState(null);
+    touchStartRef.current = null;
+  };
+
+  const handleDeleteClick = (itemId: string) => {
+    const gift = eventGifts.find(g => g.id === itemId);
+    if (gift) {
+      setDeleteConfirmId(itemId);
+    } else {
+      const reward = rewards.find(r => r.id === itemId);
+      if (reward) {
+        setDeleteConfirmId(itemId);
+      }
+    }
+  };
+
   const modal =
     mounted && open
       ? createPortal(
@@ -282,93 +367,148 @@ export default function GiftInboxNavChip({ hideChip = false }: GiftInboxNavChipP
             >
               <div className="site-event-dialog__header">
                 <h2 className="site-event-dialog__title">선물함</h2>
-                <button type="button" className="site-event-close ml-auto" onClick={close} aria-label="닫기">
-                  <CloseIcon className="h-5 w-5" />
-                </button>
+                <div className="flex gap-2 ml-auto">
+                  <button
+                    type="button"
+                    className={`px-3 py-1 text-sm rounded-lg ${activeTab === "event" ? "bg-emerald-600 text-white" : "bg-gray-200 text-gray-700"}`}
+                    onClick={() => setActiveTab("event")}
+                  >
+                    이벤트
+                  </button>
+                  <button
+                    type="button"
+                    className={`px-3 py-1 text-sm rounded-lg ${activeTab === "admin" ? "bg-emerald-600 text-white" : "bg-gray-200 text-gray-700"}`}
+                    onClick={() => setActiveTab("admin")}
+                  >
+                    관리자
+                  </button>
+                  <button type="button" className="site-event-close" onClick={close} aria-label="닫기">
+                    <CloseIcon className="h-5 w-5" />
+                  </button>
+                </div>
               </div>
               <div className="site-event-tab-body gift-inbox">
                 {!studentId ? (
                   <p className="site-event-tab-empty">로그인(학번) 후 이용할 수 있습니다.</p>
                 ) : loading ? (
                   <p className="site-event-tab-empty">불러오는 중...</p>
-                ) : rewards.length === 0 && eventGifts.length === 0 ? (
+                ) : (activeTab === "event" ? eventGifts : rewards).length === 0 ? (
                   <p className="site-event-tab-empty">받은 선물이 없습니다.</p>
                 ) : (
                   <ul className="gift-inbox__list">
-                    {eventGifts.map((gift) => (
-                      <li key={`event-${gift.id}`} className="gift-inbox__item">
-                        {gift.reward_img ? (
-                          <img src={gift.reward_img} alt="" className="gift-inbox__thumb" />
-                        ) : (
-                          <span className="gift-inbox__thumb gift-inbox__thumb--empty">
-                            <GiftIcon className="h-6 w-6" />
-                          </span>
-                        )}
-                        <div className="gift-inbox__body">
-                          <p className="gift-inbox__title">{gift.reward_name}</p>
-                          <p className="gift-inbox__msg">이벤트 보상 · 코스튬 보관함으로 수령</p>
-                          <p className="gift-inbox__meta">
-                            {gift.is_claimed ? "수령 완료" : "미수령"} ·{" "}
-                            {new Date(gift.created_at).toLocaleDateString("ko-KR")}
-                          </p>
-                        </div>
-                        <div className="gift-inbox__actions">
-                          {!gift.is_claimed ? (
+                    {activeTab === "event" ? eventGifts.map((gift) => (
+                      <li 
+                        key={`event-${gift.id}`} 
+                        className="gift-inbox__item"
+                        onTouchStart={(e) => handleTouchStart(e, gift.id)}
+                        onTouchMove={(e) => handleTouchMove(e, gift.id)}
+                        onTouchEnd={(e) => handleTouchEnd(e, gift.id)}
+                        style={{
+                          transform: swipeState?.itemId === gift.id ? `translateX(${swipeState.currentX}px)` : 'translateX(0)',
+                          transition: swipeState ? 'none' : 'transform 0.2s ease-out'
+                        }}
+                      >
+                        <div className="gift-inbox__card">
+                          {gift.reward_img ? (
+                            <img src={gift.reward_img} alt="" className="gift-inbox__thumb" />
+                          ) : (
+                            <span className="gift-inbox__thumb gift-inbox__thumb--empty">
+                              <GiftIcon className="h-6 w-6" />
+                            </span>
+                          )}
+                          <div className="gift-inbox__body">
+                            <p className="gift-inbox__title">{gift.reward_name}</p>
+                            {gift.frame_css_value ? (
+                              <p className="gift-inbox__description" style={{ whiteSpace: "pre-line" }}>
+                                코스튬 프레임이 포함되어 있습니다.
+                              </p>
+                            ) : null}
+                            <p className="gift-inbox__msg">이벤트 보상 · 코스튬 보관함으로 수령</p>
+                            <p className="gift-inbox__meta">
+                              {gift.is_claimed ? "수령 완료" : "미수령"} ·{" "}
+                              {new Date(gift.created_at).toLocaleDateString("ko-KR")}
+                            </p>
+                          </div>
+                          <div className="gift-inbox__actions">
+                            {!gift.is_claimed ? (
+                              <button
+                                type="button"
+                                className="gift-inbox__claim"
+                                disabled={busyId === gift.id}
+                                onClick={() => void claimEventGift(gift)}
+                              >
+                                {busyId === gift.id ? "..." : "받기"}
+                              </button>
+                            ) : null}
                             <button
                               type="button"
-                              className="gift-inbox__claim"
-                              disabled={busyId === gift.id}
-                              onClick={() => void claimEventGift(gift)}
+                              className="gift-inbox__delete"
+                              disabled={deletingId === gift.id}
+                              onClick={() => handleDeleteClick(gift.id)}
+                              title="삭제"
                             >
-                              {busyId === gift.id ? "..." : "받기"}
+                              {deletingId === gift.id ? "..." : "×"}
                             </button>
-                          ) : null}
+                          </div>
                         </div>
                       </li>
-                    ))}
-                    {rewards.map((reward) => (
-                      <li key={reward.id} className="gift-inbox__item">
-                        {reward.frameImageUrl ? (
-                          <img
-                            src={reward.frameImageUrl}
-                            alt=""
-                            className="gift-inbox__thumb"
-                          />
-                        ) : (
-                          <span className="gift-inbox__thumb gift-inbox__thumb--empty">
-                            <GiftIcon className="h-6 w-6" />
-                          </span>
-                        )}
-                        <div className="gift-inbox__body">
-                          <p className="gift-inbox__title">{reward.title}</p>
-                          {reward.message ? (
-                            <p className="gift-inbox__msg">{reward.message}</p>
-                          ) : null}
-                          <p className="gift-inbox__meta">
-                            {reward.status === "claimed" ? "수령 완료" : "미수령"} ·{" "}
-                            {new Date(reward.createdAt).toLocaleDateString("ko-KR")}
-                          </p>
-                        </div>
-                        <div className="gift-inbox__actions">
-                          {reward.status === "pending" ? (
+                    )) : rewards.map((reward) => (
+                      <li 
+                        key={reward.id} 
+                        className="gift-inbox__item"
+                        onTouchStart={(e) => handleTouchStart(e, reward.id)}
+                        onTouchMove={(e) => handleTouchMove(e, reward.id)}
+                        onTouchEnd={(e) => handleTouchEnd(e, reward.id)}
+                        style={{
+                          transform: swipeState?.itemId === reward.id ? `translateX(${swipeState.currentX}px)` : 'translateX(0)',
+                          transition: swipeState ? 'none' : 'transform 0.2s ease-out'
+                        }}
+                      >
+                        <div className="gift-inbox__card">
+                          {reward.frameImageUrl ? (
+                            <img
+                              src={reward.frameImageUrl}
+                              alt=""
+                              className="gift-inbox__thumb"
+                            />
+                          ) : (
+                            <span className="gift-inbox__thumb gift-inbox__thumb--empty">
+                              <GiftIcon className="h-6 w-6" />
+                            </span>
+                          )}
+                          <div className="gift-inbox__body">
+                            <p className="gift-inbox__title">{reward.title}</p>
+                            {reward.message ? (
+                              <p className="gift-inbox__description" style={{ whiteSpace: "pre-line" }}>
+                                {reward.message}
+                              </p>
+                            ) : null}
+                            <p className="gift-inbox__meta">
+                              {reward.status === "claimed" ? "수령 완료" : "미수령"} ·{" "}
+                              {new Date(reward.createdAt).toLocaleDateString("ko-KR")}
+                            </p>
+                          </div>
+                          <div className="gift-inbox__actions">
+                            {reward.status === "pending" ? (
+                              <button
+                                type="button"
+                                className="gift-inbox__claim"
+                                disabled={busyId === reward.id}
+                                onClick={() => void claim(reward)}
+                              >
+                                {busyId === reward.id ? "..." : "받기"}
+                              </button>
+                            ) : null}
                             <button
                               type="button"
-                              className="gift-inbox__claim"
-                              disabled={busyId === reward.id}
-                              onClick={() => void claim(reward)}
+                              className="gift-inbox__delete"
+                              disabled={deletingId === reward.id}
+                              onClick={() => handleDeleteClick(reward.id)}
+                              title="삭제"
                             >
-                              {busyId === reward.id ? "..." : "받기"}
+                              {deletingId === reward.id ? "..." : "×"}
                             </button>
-                          ) : null}
-                          <button
-                            type="button"
-                            className="gift-inbox__delete"
-                            disabled={deletingId === reward.id}
-                            onClick={() => setDeleteConfirmId(reward.id)}
-                            title="삭제"
-                          >
-                            {deletingId === reward.id ? "..." : "×"}
-                          </button>
+                          </div>
                         </div>
                       </li>
                     ))}
@@ -400,7 +540,14 @@ export default function GiftInboxNavChip({ hideChip = false }: GiftInboxNavChipP
           </button>
           <button
             type="button"
-            onClick={() => deleteReward(deleteConfirmId)}
+            onClick={() => {
+              const gift = eventGifts.find(g => g.id === deleteConfirmId);
+              if (gift) {
+                void deleteEventGift(deleteConfirmId);
+              } else {
+                void deleteReward(deleteConfirmId);
+              }
+            }}
             disabled={deletingId !== null}
             className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50"
           >

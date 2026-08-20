@@ -36,3 +36,29 @@ export async function GET(request: NextRequest) {
   });
 }
 
+export async function DELETE(request: NextRequest) {
+  const admin = createSupabaseAdmin();
+  if (!admin) {
+    return NextResponse.json({ error: "Supabase 서버 설정이 없습니다." }, { status: 503 });
+  }
+
+  const userId = request.nextUrl.searchParams.get("userId")?.trim() || "";
+  const giftId = request.nextUrl.searchParams.get("giftId")?.trim() || "";
+  
+  if (!userId || !giftId) {
+    return NextResponse.json({ error: "userId와 giftId가 필요합니다." }, { status: 400 });
+  }
+
+  const { error } = await admin
+    .from("user_gifts")
+    .delete()
+    .eq("user_id", userId)
+    .eq("id", giftId);
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true });
+}
+
