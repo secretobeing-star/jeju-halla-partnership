@@ -315,8 +315,12 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     setMessage(null);
 
     try {
-      // ⚡ 초고속 GPS 위치 조회 (1분 캐시, 4초 타임아웃)
-      const geo = await getCurrentGeolocation({ maximumAge: 60_000, timeout: 4_000 });
+      // ⚡ 즉시 위치 획득 (위성 대기 없이 최근 캐시/네트워크 기반으로 즉각 반환)
+      const geo = await getCurrentGeolocation({
+        enableHighAccuracy: false,
+        maximumAge: Infinity,
+        timeout: 1000,
+      }).catch(() => ({ latitude: 0, longitude: 0 }));
 
       const response = await fetch("/api/event/stamp-action", {
         method: "POST",
