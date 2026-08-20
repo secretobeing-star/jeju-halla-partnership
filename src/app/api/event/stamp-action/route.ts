@@ -196,16 +196,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "이미 완주한 이벤트입니다." }, { status: 409 });
   }
 
+  // ⚡ 쿨다운 검증 로직 보강
   const cooldownMinutes = Math.max(0, Number(event.cooldown_minutes) || 0);
   if (cooldownMinutes > 0 && progressRow?.last_stamped_at) {
     const last = Date.parse(String(progressRow.last_stamped_at));
     const remainMs = last + cooldownMinutes * 60_000 - Date.now();
     if (Number.isFinite(last) && remainMs > 0) {
-      const remainMin = Math.ceil(remainMs / 60_000);
-      const remainSec = Math.ceil(remainMs / 1000);
+      const remainMin = Math.floor(remainMs / 60_000);
+      const remainSec = Math.ceil((remainMs % 60_000) / 1000);
+      const timeText = remainMin > 0 ? `${remainMin}분 ${remainSec}초` : `${remainSec}초`;
       return NextResponse.json(
         {
-          error: `${remainMin > 0 ? `${remainMin}분` : `${remainSec}초`} 후에 도장을 찍을 수 있습니다.`,
+          error: `${timeText} 후에 도장을 찍을 수 있습니다.`,
+          cooldownError: true,
           cooldownMs: remainMs,
         },
         { status: 429 },
