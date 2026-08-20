@@ -53,7 +53,6 @@ function CloseIcon({ className = "h-5 w-5" }: { className?: string }) {
 
 type FrameInventoryNavChipProps = {
   cardFrames: PublicCardFrameItem[];
-  /** 상단 메뉴에 #frame-inventory 항목이 있으면 칩 UI는 숨기고 모달만 유지 */
   hideChip?: boolean;
 };
 
@@ -64,6 +63,7 @@ export default function FrameInventoryNavChip({
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [studentId, setStudentId] = useState("");
+  const [studentName, setStudentName] = useState("");
   const [state, setState] = useState<CardFrameUserState>({
     unlockedIds: [],
     activeFrameId: null,
@@ -74,14 +74,15 @@ export default function FrameInventoryNavChip({
   useEffect(() => {
     setMounted(true);
     const session = getSiteMemberSession();
-    const id = session?.student?.studentId?.trim() || "";
-    setStudentId(id);
+    setStudentId(session?.student?.studentId?.trim() || "");
+    setStudentName(session?.student?.name?.trim() || "학생증");
   }, []);
 
   const refresh = useCallback(() => {
     const session = getSiteMemberSession();
     const id = session?.student?.studentId?.trim() || "";
     setStudentId(id);
+    setStudentName(session?.student?.name?.trim() || "학생증");
     if (!id) {
       setState({ unlockedIds: [], activeFrameId: null, sources: {} });
       setOpen(false);
@@ -89,7 +90,7 @@ export default function FrameInventoryNavChip({
     }
     void syncCardFrameUserStateFromRemote(id, cardFrames).then((nextState) => {
       setState(nextState);
-      setSelectedFrameId((prev) => prev ?? nextState.activeFrameId ?? nextState.unlockedIds[0] ?? null);
+      setSelectedFrameId((prev) => prev ?? nextState.activeFrameId ?? null);
     });
   }, [cardFrames]);
 
@@ -141,20 +142,22 @@ export default function FrameInventoryNavChip({
     window.dispatchEvent(new Event("site-card-frame-changed"));
   };
 
+  const isCurrentEquipped = state.activeFrameId === (currentPreview?.id ?? null);
+
   const modal =
     mounted && open
       ? createPortal(
           <div className="site-event-overlay flex items-center justify-center p-3 sm:p-4 bg-black/60 z-50 fixed inset-0" onClick={close}>
             <div
-              className="bg-white rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh] sm:max-h-[90vh]"
+              className="bg-white rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] sm:max-h-[80vh] border border-gray-100"
               role="dialog"
               aria-modal="true"
               aria-label="코스튬 보관함"
               onClick={(e) => e.stopPropagation()}
             >
               {/* 상단 헤더 */}
-              <div className="flex items-center justify-between px-4 sm:px-5 py-3.5 border-b border-gray-100">
-                <h2 className="text-base sm:text-lg font-bold text-gray-900 flex items-center gap-2">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-white">
+                <h2 className="text-sm sm:text-base font-bold text-gray-900 flex items-center gap-2">
                   <FrameBoxIcon className="w-5 h-5 text-emerald-600" />
                   코스튬 보관함
                 </h2>
@@ -164,97 +167,112 @@ export default function FrameInventoryNavChip({
                   onClick={close}
                   aria-label="닫기"
                 >
-                  <CloseIcon className="h-5 w-5 sm:h-6 sm:w-6" />
+                  <CloseIcon className="h-5 w-5" />
                 </button>
               </div>
 
-              {/* 본문: 모바일/태블릿/PC 모두 좌우 2단 배치 */}
-              <div className="flex-1 overflow-y-auto p-3 sm:p-5">
+              {/* 본문 2단 구성 */}
+              <div className="p-3 sm:p-4 bg-gray-50/50 flex-1 overflow-hidden">
                 {!studentId ? (
-                  <p className="text-center py-16 text-gray-500 text-sm">로그인(학번) 후 이용할 수 있습니다.</p>
+                  <p className="text-center py-16 text-gray-500 text-xs sm:text-sm">로그인(학번) 후 이용할 수 있습니다.</p>
                 ) : unlocked.length === 0 ? (
-                  <p className="text-center py-16 text-gray-500 text-sm">
-                    보유한 학생증 코스튬이 없습니다.<br />이벤트 완료나 선물함에서 코스튬을 해금해 보세요!
+                  <p className="text-center py-16 text-gray-500 text-xs sm:text-sm">
+                    보유한 학생증 코스튬이 없습니다.<br />이벤트 완료나 선물함에서 코스튬을 획득해 보세요!
                   </p>
                 ) : (
-                  <div className="grid grid-cols-12 gap-3 sm:gap-5 h-full">
-                    {/* [좌측 영역] 선택된 코스튬 미리보기 및 적용 */}
-                    <div className="col-span-7 sm:col-span-7 flex flex-col items-center justify-between bg-gray-50/80 border border-gray-100 rounded-xl p-3 sm:p-5 text-center">
-                      <div className="w-full flex-1 flex items-center justify-center min-h-[140px] sm:min-h-[200px]">
-                        <div className="w-full max-w-[150px] sm:max-w-[210px] aspect-square rounded-xl bg-white border border-gray-200 shadow-sm flex items-center justify-center overflow-hidden p-2">
+                  <div className="grid grid-cols-12 gap-3 h-full items-stretch">
+                    {/* [좌측] 미니 학생증 미리보기 및 착용 영역 */}
+                    <div className="col-span-7 flex flex-col justify-between bg-white border border-gray-200/80 rounded-xl p-3 shadow-xs">
+                      {/* 미니 모바일 학생증 프리뷰 카드 */}
+                      <div className="flex-1 flex items-center justify-center py-1">
+                        <div className="relative w-full max-w-[140px] sm:max-w-[160px] aspect-[1/1.35] rounded-xl bg-gradient-to-br from-emerald-600 to-teal-800 p-2.5 text-white shadow-md flex flex-col justify-between overflow-hidden">
+                          {/* 코스튬 오버레이 프레임 */}
                           {currentPreview?.imageUrl ? (
                             <img
                               src={currentPreview.imageUrl}
                               alt={currentPreview.name}
-                              className="w-full h-full object-contain"
+                              className="absolute inset-0 w-full h-full object-cover pointer-events-none z-10"
                             />
-                          ) : (
-                            <div className="flex items-center justify-center text-gray-500 font-semibold text-xs sm:text-sm">
-                              <span>기본 프레임</span>
+                          ) : null}
+
+                          {/* 미니 학생증 내부 요소 */}
+                          <div className="flex items-center justify-between z-0">
+                            <span className="text-[8px] font-bold tracking-wider opacity-80">STUDENT CARD</span>
+                            <div className="w-2.5 h-2.5 rounded-full bg-white/20" />
+                          </div>
+
+                          <div className="flex flex-col items-center my-auto z-0">
+                            <div className="w-9 h-9 rounded-full bg-white/25 border border-white/40 flex items-center justify-center text-[10px] font-bold mb-1 shadow-xs">
+                              {studentName.slice(0, 1) || "학"}
                             </div>
-                          )}
+                            <span className="text-[11px] font-bold tracking-tight">{studentName}</span>
+                            <span className="text-[8px] opacity-75">{studentId || "20260000"}</span>
+                          </div>
+
+                          <div className="flex justify-between items-center text-[7px] opacity-70 z-0">
+                            <span>제주한라대학교</span>
+                            <span>{currentPreview ? "CUSTOM" : "STANDARD"}</span>
+                          </div>
                         </div>
                       </div>
 
-                      <div className="w-full my-2.5 sm:my-3">
-                        <div className="flex items-center justify-center gap-1.5 mb-1">
-                          <h3 className="font-bold text-gray-900 text-xs sm:text-base truncate">
+                      {/* 하단 텍스트 및 버튼 */}
+                      <div className="pt-2 border-t border-gray-100 mt-2">
+                        <div className="text-center mb-2">
+                          <h3 className="font-bold text-gray-900 text-xs sm:text-sm truncate">
                             {currentPreview?.name || "기본 학생증"}
                           </h3>
-                          {currentPreview && state.sources[currentPreview.id] ? (
-                            <span className="px-1.5 py-0.5 text-[9px] sm:text-[10px] font-medium rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200 flex-shrink-0">
-                              {state.sources[currentPreview.id] === "event" ? "이벤트" : "지급"}
-                            </span>
-                          ) : null}
+                          <p className="text-[10px] text-gray-400 truncate mt-0.5">
+                            {currentPreview?.description || "기본 모바일 학생증 디자인"}
+                          </p>
                         </div>
-                        <p className="text-[11px] sm:text-xs text-gray-500 line-clamp-2 px-1 whitespace-pre-line">
-                          {currentPreview?.description || "코스튬이 적용되지 않은 기본 학생증 스타일입니다."}
-                        </p>
-                      </div>
 
-                      <button
-                        type="button"
-                        className={`w-full py-2 sm:py-2.5 px-3 rounded-xl font-medium text-xs sm:text-sm transition-all shadow-sm ${
-                          state.activeFrameId === (currentPreview?.id ?? null)
-                            ? "bg-emerald-50 text-emerald-700 border border-emerald-300 font-semibold cursor-default"
-                            : "bg-emerald-600 text-white hover:bg-emerald-700 active:scale-[0.98]"
-                        }`}
-                        onClick={() => handleApplyFrame(currentPreview?.id ?? null)}
-                      >
-                        {state.activeFrameId === (currentPreview?.id ?? null) ? "✓ 착용 중" : "학생증에 착용"}
-                      </button>
-                    </div>
-
-                    {/* [우측 영역] 세로 스크롤 코스튬 목록 */}
-                    <div className="col-span-5 sm:col-span-5 flex flex-col h-full min-h-0">
-                      <p className="text-[11px] sm:text-xs font-semibold text-gray-400 mb-2 px-1 text-left">
-                        보유 코스튬 ({unlocked.length})
-                      </p>
-                      <div className="flex-1 overflow-y-auto space-y-2 pr-1 max-h-[290px] sm:max-h-[380px]">
-                        {/* 기본 프레임 선택 버튼 */}
                         <button
                           type="button"
-                          className={`w-full flex items-center gap-2 sm:gap-3 p-2 rounded-xl border text-left transition-all ${
+                          className={`w-full py-2 px-3 rounded-lg font-semibold text-xs transition-all shadow-xs ${
+                            isCurrentEquipped
+                              ? "bg-emerald-50 text-emerald-700 border border-emerald-300 cursor-default"
+                              : "bg-emerald-600 text-white hover:bg-emerald-700 active:scale-[0.98]"
+                          }`}
+                          onClick={() => handleApplyFrame(currentPreview?.id ?? null)}
+                        >
+                          {isCurrentEquipped ? "✓ 착용 중" : "학생증에 착용"}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* [우측] 보유 코스튬 목록 스크롤 뷰 */}
+                    <div className="col-span-5 flex flex-col bg-white border border-gray-200/80 rounded-xl p-2.5 shadow-xs overflow-hidden">
+                      <div className="flex items-center justify-between mb-2 px-0.5">
+                        <span className="text-[11px] font-bold text-gray-700">보유 목록</span>
+                        <span className="text-[10px] text-emerald-600 font-semibold">{unlocked.length}개</span>
+                      </div>
+
+                      <div className="flex-1 overflow-y-auto space-y-1.5 pr-0.5 no-scrollbar">
+                        {/* 기본 스타일 */}
+                        <button
+                          type="button"
+                          className={`w-full flex items-center gap-2 p-1.5 rounded-lg border text-left transition-all ${
                             selectedFrameId === null
-                              ? "border-emerald-500 bg-emerald-50/50 shadow-sm ring-1 ring-emerald-500"
-                              : "border-gray-200 bg-white hover:border-gray-300"
+                              ? "border-emerald-500 bg-emerald-50/60 ring-1 ring-emerald-400"
+                              : "border-gray-150 bg-gray-50/40 hover:bg-gray-100/60"
                           }`}
                           onClick={() => setSelectedFrameId(null)}
                         >
-                          <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-lg bg-gray-100 flex items-center justify-center text-[10px] sm:text-xs font-bold text-gray-600 border border-gray-200 flex-shrink-0">
+                          <div className="w-8 h-8 rounded-md bg-gray-150 flex items-center justify-center text-[10px] font-bold text-gray-500 flex-shrink-0">
                             기본
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-[11px] sm:text-xs font-semibold text-gray-800 truncate">기본 스타일</p>
+                            <p className="text-[11px] font-semibold text-gray-800 truncate leading-tight">기본 스타일</p>
                             {state.activeFrameId === null ? (
-                              <span className="text-[9px] sm:text-[10px] font-bold text-emerald-600">착용 중</span>
+                              <span className="text-[9px] font-bold text-emerald-600 leading-none">착용 중</span>
                             ) : (
-                              <span className="text-[9px] sm:text-[10px] text-gray-400">효과 없음</span>
+                              <span className="text-[9px] text-gray-400 leading-none">미착용</span>
                             )}
                           </div>
                         </button>
 
-                        {/* 해금된 코스튬 목록 */}
+                        {/* 해금된 코스튬들 */}
                         {unlocked.map((frame) => {
                           const isSelected = selectedFrameId === frame.id;
                           const isWearing = state.activeFrameId === frame.id;
@@ -262,26 +280,26 @@ export default function FrameInventoryNavChip({
                             <button
                               key={frame.id}
                               type="button"
-                              className={`w-full relative flex items-center gap-2 sm:gap-3 p-2 rounded-xl border text-left transition-all ${
+                              className={`w-full flex items-center gap-2 p-1.5 rounded-lg border text-left transition-all ${
                                 isSelected
-                                  ? "border-emerald-500 bg-emerald-50/50 shadow-sm ring-1 ring-emerald-500"
-                                  : "border-gray-200 bg-white hover:border-gray-300"
+                                  ? "border-emerald-500 bg-emerald-50/60 ring-1 ring-emerald-400"
+                                  : "border-gray-150 bg-gray-50/40 hover:bg-gray-100/60"
                               }`}
                               onClick={() => setSelectedFrameId(frame.id)}
                             >
-                              <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center p-1 overflow-hidden flex-shrink-0">
+                              <div className="w-8 h-8 rounded-md bg-white border border-gray-200 flex items-center justify-center p-0.5 overflow-hidden flex-shrink-0">
                                 {frame.imageUrl ? (
                                   <img src={frame.imageUrl} alt={frame.name} className="w-full h-full object-contain" />
                                 ) : (
-                                  <span className="text-[9px] sm:text-[10px] text-gray-400 text-center line-clamp-1">{frame.name}</span>
+                                  <span className="text-[8px] text-gray-400 text-center">프레임</span>
                                 )}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className="text-[11px] sm:text-xs font-semibold text-gray-800 truncate">{frame.name}</p>
+                                <p className="text-[11px] font-semibold text-gray-800 truncate leading-tight">{frame.name}</p>
                                 {isWearing ? (
-                                  <span className="text-[9px] sm:text-[10px] font-bold text-emerald-600">착용 중</span>
+                                  <span className="text-[9px] font-bold text-emerald-600 leading-none">착용 중</span>
                                 ) : (
-                                  <span className="text-[9px] sm:text-[10px] text-gray-400">보유</span>
+                                  <span className="text-[9px] text-gray-400 leading-none">보유</span>
                                 )}
                               </div>
                             </button>
