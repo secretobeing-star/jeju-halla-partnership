@@ -393,7 +393,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         )
       : 0;
 
-    // 쿨다운 팝업 커스텀 문구 적용
     if (currentRealtimeCooldown > 0) {
       const remainText = formatCooldownRemain(currentRealtimeCooldown);
       const customTitle =
@@ -671,7 +670,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     DEFAULT_STAMP_BTN_LABEL;
 
   return (
-    <div className="map-event-shell">
+    <div className="map-event-shell" style={{ position: "relative" }}>
       <div className="map-event-tabs" role="tablist" aria-label="지도 이벤트 탭">
         <button
           type="button"
@@ -700,10 +699,9 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         <div className="map-event-stamp-bar" style={stampBarCssVars(activeEvent)}>
           <div className="map-event-stamp-bar__copy">
             <p className="map-event-stamp-bar__title">{activeEvent.title}</p>
-            {/* 0 / 1 숫자 카운터 제거 완료 */}
-            {(isCompleted || !isEventLive(activeEvent) || (!isCompleted && cooldownRemainMs > 0)) ? (
+            {/* 완주 문구 및 0/1 숫자 제거 완료 */}
+            {(!isCompleted && (!isEventLive(activeEvent) || cooldownRemainMs > 0)) ? (
               <p className="map-event-stamp-bar__meta">
-                {isCompleted ? "완주" : ""}
                 {!isEventLive(activeEvent) ? "기간 종료" : ""}
                 {!isCompleted && cooldownRemainMs > 0
                   ? `${formatCooldownRemain(cooldownRemainMs)} 후 도장 가능`
@@ -753,29 +751,30 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
       {message ? <p className="map-event-message">{message}</p> : null}
 
-      {/* 지도 패널 및 지도 내부 상단 타이머 플로팅 오버레이 */}
-      <div style={{ position: "relative", width: "100%" }}>
-        {!isCompleted && cooldownRemainMs > 0 && (
+      {/* 지도 영역 + 실시간 타이머 플로팅 뱃지 */}
+      <div style={{ position: "relative", width: "100%", overflow: "visible" }}>
+        {!isDefaultTab && activeEvent && !isCompleted && cooldownRemainMs > 0 && (
           <div
             style={{
               position: "absolute",
-              top: "14px",
+              top: "16px",
               left: "50%",
               transform: "translateX(-50%)",
-              zIndex: 30,
-              backgroundColor: "rgba(17, 24, 39, 0.88)",
-              backdropFilter: "blur(4px)",
+              zIndex: 9999,
+              backgroundColor: "rgba(17, 24, 39, 0.92)",
+              backdropFilter: "blur(6px)",
               color: "#ffffff",
-              padding: "7px 16px",
+              padding: "8px 18px",
               borderRadius: "9999px",
               fontSize: "13px",
-              fontWeight: "600",
-              boxShadow: "0 4px 10px rgba(0, 0, 0, 0.2)",
+              fontWeight: "700",
+              boxShadow: "0 6px 16px rgba(0, 0, 0, 0.3)",
               display: "flex",
               alignItems: "center",
               gap: "6px",
               pointerEvents: "none",
               letterSpacing: "-0.02em",
+              border: "1px solid rgba(255, 255, 255, 0.15)",
             }}
           >
             <span>⏰</span>
