@@ -139,7 +139,6 @@ export default function FrameInventoryNavChip({
     [cardFrames, state.unlockedIds],
   );
 
-  // 전체 탐색 가능한 아이템 리스트 (기본 스타일 null + 해금된 프레임들)
   const selectableList = useMemo(() => [null, ...unlocked.map((f) => f.id)], [unlocked]);
 
   const currentPreview = useMemo(() => {
@@ -152,7 +151,6 @@ export default function FrameInventoryNavChip({
     window.dispatchEvent(new Event("site-card-frame-changed"));
   };
 
-  // 좌우 스와이프 로직
   const handlePrev = useCallback(() => {
     const currentIndex = selectableList.indexOf(selectedFrameId);
     if (currentIndex > 0) {
@@ -182,12 +180,11 @@ export default function FrameInventoryNavChip({
     const diffX = touchStartXRef.current - clientX;
     const diffY = touchStartYRef.current - clientY;
 
-    // 세로 스크롤 의도가 아니고, 가로 이동이 40px 이상일 때 스와이프 인정
     if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 40) {
       if (diffX > 0) {
-        handleNext(); // 오른쪽에서 왼쪽으로 밀면 다음 코스튬
+        handleNext();
       } else {
-        handlePrev(); // 왼쪽에서 오른쪽으로 밀면 이전 코스튬
+        handlePrev();
       }
     }
 
@@ -202,14 +199,14 @@ export default function FrameInventoryNavChip({
       ? createPortal(
           <div className="site-event-overlay flex items-center justify-center p-3 sm:p-4 bg-black/60 z-50 fixed inset-0" onClick={close}>
             <div
-              className="bg-white rounded-3xl w-full max-w-md md:max-w-2xl overflow-hidden shadow-2xl flex flex-col border border-gray-100 animate-in fade-in zoom-in-95 duration-150 max-h-[92vh]"
+              className="bg-white rounded-3xl w-full max-w-md md:max-w-2xl overflow-hidden shadow-2xl flex flex-col border border-gray-100 animate-in fade-in zoom-in-95 duration-150 max-h-[88vh]"
               role="dialog"
               aria-modal="true"
               aria-label="코스튬 보관함"
               onClick={(e) => e.stopPropagation()}
             >
               {/* 상단 헤더 */}
-              <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 bg-white">
+              <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 bg-white">
                 <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
                   <FrameBoxIcon className="w-5 h-5 text-emerald-600" />
                   코스튬 보관함
@@ -224,27 +221,26 @@ export default function FrameInventoryNavChip({
                 </button>
               </div>
 
-              {/* 본문 영역 */}
-              <div className="p-3.5 sm:p-5 flex-1 overflow-y-auto bg-gray-50/60">
+              {/* 본문 영역: 창 높이를 불필요하게 늘리지 않고 밀착 */}
+              <div className="p-3 sm:p-4 flex-1 overflow-y-auto bg-gray-50/60 flex flex-col md:flex-row gap-3">
                 {!studentId ? (
-                  <p className="text-center py-12 text-gray-500 text-sm">로그인(학번) 후 이용할 수 있습니다.</p>
+                  <p className="text-center py-10 text-gray-500 text-sm w-full">로그인(학번) 후 이용할 수 있습니다.</p>
                 ) : unlocked.length === 0 ? (
-                  <p className="text-center py-12 text-gray-500 text-sm">
+                  <p className="text-center py-10 text-gray-500 text-sm w-full">
                     보유한 학생증 코스튬이 없습니다.<br />이벤트 완료나 선물함에서 코스튬을 획득해 보세요!
                   </p>
                 ) : (
-                  <div className="flex flex-col md:flex-row gap-3.5 sm:gap-4 h-full">
-                    {/* [메인 영역] 학생증 프리뷰 카드 (터치/마우스 좌우 스와이프 적용) */}
+                  <>
+                    {/* [상단/좌측 영역] 가로형 학생증 미리보기 카드 */}
                     <div 
-                      className="flex-1 flex flex-col items-center bg-white border border-gray-200/90 rounded-2xl p-3.5 sm:p-4 shadow-xs select-none touch-pan-y"
+                      className="flex-1 flex flex-col items-center bg-white border border-gray-200/90 rounded-2xl p-3 shadow-xs select-none touch-pan-y"
                       onTouchStart={onTouchStart}
                       onTouchEnd={onTouchEnd}
                       onMouseDown={onTouchStart}
                       onMouseUp={onTouchEnd}
                     >
-                      {/* 가로형 학생증 카드 디자인 */}
-                      <div className="relative w-full aspect-[1.58/1] rounded-2xl bg-white border border-gray-200/90 shadow-sm p-4 text-gray-800 flex flex-col justify-between overflow-hidden cursor-grab active:cursor-grabbing">
-                        {/* 착용 프레임 이미지 오버레이 */}
+                      {/* 실제 학생증 카드 */}
+                      <div className="relative w-full aspect-[1.58/1] max-w-[340px] rounded-2xl bg-white border border-gray-200/90 shadow-sm p-3.5 text-gray-800 flex flex-col justify-between overflow-hidden cursor-grab active:cursor-grabbing">
                         {currentPreview?.imageUrl ? (
                           <img
                             src={currentPreview.imageUrl}
@@ -253,27 +249,23 @@ export default function FrameInventoryNavChip({
                           />
                         ) : null}
 
-                        {/* 학교 워터마크 배경 */}
                         <div className="absolute inset-0 bg-gradient-to-br from-white/90 via-emerald-50/20 to-white/90 z-0 pointer-events-none" />
 
-                        {/* 학생증 내부 컨텐츠 */}
                         <div className="relative z-0 flex h-full gap-3.5 items-center">
-                          {/* 증명사진 박스 */}
                           <div className="w-[32%] aspect-[3/4] rounded-xl bg-gray-100 border border-gray-200 flex items-center justify-center text-gray-400 text-xs font-medium flex-shrink-0">
                             사진
                           </div>
 
-                          {/* 인적사항 목록 */}
                           <div className="flex-1 flex flex-col justify-center">
-                            <div className="flex items-center gap-1.5 mb-1.5">
+                            <div className="flex items-center gap-1.5 mb-1">
                               <span className="text-[11px] font-bold text-emerald-800 tracking-tight">제주한라대학교</span>
                             </div>
 
-                            <h3 className="text-base font-black text-gray-900 tracking-tight mb-2">
+                            <h3 className="text-base font-black text-gray-900 tracking-tight mb-1.5">
                               {studentName}
                             </h3>
 
-                            <div className="space-y-1 text-xs">
+                            <div className="space-y-0.5 text-xs">
                               <div className="flex items-center text-gray-600">
                                 <span className="w-10 text-gray-400 font-medium text-[11px]">학과</span>
                                 <span className="font-semibold text-gray-800 text-[11px] truncate">{department}</span>
@@ -291,8 +283,8 @@ export default function FrameInventoryNavChip({
                         </div>
                       </div>
 
-                      {/* 프레임 정보 및 착용 버튼 */}
-                      <div className="w-full pt-3 mt-2.5 border-t border-gray-100 text-center">
+                      {/* 정보 및 버튼 */}
+                      <div className="w-full pt-2.5 mt-2 border-t border-gray-100 text-center">
                         <div className="mb-2">
                           <div className="flex items-center justify-center gap-1.5">
                             <h4 className="font-bold text-gray-900 text-sm">
@@ -325,16 +317,16 @@ export default function FrameInventoryNavChip({
                       </div>
                     </div>
 
-                    {/* [목록 영역: 모바일은 하단 가로 일자 칩 / PC·태블릿·폴드는 우측 세로 스크롤] */}
-                    <div className="md:w-56 flex flex-col flex-shrink-0 bg-white border border-gray-200/90 rounded-2xl p-3 shadow-xs">
+                    {/* [하단/우측 영역] 세로 리스트 배치 (스크롤 지원) */}
+                    <div className="md:w-56 flex flex-col bg-white border border-gray-200/90 rounded-2xl p-3 shadow-xs">
                       <p className="text-xs font-bold text-gray-700 mb-2 px-0.5 text-left">
                         보유 코스튬 ({unlocked.length})
                       </p>
-                      <div className="flex md:flex-col gap-2 overflow-x-auto md:overflow-y-auto pb-1 md:pb-0 md:max-h-[360px] no-scrollbar">
-                        {/* 기본 스타일 선택 버튼 */}
+                      <div className="flex flex-col gap-2 overflow-y-auto max-h-[160px] md:max-h-[320px] pr-0.5 no-scrollbar">
+                        {/* 기본 스타일 선택 */}
                         <button
                           type="button"
-                          className={`flex-shrink-0 flex items-center gap-2.5 p-2 rounded-xl border text-left transition-all min-w-[130px] md:min-w-0 ${
+                          className={`w-full flex items-center gap-2.5 p-2 rounded-xl border text-left transition-all ${
                             selectedFrameId === null
                               ? "border-emerald-500 bg-emerald-50/60 shadow-xs ring-2 ring-emerald-500/20"
                               : "border-gray-200 bg-gray-50/50 hover:bg-gray-100/70"
@@ -362,7 +354,7 @@ export default function FrameInventoryNavChip({
                             <button
                               key={frame.id}
                               type="button"
-                              className={`flex-shrink-0 relative flex items-center gap-2.5 p-2 rounded-xl border text-left transition-all min-w-[140px] md:min-w-0 ${
+                              className={`w-full relative flex items-center gap-2.5 p-2 rounded-xl border text-left transition-all ${
                                 isSelected
                                   ? "border-emerald-500 bg-emerald-50/60 shadow-xs ring-2 ring-emerald-500/20"
                                   : "border-gray-200 bg-gray-50/50 hover:bg-gray-100/70"
@@ -389,7 +381,7 @@ export default function FrameInventoryNavChip({
                         })}
                       </div>
                     </div>
-                  </div>
+                  </>
                 )}
               </div>
             </div>
