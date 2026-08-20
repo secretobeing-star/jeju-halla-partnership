@@ -224,6 +224,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return () => window.removeEventListener("site-stamp-progress-changed", onStampChanged);
   }, [loadProgress]);
 
+  // 👈 좋아요(즐겨찾기)를 누른 매장에만 pinImageUrl 부여 (나머지는 null 처리하여 불꽃 아이콘 미표시)
   const visiblePartners = useMemo(() => {
     const pin =
       activeEvent?.marker_icon_img?.trim() ||
@@ -235,11 +236,14 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         ? props.partners.filter((partner) => allowed.includes(partner.id))
         : props.partners;
 
-    return filtered.map((partner) => ({
-      ...partner,
-      pinImageUrl: pin,
-    }));
-  }, [activeEvent, config.default_map_marker_img, props.partners]);
+    return filtered.map((partner) => {
+      const isFav = Boolean(props.favoritePartnerIds?.has(partner.id));
+      return {
+        ...partner,
+        pinImageUrl: isFav ? pin : null,
+      };
+    });
+  }, [activeEvent, config.default_map_marker_img, props.partners, props.favoritePartnerIds]);
 
   const stampedPlaceIds = useMemo(
     () => new Set(progress?.stamped_places ?? []),
@@ -252,6 +256,22 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       setMessage("이벤트 기간이 종료되어 도장을 찍을 수 없습니다.");
       return;
     }
+
+    // 💖 좋아요(즐겨찾기)하지 않은 매장은 참여 차단
+    const isFavorited = Boolean(props.favoritePartnerIds?.has(partner.id));
+    if (props.favoritesEnabled && !isFavorited) {
+      setRewardModal({
+        kind: "lose",
+        title: "좋아요 매장 전용 이벤트",
+        body: `먼저 '${partner.name}' 매장의 좋아요(💖)를 누른 후 도장을 찍어주세요!`,
+        banner: activeEvent.banner_img || null,
+        rewardName: null,
+        rewardImg: null,
+        showGiftButton: false,
+      });
+      return;
+    }
+
     const sessionStudent = getSiteMemberSession()?.student;
     const sessionUserId = sessionStudent?.studentId?.trim() || "";
     const sessionName = sessionStudent?.name?.trim() || "";
