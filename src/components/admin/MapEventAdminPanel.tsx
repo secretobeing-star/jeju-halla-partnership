@@ -427,7 +427,7 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
             />
           </label>
           <ImageField
-            label="상단 마커 아이콘 이미지 (기본 제휴처용)"
+            label="상단 마커 아이콘 이미지 (기본 제휴처 하트 뱃지 교체용)"
             value={config.default_map_marker_img}
             uploading={uploadingKey === "default_pin"}
             onUpload={async (file) => {
@@ -755,32 +755,34 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
             </div>
           </div>
 
-          {/* 이벤트 탭 전용 마커 및 이미지 설정 영역 */}
+          {/* 이벤트 탭 전용 상단 마커 아이콘 설정 */}
           <div className="rounded-xl border border-blue-100 bg-blue-50/40 p-4">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <p className="text-sm font-semibold text-gray-800">이벤트 탭 상단 마커 아이콘 설정</p>
                 <p className="mt-0.5 text-xs text-gray-500">
-                  해당 이벤트 탭이 활성화되었을 때 지도 상의 마커 상단에 부착될 아이콘(불꽃 등)입니다.
+                  해당 이벤트 탭 활성화 시 마커 상단(기존 하트 💗 위치)에 들어갈 아이콘입니다.
                 </p>
               </div>
 
-              {/* 실제 지도 마커 형태의 실시간 미리보기 */}
+              {/* 실제 마커와 동일한 비율의 실시간 미리보기 */}
               <div className="flex flex-col items-center">
                 <div className="relative flex flex-col items-center">
-                  {/* 상단 뱃지 아이콘 */}
-                  {form.marker_icon_img ? (
-                    <div className="absolute -top-3 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-white p-0.5 shadow-md ring-2 ring-white">
+                  {/* 상단 원형 뱃지 (하트 위치) */}
+                  <div className="absolute -top-3 z-10 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-pink-50 shadow-sm overflow-hidden">
+                    {form.marker_icon_img ? (
                       <img
                         src={form.marker_icon_img}
                         alt="상단 마커 뱃지"
-                        className="h-full w-full object-contain"
+                        className="h-full w-full object-contain p-0.5"
                       />
-                    </div>
-                  ) : null}
+                    ) : (
+                      <span className="text-[11px]">💗</span>
+                    )}
+                  </div>
 
-                  {/* 마커 본체 (매장 썸네일 박스) */}
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl border-2 border-white bg-gray-800 text-[10px] text-white shadow-md">
+                  {/* 마커 본체 (매장 썸네일 박스 형태) */}
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl border-2 border-white bg-slate-700 text-[10px] text-white shadow-md">
                     Store
                   </div>
 
@@ -791,7 +793,7 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
                       height: 0,
                       borderLeft: "5px solid transparent",
                       borderRight: "5px solid transparent",
-                      borderTop: "6px solid #1f2937",
+                      borderTop: "6px solid #334155",
                       marginTop: "-1px",
                     }}
                   />
@@ -802,7 +804,7 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
 
             <div className="mt-4">
               <ImageField
-                label="상단 마커 아이콘 이미지"
+                label="상단 마커 아이콘 이미지 (하트 대체)"
                 value={form.marker_icon_img}
                 uploading={uploadingKey === "marker"}
                 onUpload={async (file) => {
