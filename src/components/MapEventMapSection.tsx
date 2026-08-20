@@ -129,6 +129,15 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const [rewardModal, setRewardModal] = useState<RewardModalState | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
 
+  // ⚡ 페이지 진입 즉시 GPS 좌표를 백그라운드 사전 캐싱 (클릭 시 0초 딜레이)
+  useEffect(() => {
+    void getCurrentGeolocation({
+      enableHighAccuracy: false,
+      maximumAge: 120_000,
+      timeout: 5_000,
+    }).catch(() => {});
+  }, []);
+
   const liveEvents = useMemo(
     () => events.filter((event) => isEventLive(event, nowMs)),
     [events, nowMs],
@@ -224,7 +233,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return () => window.removeEventListener("site-stamp-progress-changed", onStampChanged);
   }, [loadProgress]);
 
-  // 좋아요(즐겨찾기)를 누른 매장에만 pinImageUrl 부여 (나머지는 null 처리)[cite: 8]
+  // 좋아요(즐겨찾기)를 누른 매장에만 pinImageUrl 부여 (나머지는 null 처리)
   const visiblePartners = useMemo(() => {
     const pin =
       activeEvent?.marker_icon_img?.trim() ||
@@ -257,7 +266,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       return;
     }
 
-    // 좋아요(즐겨찾기)하지 않은 매장은 참여 차단[cite: 8]
+    // 좋아요(즐겨찾기)하지 않은 매장은 참여 차단
     const isFavorited = Boolean(props.favoritePartnerIds?.has(partner.id));
     if (props.favoritesEnabled && !isFavorited) {
       setRewardModal({
@@ -277,7 +286,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     const sessionName = sessionStudent?.name?.trim() || "";
     const sessionDepartment = sessionStudent?.department?.trim() || "";
 
-    // 비로그인 사용자: 커스텀 로그인 안내 팝업창 모달 노출[cite: 8]
+    // 비로그인 사용자: 커스텀 로그인 안내 팝업창 모달 노출
     if (!sessionUserId || !sessionStudent || !sessionName) {
       const loginMsg =
         (activeEvent as unknown as { login_required_message?: string })?.login_required_message?.trim() ||
@@ -310,17 +319,16 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       return;
     }
 
-    // ⚡ 중복 클릭 방지 즉시 잠금[cite: 8]
     setBusy(true);
     setMessage(null);
 
     try {
-      // ⚡ 즉시 위치 획득 (위성 대기 없이 최근 캐시/네트워크 기반으로 즉각 반환)
+      // ⚡ 사전 캐시 우선 사용 + 3초 안정 타임아웃
       const geo = await getCurrentGeolocation({
         enableHighAccuracy: false,
-        maximumAge: Infinity,
-        timeout: 1000,
-      }).catch(() => ({ latitude: 0, longitude: 0 }));
+        maximumAge: 120_000,
+        timeout: 3000,
+      });
 
       const response = await fetch("/api/event/stamp-action", {
         method: "POST",
@@ -436,7 +444,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         });
       }
 
-      // ⚡ 백그라운드 비동기 로그 전송 (UI 블로킹 없이 모달 즉시 노출)
+      // ⚡ 백그라운드 비동기 로그 전송 (UI 블로킹 방지)
       setTimeout(() => {
         sendMapStampLog({
           action: popupKind === "completion" ? "스탬프 완주" : "도장 찍기",
