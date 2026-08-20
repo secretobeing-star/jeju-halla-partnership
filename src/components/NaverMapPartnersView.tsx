@@ -147,10 +147,27 @@ export default function NaverMapPartnersView({
 
   useEffect(() => {
     stampActionRef.current = stampAction;
+    // 열려있는 미니 카드가 있다면 도장 버튼 라벨 즉시 업데이트
+    const openCard = miniCardElementRef.current;
+    if (openCard) {
+      const stampBtn = openCard.querySelector<HTMLButtonElement>(".partner-map-mini-card__stamp-btn");
+      if (stampBtn && stampAction?.label) {
+        if (!stampBtn.disabled) {
+          stampBtn.textContent = stampAction.label;
+        }
+      }
+    }
   }, [stampAction]);
 
   useEffect(() => {
     detailButtonLabelRef.current = detailButtonLabel;
+    const openCard = miniCardElementRef.current;
+    if (openCard && detailButtonLabel) {
+      const detailBtn = openCard.querySelector<HTMLButtonElement>(".partner-map-mini-card__detail-btn");
+      if (detailBtn) {
+        detailBtn.textContent = detailButtonLabel;
+      }
+    }
   }, [detailButtonLabel]);
 
   useEffect(() => {
@@ -358,7 +375,7 @@ export default function NaverMapPartnersView({
     const validPartners = normalizedPartners.filter((partner) =>
       hasValidPartnerMapCoords(partner.latitude, partner.longitude),
     );
-    const nextSignature = getMapPartnerMarkersSignature(validPartners);
+    const nextSignature = `${getMapPartnerMarkersSignature(validPartners)}:${stampAction?.label ?? ""}:${detailButtonLabel ?? ""}`;
     const nextOrderKey = validPartners.map((partner) => partner.id).join("|");
     const preserveMapView = nextSignature === mapMarkersSignatureRef.current;
     const orderChanged = nextOrderKey !== mapMarkersOrderRef.current;
@@ -447,6 +464,7 @@ export default function NaverMapPartnersView({
         );
       }
 
+      const activeStampAction = stampActionRef.current;
       const card = createPartnerMapMiniCardElement(partner, () => {
         miniCardOverlayRef.current?.close();
         miniCardOverlayRef.current = null;
@@ -466,12 +484,12 @@ export default function NaverMapPartnersView({
               onFavoriteToggleRef.current?.(partner.id);
             }
           : undefined,
-        stamp: stampActionRef.current?.enabled
+        stamp: activeStampAction?.enabled
           ? {
               visible: true,
-              disabled: Boolean(stampActionRef.current.stampedPlaceIds.has(partner.id)),
-              label: stampActionRef.current.label,
-              onStamp: () => stampActionRef.current?.onStamp(partner),
+              disabled: Boolean(activeStampAction.stampedPlaceIds?.has(partner.id)),
+              label: activeStampAction.label?.trim() || "도장 찍기",
+              onStamp: () => activeStampAction?.onStamp(partner),
             }
           : undefined,
         detailLabel: detailButtonLabelRef.current,
@@ -680,7 +698,7 @@ export default function NaverMapPartnersView({
         window.clearTimeout(readyTimeoutId);
       }
     };
-  }, [clientId, mapReady, normalizedPartners]);
+  }, [clientId, detailButtonLabel, mapReady, normalizedPartners, stampAction?.label]);
 
   useEffect(() => {
     const wasHolding = wasHoldingLoadingRef.current;
