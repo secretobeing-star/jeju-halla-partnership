@@ -735,7 +735,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
                     : cooldownRemainMs > 0
                       ? `${formatCooldownRemain(cooldownRemainMs)} 후 가능`
                       : currentStampBtnLabel,
-                disabled: busy || cooldownRemainMs > 0,
+                 busy || cooldownRemainMs > 0,
                 onStamp: (partner) => {
                   void handleStamp(partner);
                 },
