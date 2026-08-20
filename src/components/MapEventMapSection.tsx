@@ -23,6 +23,7 @@ import { SITE_STUDENT_NEED_LOGIN_EVENT } from "@/lib/site-student-auth-settings"
 const DEFAULT_TAB_ID = "__default_partners__";
 const DEFAULT_STAMP_BAR_BG = "#ecfdf5";
 const DEFAULT_DISTANCE_ERROR_MSG = "제휴처와의 거리가 {distance}m 남았습니다. 지정된 반경({radius}m) 내에서 도장을 찍어주세요.";
+const DEFAULT_LOGIN_REQUIRED_MSG = "로그인 후 이벤트 도장을 찍고 보상을 받을 수 있습니다. 로그인하시겠습니까?";
 
 function stampBarCssVars(
   event: Pick<MapEvent, "stamp_bar_bg_color" | "stamp_bar_bg_img">,
@@ -64,7 +65,7 @@ type MapEventMapSectionProps = {
 };
 
 type RewardModalState = {
-  kind: "win" | "lose" | "completion" | "distance";
+  kind: "win" | "lose" | "completion" | "distance" | "login_required";
   title: string;
   body: string;
   banner: string | null;
@@ -112,14 +113,15 @@ const sendMapStampLog = (params: {
 };
 
 export default function MapEventMapSection(props: MapEventMapSectionProps) {
-  const [config, setConfig] = useState<MapAppConfig & { distance_error_message?: string }>({
+  const [config, setConfig] = useState<MapAppConfig & { distance_error_message?: string; login_required_message?: string }>({
     default_map_tab_name: DEFAULT_MAP_TAB_NAME,
     default_map_marker_img: "",
     default_benefit_btn_label: DEFAULT_BENEFIT_BTN_LABEL,
     event_stamp_btn_label: DEFAULT_STAMP_BTN_LABEL,
     distance_error_message: DEFAULT_DISTANCE_ERROR_MSG,
+    login_required_message: DEFAULT_LOGIN_REQUIRED_MSG,
   });
-  const [events, setEvents] = useState<(MapEvent & { distance_error_message?: string })[]>([]);
+  const [events, setEvents] = useState<(MapEvent & { distance_error_message?: string; login_required_message?: string })[]>([]);
   const [activeTabId, setActiveTabId] = useState(DEFAULT_TAB_ID);
   const [progress, setProgress] = useState<UserEventProgress | null>(null);
   const [busy, setBusy] = useState(false);
@@ -171,8 +173,8 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         fetch("/api/map-events/config", { cache: "no-store" }),
         fetch("/api/map-events", { cache: "no-store" }),
       ]);
-      const configPayload = (await configRes.json()) as { config?: MapAppConfig & { distance_error_message?: string } };
-      const eventsPayload = (await eventsRes.json()) as { events?: (MapEvent & { distance_error_message?: string })[] };
+      const configPayload = (await configRes.json()) as { config?: MapAppConfig & { distance_error_message?: string; login_required_message?: string } };
+      const eventsPayload = (await eventsRes.json()) as { events?: (MapEvent & { distance_error_message?: string; login_required_message?: string })[] };
       if (configPayload.config) setConfig(configPayload.config);
       setEvents((eventsPayload.events ?? []).filter((event) => isEventLive(event)));
     } catch {
@@ -255,11 +257,25 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     const sessionName = sessionStudent?.name?.trim() || "";
     const sessionDepartment = sessionStudent?.department?.trim() || "";
 
+    // 🔒 비로그인 사용자: 커스텀 로그인 안내 팝업창 모달 노출
     if (!sessionUserId || !sessionStudent || !sessionName) {
-      window.dispatchEvent(new Event(SITE_STUDENT_NEED_LOGIN_EVENT));
-      setMessage("도장을 찍으려면 학생 로그인이 필요합니다.");
+      const loginMsg =
+        (activeEvent as unknown as { login_required_message?: string })?.login_required_message?.trim() ||
+        config.login_required_message?.trim() ||
+        DEFAULT_LOGIN_REQUIRED_MSG;
+
+      setRewardModal({
+        kind: "login_required",
+        title: "로그인이 필요합니다",
+        body: loginMsg,
+        banner: activeEvent.banner_img || null,
+        rewardName: null,
+        rewardImg: null,
+        showGiftButton: false,
+      });
       return;
     }
+
     if (stampedPlaceIds.has(partner.id) || busy) return;
     if (cooldownRemainMs > 0) {
       setRewardModal({
@@ -561,26 +577,53 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
             {rewardModal.rewardName ? (
               <p className="map-event-modal__reward">{rewardModal.rewardName}</p>
             ) : null}
-            {rewardModal.showGiftButton ? (
-              <button
-                type="button"
-                className="map-event-modal__btn"
-                onClick={() => {
-                  setRewardModal(null);
-                  window.dispatchEvent(new Event("site-gift-inbox-open"));
-                }}
-              >
-                선물함 열기
-              </button>
-            ) : null}
-            <button
-              type="button"
-              className="map-event-modal__btn"
-              style={{ background: "#6b7280" }}
-              onClick={() => setRewardModal(null)}
-            >
-              확인
-            </button>
+
+            {rewardModal.kind === "login_required" ? (
+              <div style={{ display: "flex", gap: "8px", marginTop: "12px", width: "100%" }}>
+                <button
+                  type="button"
+                  className="map-event-modal__btn"
+                  style={{ background: "#6b7280", flex: 1 }}
+                  onClick={() => setRewardModal(null)}
+                >
+                  닫기
+                </button>
+                <button
+                  type="button"
+                  className="map-event-modal__btn"
+                  style={{ background: "#059669", flex: 1.2 }}
+                  onClick={() => {
+                    setRewardModal(null);
+                    window.dispatchEvent(new Event(SITE_STUDENT_NEED_LOGIN_EVENT));
+                  }}
+                >
+                  로그인하기
+                </button>
+              </div>
+            ) : (
+              <>
+                {rewardModal.showGiftButton ? (
+                  <button
+                    type="button"
+                    className="map-event-modal__btn"
+                    onClick={() => {
+                      setRewardModal(null);
+                      window.dispatchEvent(new Event("site-gift-inbox-open"));
+                    }}
+                  >
+                    선물함 열기
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="map-event-modal__btn"
+                  style={{ background: "#6b7280" }}
+                  onClick={() => setRewardModal(null)}
+                >
+                  확인
+                </button>
+              </>
+            )}
           </div>
         </div>
       ) : null}
