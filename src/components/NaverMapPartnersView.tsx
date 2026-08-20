@@ -184,8 +184,8 @@ export default function NaverMapPartnersView({
 
   const effectiveEndAt = favoriteCountdownEndAt || activeDbEvent?.end_at || null;
   const effectiveStampLabel =
-    activeDbEvent?.stamp_btn_label?.trim() ||
     stampAction?.label?.trim() ||
+    activeDbEvent?.stamp_btn_label?.trim() ||
     "도장 찍기";
 
   const effectiveMarkerSettings = useMemo<MapMarkerCustomSettings>(() => {
@@ -296,7 +296,6 @@ export default function NaverMapPartnersView({
     }
   }, [favoritePartnerIds, favoritesEnabled, favoritesTerm, mapReady]);
 
-  // 카운트다운 배지: 오직 사용자가 좋아요(즐겨찾기)를 누른 매장에만 노출
   useEffect(() => {
     if (!mapReady) {
       return;
@@ -310,7 +309,6 @@ export default function NaverMapPartnersView({
           favoritesEnabledRef.current && favoritePartnerIdsRef.current?.has(partnerId),
         );
 
-        // 오직 좋아요한 마커에만 D-Day 시간 배지 표시
         const show = isFavorite && Boolean(endAt);
 
         let badgeText: string | null = null;
@@ -490,7 +488,8 @@ export default function NaverMapPartnersView({
       hasValidPartnerMapCoords(partner.latitude, partner.longitude),
     );
     const favKey = Array.from(favoritePartnerIds ?? []).sort().join(",");
-    const nextSignature = `${getMapPartnerMarkersSignature(validPartners)}:${effectiveStampLabel}:${detailButtonLabel ?? ""}:${effectiveMarkerSettings?.borderColor ?? ""}:${effectiveMarkerSettings?.topIconImg ?? ""}:${favKey}`;
+    const isStampOn = Boolean(stampAction?.enabled);
+    const nextSignature = `${getMapPartnerMarkersSignature(validPartners)}:${isStampOn ? effectiveStampLabel : "nostamp"}:${detailButtonLabel ?? ""}:${effectiveMarkerSettings?.borderColor ?? ""}:${effectiveMarkerSettings?.topIconImg ?? ""}:${favKey}`;
     const nextOrderKey = validPartners.map((partner) => partner.id).join("|");
     const preserveMapView = nextSignature === mapMarkersSignatureRef.current;
     const orderChanged = nextOrderKey !== mapMarkersOrderRef.current;
@@ -584,6 +583,9 @@ export default function NaverMapPartnersView({
         favoritesEnabledRef.current && favoritePartnerIdsRef.current?.has(partner.id)
       );
 
+      // stampAction이 실제로 활성화되어 넘어왔고, 즐겨찾기(좋아요)된 매장일 때만 도장 찍기 버튼 노출
+      const showStampButton = Boolean(activeStampAction?.enabled) && isFav;
+
       const card = createPartnerMapMiniCardElement(partner, () => {
         miniCardOverlayRef.current?.close();
         miniCardOverlayRef.current = null;
@@ -601,12 +603,11 @@ export default function NaverMapPartnersView({
               onFavoriteToggleRef.current?.(partner.id);
             }
           : undefined,
-        // 좋아요를 누른 매장에만 도장 버튼 전달 (안 누른 매장은 비활성 버튼도 숨김 처리)
-        stamp: (activeStampAction?.enabled || activeDbEvent) && isFav
+        stamp: showStampButton
           ? {
               visible: true,
               disabled: Boolean(activeStampAction?.stampedPlaceIds?.has(partner.id)),
-              label: effectiveStampLabel,
+              label: activeStampAction?.label || effectiveStampLabel,
               onStamp: () => {
                 activeStampAction?.onStamp(partner);
               },
@@ -666,7 +667,6 @@ export default function NaverMapPartnersView({
 
         const isFav = favoritesEnabled && Boolean(favoritePartnerIds?.has(partner.id));
 
-        // 좋아요를 누른 매장에만 상단 핀(불꽃) 렌더링, 미즐겨찾기는 일반 마커로 출력
         const customSettingsForMarker = isFav
           ? effectiveMarkerSettings
           : { ...effectiveMarkerSettings, topIconImg: null };
@@ -834,6 +834,7 @@ export default function NaverMapPartnersView({
     effectiveStampLabel,
     favoritePartnerIds,
     favoritesEnabled,
+    stampAction,
   ]);
 
   useEffect(() => {
