@@ -233,7 +233,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return () => window.removeEventListener("site-stamp-progress-changed", onStampChanged);
   }, [loadProgress]);
 
-  // 좋아요(즐겨찾기)를 누른 매장에만 pinImageUrl 부여 (나머지는 null 처리)
+  // 좋아요(즐겨찾기)를 누른 매장에만 pinImageUrl 부여
   const visiblePartners = useMemo(() => {
     const pin =
       activeEvent?.marker_icon_img?.trim() ||
@@ -259,23 +259,10 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     [progress],
   );
 
-  // 현재 활성화된 이벤트에 포함된 제휴처 ID Set
-  const activeEventAllowedIds = useMemo(() => {
-    if (!activeEvent || !activeEvent.partner_ids || activeEvent.partner_ids.length === 0) {
-      return null;
-    }
-    return new Set(activeEvent.partner_ids);
-  }, [activeEvent]);
-
   async function handleStamp(partner: { id: string; name: string }) {
     if (!activeEvent || busy) return;
     if (!isEventLive(activeEvent)) {
       setMessage("이벤트 기간이 종료되어 도장을 찍을 수 없습니다.");
-      return;
-    }
-
-    // 해당 이벤트 지정 매장이 아닌 경우 차단
-    if (activeEventAllowedIds && !activeEventAllowedIds.has(partner.id)) {
       return;
     }
 
@@ -487,6 +474,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     activeEvent?.completion_badge_img?.trim() || completionPreview?.reward_img || null;
   const stampEnabled =
     Boolean(activeEvent) &&
+    activeTabId !== DEFAULT_TAB_ID &&
     isEventLive(activeEvent!) &&
     !progress?.is_completed &&
     cooldownRemainMs <= 0;
@@ -586,8 +574,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
             ? {
                 enabled: true,
                 stampedPlaceIds,
-                // 이벤트 지정 매장 ID Set 전달 (일반 제휴처 제외용)
-                allowedPartnerIds: activeEventAllowedIds,
                 label:
                   cooldownRemainMs > 0
                     ? `${formatCooldownRemain(cooldownRemainMs)} 후 가능`
