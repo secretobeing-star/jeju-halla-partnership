@@ -54,11 +54,14 @@ function CloseIcon({ className = "h-5 w-5" }: { className?: string }) {
 type FrameInventoryNavChipProps = {
   cardFrames: PublicCardFrameItem[];
   hideChip?: boolean;
+  /** 관리자 설정: 한 페이지당 노출할 코스튬 아이템 개수 (기본값: 4) */
+  pageSize?: number;
 };
 
 export default function FrameInventoryNavChip({
   cardFrames,
   hideChip = false,
+  pageSize = 4,
 }: FrameInventoryNavChipProps) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -71,6 +74,7 @@ export default function FrameInventoryNavChip({
     sources: {},
   });
   const [selectedFrameId, setSelectedFrameId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   // 스와이프 제스처 ref
   const touchStartXRef = useRef<number | null>(null);
@@ -139,7 +143,29 @@ export default function FrameInventoryNavChip({
     [cardFrames, state.unlockedIds],
   );
 
-  const selectableList = useMemo(() => [null, ...unlocked.map((f) => f.id)], [unlocked]);
+  // 기본 스타일(null)을 포함한 전체 아이템 리스트 (순번 매김용)
+  const allDisplayItems = useMemo(() => {
+    return [
+      { id: null, name: "기본 스타일", isDefault: true, indexNum: 0 },
+      ...unlocked.map((frame, idx) => ({
+        ...frame,
+        isDefault: false,
+        indexNum: idx + 1,
+      })),
+    ];
+  }, [unlocked]);
+
+  // 페이지네이션 연산
+  const totalPages = Math.max(1, Math.ceil(allDisplayItems.length / pageSize));
+  const paginatedItems = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return allDisplayItems.slice(start, start + pageSize);
+  }, [allDisplayItems, currentPage, pageSize]);
+
+  // 선택된 아이템 정보
+  const currentItemInfo = useMemo(() => {
+    return allDisplayItems.find((item) => item.id === selectedFrameId) || allDisplayItems[0];
+  }, [allDisplayItems, selectedFrameId]);
 
   const currentPreview = useMemo(() => {
     if (!selectedFrameId) return null;
@@ -151,19 +177,26 @@ export default function FrameInventoryNavChip({
     window.dispatchEvent(new Event("site-card-frame-changed"));
   };
 
+  // 좌우 스와이프 로직
   const handlePrev = useCallback(() => {
-    const currentIndex = selectableList.indexOf(selectedFrameId);
+    const currentIndex = allDisplayItems.findIndex((item) => item.id === selectedFrameId);
     if (currentIndex > 0) {
-      setSelectedFrameId(selectableList[currentIndex - 1]);
+      const prevItem = allDisplayItems[currentIndex - 1];
+      setSelectedFrameId(prevItem.id);
+      // 필요 시 페이지 동기화
+      setCurrentPage(Math.floor((currentIndex - 1) / pageSize) + 1);
     }
-  }, [selectableList, selectedFrameId]);
+  }, [allDisplayItems, selectedFrameId, pageSize]);
 
   const handleNext = useCallback(() => {
-    const currentIndex = selectableList.indexOf(selectedFrameId);
-    if (currentIndex < selectableList.length - 1) {
-      setSelectedFrameId(selectableList[currentIndex + 1]);
+    const currentIndex = allDisplayItems.findIndex((item) => item.id === selectedFrameId);
+    if (currentIndex < allDisplayItems.length - 1) {
+      const nextItem = allDisplayItems[currentIndex + 1];
+      setSelectedFrameId(nextItem.id);
+      // 필요 시 페이지 동기화
+      setCurrentPage(Math.floor((currentIndex + 1) / pageSize) + 1);
     }
-  }, [selectableList, selectedFrameId]);
+  }, [allDisplayItems, selectedFrameId, pageSize]);
 
   const onTouchStart = (e: React.TouchEvent | React.MouseEvent) => {
     const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
@@ -206,8 +239,8 @@ export default function FrameInventoryNavChip({
               onClick={(e) => e.stopPropagation()}
             >
               {/* 상단 헤더 */}
-              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-white">
-                <h2 className="text-sm sm:text-base font-bold text-gray-900 flex items-center gap-2">
+              <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 bg-white">
+                <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
                   <FrameBoxIcon className="w-5 h-5 text-emerald-600" />
                   코스튬 보관함
                 </h2>
@@ -222,7 +255,7 @@ export default function FrameInventoryNavChip({
               </div>
 
               {/* 본문 영역 */}
-              <div className="p-3 sm:p-4 flex-1 overflow-y-auto bg-gray-50/60 flex flex-col gap-2.5">
+              <div className="p-3.5 sm:p-4 flex-1 overflow-y-auto bg-gray-50/60 flex flex-col gap-2.5 items-center">
                 {!studentId ? (
                   <p className="text-center py-8 text-gray-500 text-sm w-full">로그인(학번) 후 이용할 수 있습니다.</p>
                 ) : unlocked.length === 0 ? (
@@ -231,16 +264,16 @@ export default function FrameInventoryNavChip({
                   </p>
                 ) : (
                   <>
-                    {/* [상단 카드] 학생증 미리보기 (공백 제거 밀착형) */}
+                    {/* [상단 카드] 정중앙 정렬 학생증 카드 영역 */}
                     <div 
-                      className="w-full flex flex-col items-center bg-white border border-gray-200/90 rounded-2xl p-3 shadow-xs select-none touch-pan-y"
+                      className="w-full flex flex-col items-center justify-center bg-white border border-gray-200/90 rounded-2xl p-3 shadow-xs select-none touch-pan-y"
                       onTouchStart={onTouchStart}
                       onTouchEnd={onTouchEnd}
                       onMouseDown={onTouchStart}
                       onMouseUp={onTouchEnd}
                     >
-                      {/* 가로형 학생증 카드 디자인 */}
-                      <div className="relative w-full aspect-[1.62/1] rounded-2xl bg-white border border-gray-200/90 shadow-sm p-3.5 text-gray-800 flex flex-col justify-between overflow-hidden cursor-grab active:cursor-grabbing">
+                      {/* 가로형 학생증 카드 디자인 (완벽한 중앙 배치) */}
+                      <div className="relative w-full aspect-[1.62/1] max-w-[340px] rounded-2xl bg-white border border-gray-200/90 shadow-sm p-3.5 text-gray-800 flex flex-col justify-between overflow-hidden cursor-grab active:cursor-grabbing mx-auto">
                         {currentPreview?.imageUrl ? (
                           <img
                             src={currentPreview.imageUrl}
@@ -251,7 +284,7 @@ export default function FrameInventoryNavChip({
 
                         <div className="absolute inset-0 bg-gradient-to-br from-white/95 via-emerald-50/20 to-white/95 z-0 pointer-events-none" />
 
-                        <div className="relative z-0 flex h-full gap-3 items-center">
+                        <div className="relative z-0 flex h-full gap-3 items-center justify-center">
                           <div className="w-[30%] aspect-[3/4] rounded-xl bg-gray-100 border border-gray-200 flex items-center justify-center text-gray-400 text-xs font-medium flex-shrink-0">
                             사진
                           </div>
@@ -283,10 +316,15 @@ export default function FrameInventoryNavChip({
                         </div>
                       </div>
 
-                      {/* 프레임 정보 및 버튼 */}
+                      {/* 프레임 정보 및 착용 버튼 */}
                       <div className="w-full pt-2.5 mt-2 border-t border-gray-100 text-center">
                         <div className="mb-2">
                           <div className="flex items-center justify-center gap-1.5">
+                            {currentItemInfo.indexNum > 0 ? (
+                              <span className="px-1.5 py-0.5 text-[10px] font-black rounded-md bg-gray-800 text-white">
+                                #{String(currentItemInfo.indexNum).padStart(2, "0")}
+                              </span>
+                            ) : null}
                             <h4 className="font-bold text-gray-900 text-xs sm:text-sm">
                               {currentPreview?.name || "기본 학생증"}
                             </h4>
@@ -317,63 +355,82 @@ export default function FrameInventoryNavChip({
                       </div>
                     </div>
 
-                    {/* [하단 목록 영역] 세로 스크롤 리스트 */}
+                    {/* [하단 목록 영역] 번호 부여 & N개당 페이지네이션 */}
                     <div className="w-full flex flex-col bg-white border border-gray-200/90 rounded-2xl p-3 shadow-xs">
-                      <p className="text-xs font-bold text-gray-700 mb-2 px-0.5 text-left">
-                        보유 코스튬 ({unlocked.length})
-                      </p>
-                      <div className="flex flex-col gap-1.5 overflow-y-auto max-h-[140px] pr-0.5 no-scrollbar">
-                        {/* 기본 스타일 */}
-                        <button
-                          type="button"
-                          className={`w-full flex items-center gap-2.5 p-2 rounded-xl border text-left transition-all ${
-                            selectedFrameId === null
-                              ? "border-emerald-500 bg-emerald-50/60 shadow-xs ring-1 ring-emerald-500/30"
-                              : "border-gray-200 bg-gray-50/50 hover:bg-gray-100/70"
-                          }`}
-                          onClick={() => setSelectedFrameId(null)}
-                        >
-                          <div className="w-9 h-9 rounded-lg bg-gray-200/80 flex items-center justify-center text-[11px] font-bold text-gray-600 flex-shrink-0">
-                            기본
+                      <div className="flex items-center justify-between mb-2 px-0.5">
+                        <p className="text-xs font-bold text-gray-700">
+                          보유 코스튬 ({unlocked.length})
+                        </p>
+                        {totalPages > 1 ? (
+                          <div className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-500">
+                            <button
+                              type="button"
+                              className="px-1.5 py-0.5 rounded bg-gray-100 hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed"
+                              disabled={currentPage <= 1}
+                              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                            >
+                              ◀
+                            </button>
+                            <span>{currentPage} / {totalPages}</span>
+                            <button
+                              type="button"
+                              className="px-1.5 py-0.5 rounded bg-gray-100 hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed"
+                              disabled={currentPage >= totalPages}
+                              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                            >
+                              ▶
+                            </button>
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs font-bold text-gray-800 truncate leading-tight">기본 스타일</p>
-                            {state.activeFrameId === null ? (
-                              <span className="text-[10px] font-bold text-emerald-600 leading-none">착용 중</span>
-                            ) : (
-                              <span className="text-[10px] text-gray-400 leading-none">미착용</span>
-                            )}
-                          </div>
-                        </button>
+                        ) : null}
+                      </div>
 
-                        {/* 해금된 코스튬들 */}
-                        {unlocked.map((frame) => {
-                          const isSelected = selectedFrameId === frame.id;
-                          const isWearing = state.activeFrameId === frame.id;
+                      <div className="flex flex-col gap-1.5 pr-0.5">
+                        {paginatedItems.map((item) => {
+                          const isSelected = selectedFrameId === item.id;
+                          const isWearing = state.activeFrameId === item.id;
+
                           return (
                             <button
-                              key={frame.id}
+                              key={item.id ?? "default-style"}
                               type="button"
-                              className={`w-full relative flex items-center gap-2.5 p-2 rounded-xl border text-left transition-all ${
+                              className={`w-full flex items-center gap-2.5 p-2 rounded-xl border text-left transition-all ${
                                 isSelected
                                   ? "border-emerald-500 bg-emerald-50/60 shadow-xs ring-1 ring-emerald-500/30"
                                   : "border-gray-200 bg-gray-50/50 hover:bg-gray-100/70"
                               }`}
-                              onClick={() => setSelectedFrameId(frame.id)}
+                              onClick={() => setSelectedFrameId(item.id)}
                             >
-                              <div className="w-9 h-9 rounded-lg bg-white border border-gray-200 flex items-center justify-center p-0.5 overflow-hidden flex-shrink-0">
-                                {frame.imageUrl ? (
-                                  <img src={frame.imageUrl} alt={frame.name} className="w-full h-full object-contain" />
-                                ) : (
-                                  <span className="text-[9px] text-gray-400 text-center line-clamp-1">{frame.name}</span>
-                                )}
+                              {/* 코스튬 순번 번호 배지 */}
+                              <div className="w-8 h-8 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center text-[10px] font-black text-gray-600 flex-shrink-0">
+                                {item.isDefault ? "기본" : `#${String(item.indexNum).padStart(2, "0")}`}
                               </div>
+
+                              {/* 썸네일 이미지 */}
+                              {!item.isDefault ? (
+                                <div className="w-8 h-8 rounded-lg bg-white border border-gray-200 flex items-center justify-center p-0.5 overflow-hidden flex-shrink-0">
+                                  {(item as PublicCardFrameItem).imageUrl ? (
+                                    <img
+                                      src={(item as PublicCardFrameItem).imageUrl}
+                                      alt={item.name}
+                                      className="w-full h-full object-contain"
+                                    />
+                                  ) : (
+                                    <span className="text-[8px] text-gray-400 text-center line-clamp-1">{item.name}</span>
+                                  )}
+                                </div>
+                              ) : null}
+
+                              {/* 정보 */}
                               <div className="flex-1 min-w-0">
-                                <p className="text-xs font-bold text-gray-800 truncate leading-tight">{frame.name}</p>
+                                <p className="text-xs font-bold text-gray-800 truncate leading-tight">
+                                  {item.name}
+                                </p>
                                 {isWearing ? (
                                   <span className="text-[10px] font-bold text-emerald-600 leading-none">착용 중</span>
                                 ) : (
-                                  <span className="text-[10px] text-gray-400 leading-none">보유</span>
+                                  <span className="text-[10px] text-gray-400 leading-none">
+                                    {item.isDefault ? "미착용" : "보유"}
+                                  </span>
                                 )}
                               </div>
                             </button>
