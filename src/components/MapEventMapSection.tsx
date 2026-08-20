@@ -176,32 +176,25 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const activeEvent = liveEvents.find((event) => event.id === activeTabId) ?? null;
   const isDefaultTab = activeTabId === DEFAULT_TAB_ID;
 
-  const cooldownRemainMs = remainingCooldownMs(
-    progress?.last_stamped_at,
-    activeEvent?.cooldown_minutes ?? 0,
-    nowMs,
-  );
+  // 1초마다 실시간 시간 갱신
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setNowMs(Date.now());
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const cooldownRemainMs = useMemo(() => {
+    if (!activeEvent || !progress?.last_stamped_at) return 0;
+    return remainingCooldownMs(
+      progress.last_stamped_at,
+      activeEvent.cooldown_minutes ?? 0,
+      nowMs,
+    );
+  }, [activeEvent, progress?.last_stamped_at, nowMs]);
 
   useEffect(() => {
-    const nextEnd = events
-      .map((event) => (event.end_at ? Date.parse(event.end_at) : Number.NaN))
-      .filter((value) => Number.isFinite(value) && value > Date.now())
-      .sort((a, b) => a - b)[0];
-    const cooldownActive = cooldownRemainMs > 0;
-    if (!nextEnd && !cooldownActive) {
-      return;
-    }
-    const delay = cooldownActive
-      ? 1000
-      : Math.min(Math.max(250, nextEnd - Date.now() + 250), 60_000);
-    const timerId = window.setTimeout(() => setNowMs(Date.now()), delay);
-    return () => window.clearTimeout(timerId);
-  }, [events, nowMs, cooldownRemainMs]);
-
-  useEffect(() => {
-    if (activeTabId === DEFAULT_TAB_ID) {
-      return;
-    }
+    if (activeTabId === DEFAULT_TAB_ID) return;
     if (!liveEvents.some((event) => event.id === activeTabId)) {
       setActiveTabId(DEFAULT_TAB_ID);
       setMessage("이벤트 기간이 종료되어 도장을 찍을 수 없습니다.");
@@ -349,11 +342,19 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     }
 
     if (stampedPlaceIds.has(partner.id)) return;
-    if (cooldownRemainMs > 0) {
+
+    // 실시간 쿨다운 엄격 검증
+    const currentRealtimeCooldown = remainingCooldownMs(
+      progress?.last_stamped_at,
+      activeEvent?.cooldown_minutes ?? 0,
+      Date.now(),
+    );
+
+    if (currentRealtimeCooldown > 0) {
       setRewardModal({
         kind: "lose",
         title: "잠시 후 도장을 찍을 수 있어요",
-        body: `${formatCooldownRemain(cooldownRemainMs)} 후에 도장을 찍을 수 있습니다.`,
+        body: `${formatCooldownRemain(currentRealtimeCooldown)} 후에 도장을 찍을 수 있습니다.`,
         banner: null,
         rewardName: null,
         rewardImg: null,
@@ -425,7 +426,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       };
 
       if (!response.ok) {
-        // ⚡ 쿨다운 에러 처리 분기 (모달 노출)
         if (payload.cooldownError) {
           setRewardModal({
             kind: "lose",
@@ -467,13 +467,11 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         throw new Error(payload.error || "도장을 찍지 못했습니다.");
       }
 
-      const stampedNow = new Date().toISOString();
+      // 서버에서 반환된 progress로 즉시 교체
       if (payload.progress) {
-        setProgress({
-          ...payload.progress,
-          last_stamped_at: payload.progress.last_stamped_at || stampedNow,
-        });
+        setProgress(payload.progress);
       } else {
+        const stampedNow = new Date().toISOString();
         setProgress((prev) =>
           prev
             ? {
