@@ -224,7 +224,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return () => window.removeEventListener("site-stamp-progress-changed", onStampChanged);
   }, [loadProgress]);
 
-  // 좋아요(즐겨찾기)를 누른 매장에만 pinImageUrl 부여[cite: 6]
+  // 좋아요(즐겨찾기)를 누른 매장에만 pinImageUrl 부여 (나머지는 null 처리)[cite: 8]
   const visiblePartners = useMemo(() => {
     const pin =
       activeEvent?.marker_icon_img?.trim() ||
@@ -251,13 +251,13 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   );
 
   async function handleStamp(partner: { id: string; name: string }) {
-    if (!activeEvent) return;
+    if (!activeEvent || busy) return;
     if (!isEventLive(activeEvent)) {
       setMessage("이벤트 기간이 종료되어 도장을 찍을 수 없습니다.");
       return;
     }
 
-    // 좋아요(즐겨찾기)하지 않은 매장은 참여 차단[cite: 6]
+    // 좋아요(즐겨찾기)하지 않은 매장은 참여 차단[cite: 8]
     const isFavorited = Boolean(props.favoritePartnerIds?.has(partner.id));
     if (props.favoritesEnabled && !isFavorited) {
       setRewardModal({
@@ -277,7 +277,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     const sessionName = sessionStudent?.name?.trim() || "";
     const sessionDepartment = sessionStudent?.department?.trim() || "";
 
-    // 비로그인 사용자: 커스텀 로그인 안내 팝업창 모달 노출[cite: 6]
+    // 비로그인 사용자: 커스텀 로그인 안내 팝업창 모달 노출[cite: 8]
     if (!sessionUserId || !sessionStudent || !sessionName) {
       const loginMsg =
         (activeEvent as unknown as { login_required_message?: string })?.login_required_message?.trim() ||
@@ -296,7 +296,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       return;
     }
 
-    if (stampedPlaceIds.has(partner.id) || busy) return;
+    if (stampedPlaceIds.has(partner.id)) return;
     if (cooldownRemainMs > 0) {
       setRewardModal({
         kind: "lose",
@@ -310,10 +310,14 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       return;
     }
 
+    // ⚡ 중복 클릭 방지 즉시 잠금[cite: 8]
     setBusy(true);
     setMessage(null);
+
     try {
-      const geo = await getCurrentGeolocation({ maximumAge: 5_000, timeout: 15_000 });
+      // ⚡ 초고속 GPS 위치 조회 (1분 캐시, 4초 타임아웃)
+      const geo = await getCurrentGeolocation({ maximumAge: 60_000, timeout: 4_000 });
+
       const response = await fetch("/api/event/stamp-action", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -329,6 +333,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
           longitude: geo.longitude,
         }),
       });
+
       const payload = (await response.json()) as {
         error?: string;
         progress?: UserEventProgress;
@@ -371,22 +376,11 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         }
         throw new Error(payload.error || "도장을 찍지 못했습니다.");
       }
+
       if (payload.progress) setProgress(payload.progress);
 
       const maxStamps = activeEvent.max_stamps || 5;
       const nextStampCount = payload.progress?.current_stamps ?? (progress?.current_stamps ?? 0) + 1;
-
-      sendMapStampLog({
-        action: "도장 찍기",
-        eventTitle: activeEvent.title,
-        storeName: partner.name,
-        currentCount: nextStampCount,
-        maxCount: maxStamps,
-        studentId: sessionUserId,
-        studentName: sessionName,
-        department: sessionDepartment,
-      });
-
       const completionReward = payload.completion?.reward;
       const winReward = payload.step?.reward || payload.guaranteed?.reward || null;
       const popupKind = payload.popup || (payload.completion?.reached ? "completion" : (payload.giftCount ?? 0) > 0 ? "win" : "lose");
@@ -405,18 +399,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
           rewardName: completionReward?.reward_name || winReward?.reward_name || null,
           rewardImg: completionReward?.reward_img || winReward?.reward_img || null,
           showGiftButton: (payload.giftCount ?? 0) > 0,
-        });
-
-        sendMapStampLog({
-          action: "스탬프 완주",
-          eventTitle: activeEvent.title,
-          storeName: partner.name,
-          currentCount: nextStampCount,
-          maxCount: maxStamps,
-          studentId: sessionUserId,
-          studentName: sessionName,
-          department: sessionDepartment,
-          rewardMessage: completionMsg,
         });
       } else if (popupKind === "win") {
         const winMsg =
@@ -449,6 +431,22 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
           showGiftButton: false,
         });
       }
+
+      // ⚡ 백그라운드 비동기 로그 전송 (UI 블로킹 없이 모달 즉시 노출)
+      setTimeout(() => {
+        sendMapStampLog({
+          action: popupKind === "completion" ? "스탬프 완주" : "도장 찍기",
+          eventTitle: activeEvent.title,
+          storeName: partner.name,
+          currentCount: nextStampCount,
+          maxCount: maxStamps,
+          studentId: sessionUserId,
+          studentName: sessionName,
+          department: sessionDepartment,
+          rewardMessage: popupKind === "completion" ? (payload.messages?.completion || "") : undefined,
+        });
+      }, 0);
+
       if ((payload.giftCount ?? 0) > 0) {
         window.dispatchEvent(new Event("site-gift-inbox-refresh"));
       }
