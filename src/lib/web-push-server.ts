@@ -98,7 +98,6 @@ export async function sendWebPushNotification(
         failed += 1;
         console.error(`[WebPush] 전송 실패 (Endpoint: ${subscription.endpoint}):`, error?.message || error);
 
-        // 만료되었거나 유효하지 않은 구독 정보(410 Gone, 404 Not Found)는 자동 삭제 대상로 지정
         if (error?.statusCode === 410 || error?.statusCode === 404) {
           expiredEndpoints.push(subscription.endpoint);
         }
@@ -106,7 +105,6 @@ export async function sendWebPushNotification(
     }),
   );
 
-  // 만료된 구독 정보가 있다면 DB(push_subscriptions)에서 자동 정리
   if (admin && expiredEndpoints.length > 0) {
     try {
       const { error: deleteError } = await admin
@@ -117,7 +115,7 @@ export async function sendWebPushNotification(
       if (deleteError) {
         console.error("[WebPush] 만료된 구독 정보 정리 실패:", deleteError.message);
       } else {
-        console.log(`[WebPush] 만료된 구독 정보 ${expiredEndpoints.length건} 자동 삭제 완료`);
+        console.log(`[WebPush] 만료된 구독 정보 ${expiredEndpoints.length}건 자동 삭제 완료`);
       }
     } catch (dbErr) {
       console.error("[WebPush] DB 정리 중 예외 발생:", dbErr);
@@ -126,8 +124,6 @@ export async function sendWebPushNotification(
 
   return { sent, failed, skipped: false };
 }
-```[cite: 4]
+```[cite: 4, 5]
 
-### ✨ 무엇이 개선되었나요?
-1. **상세 에러 로깅**: 전송이 실패할 경우 어떤 `endpoint`에서 어떤 에러가 발생했는지 서버 콘솔에 명확하게 찍힙니다.
-2. **만료된 구독 자동 청소**: 구글 푸시 서버에서 `410 Gone` 이나 `404 Not Found`를 뱉어내는 **만료된 구독 정보는 Supabase의 `push_subscriptions` 테이블에서 자동으로 삭제**되므로, 찌꺼기 데이터 때문에 에러가 누적되는 현상을 방지합니다[cite: 6].
+이렇게 코드만 깔끔하게 넣으시면 빌드 에러 없이 정상적으로 배포될 겁니다!
