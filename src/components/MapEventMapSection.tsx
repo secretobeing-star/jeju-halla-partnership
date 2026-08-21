@@ -135,8 +135,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const isGuest = !userId;
 
   const isDefaultTab = !activeTabId || activeTabId === DEFAULT_TAB_ID;
-
-  // 🎯 찜(좋아요)한 제휴가 있는지 여부
   const hasFavorites = Boolean(props.favoritePartnerIds && props.favoritePartnerIds.size > 0);
 
   const liveEvents = useMemo(
@@ -148,13 +146,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     () => (isDefaultTab ? null : liveEvents.find((event) => event.id === activeTabId) ?? null),
     [isDefaultTab, liveEvents, activeTabId],
   );
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setNowMs(Date.now());
-    }, 1000);
-    return () => window.clearInterval(timer);
-  }, []);
 
   const visiblePartners = useMemo(() => {
     const raw = props.partners || [];
@@ -236,6 +227,22 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return null;
   }, [nearestTargetPartner]);
 
+  // 🎯 제휴를 찾을 수 없는지 여부 (타이머 중단 조건)
+  const isTimerPaused = useMemo(() => {
+    if (isDefaultTab || !activeEvent) return false;
+    return visiblePartners.length === 0 || !nearestTargetPartner;
+  }, [isDefaultTab, activeEvent, visiblePartners.length, nearestTargetPartner]);
+
+  // 🎯 제휴를 찾을 수 있을 때만 타이머 갱신 (못 찾으면 정지)
+  useEffect(() => {
+    if (isTimerPaused) return;
+
+    const timer = window.setInterval(() => {
+      setNowMs(Date.now());
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [isTimerPaused]);
+
   // 로그인 상태이고 찜한 제휴 반경에 들어왔을 때만 쿨다운 타이머 시작
   useEffect(() => {
     if (isDefaultTab || !activeEvent || isGuest || !hasFavorites) return;
@@ -292,9 +299,8 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     setShowIntroModal(false);
   }, [activeEvent, isGuest, userId, getIntroConfirmedKey]);
 
-  // 🎯 좋아요가 없으면 남은 시간 계산도 무조건 0으로 반환
   const currentPlaceCooldownRemainMs = useMemo(() => {
-    if (isDefaultTab || !activeEvent || !nearestUnstampedPartnerInside || isGuest || !hasFavorites) return 0;
+    if (isDefaultTab || !activeEvent || !nearestUnstampedPartnerInside || isGuest || !hasFavorites || isTimerPaused) return 0;
 
     const storageKey = getEventCooldownKey(activeEvent.id);
     let targetEndTimeStr: string | null = null;
@@ -308,7 +314,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     if (isNaN(targetEndTime) || targetEndTime <= 0) return 0;
 
     return Math.max(0, targetEndTime - nowMs);
-  }, [activeEvent, isDefaultTab, nearestUnstampedPartnerInside, getEventCooldownKey, isGuest, hasFavorites, nowMs]);
+  }, [activeEvent, isDefaultTab, nearestUnstampedPartnerInside, getEventCooldownKey, isGuest, hasFavorites, isTimerPaused, nowMs]);
 
   const hasTimerKey = useMemo(() => {
     if (isDefaultTab || !activeEvent || !nearestUnstampedPartnerInside || isGuest || !hasFavorites) return false;
@@ -662,7 +668,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
               <span>🔒 로그인 후 도장을 찍을 수 있어요!</span>
             </div>
           ) : !hasFavorites ? (
-            // 🎯 2. 로그인 상태지만 좋아요(찜)한 제휴가 없을 때 -> 시간 대신 좋아요 안내 배지만 노출
+            // 2. 로그인 상태지만 좋아요(찜)한 제휴가 없을 때
             <div
               style={{
                 position: "absolute",
@@ -688,9 +694,36 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
               <span>❤️</span>
               <span>찜한 제휴가 없습니다. 제휴의 ❤️를 먼저 눌러주세요!</span>
             </div>
+          ) : isTimerPaused ? (
+            // 🎯 3. 제휴처를 찾을 수 없어 타이머가 일시정지(대기)된 경우
+            <div
+              style={{
+                position: "absolute",
+                top: "16px",
+                left: "50%",
+                transform: "translateX(-50%)",
+                zIndex: 20,
+                backgroundColor: "rgba(31, 41, 55, 0.95)",
+                color: "#f9fafb",
+                padding: "8px 18px",
+                borderRadius: "9999px",
+                fontSize: "12px",
+                fontWeight: "600",
+                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.25)",
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                pointerEvents: "none",
+                border: "1px solid rgba(255, 255, 255, 0.1)",
+                whiteSpace: "nowrap",
+              }}
+            >
+              <span>⏸️</span>
+              <span>주변 제휴처를 찾을 수 없어 타이머가 일시정지되었습니다.</span>
+            </div>
           ) : nearestUnstampedPartnerInside ? (
             currentPlaceCooldownRemainMs > 0 ? (
-              // 3. 좋아요 제휴 반경 내 + 쿨다운 대기 중 -> 타이머 배지 노출
+              // 4. 좋아요 제휴 반경 내 + 쿨다운 대기 중 -> 타이머 배지 노출
               <div
                 style={{
                   position: "absolute",
@@ -716,7 +749,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
                 <span>{timerBadgeText}</span>
               </div>
             ) : isReadyToStamp ? (
-              // 4. 좋아요 제휴 반경 내 + 도장 찍기 가능
+              // 5. 좋아요 제휴 반경 내 + 도장 찍기 가능
               <div
                 style={{
                   position: "absolute",
@@ -742,7 +775,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
               </div>
             ) : null
           ) : (
-            // 5. 좋아요 제휴가 있지만 거리가 멀 때 -> 거리 안내
+            // 6. 좋아요 제휴가 있지만 거리가 멀 때 -> 거리 안내
             <div
               style={{
                 position: "absolute",
