@@ -118,7 +118,24 @@ export async function sendWebPushNotification(
       } catch (error: any) {
         failed += 1;
 
-        const errorMessage = error?.message || String(error);
+        const statusCode =
+          typeof error?.statusCode === "number" ? error.statusCode : null;
+
+        const responseBody =
+          typeof error?.body === "string"
+            ? error.body
+            : error?.body
+              ? JSON.stringify(error.body)
+              : null;
+
+        const errorMessage = [
+          `[status=${statusCode ?? "unknown"}]`,
+          error?.message || String(error),
+          responseBody ? `body=${responseBody}` : null,
+        ]
+          .filter(Boolean)
+          .join(" | ");
+
         errors.push(errorMessage);
 
         console.error(
@@ -126,7 +143,7 @@ export async function sendWebPushNotification(
           errorMessage,
         );
 
-        if (error?.statusCode === 410 || error?.statusCode === 404) {
+        if (statusCode === 410 || statusCode === 404) {
           expiredEndpoints.push(subscription.endpoint);
         }
       }
