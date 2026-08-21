@@ -242,7 +242,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const showStampTimer =
     !hideStampTimer &&
     Boolean(activeEvent) &&
-    !isCompleted &&
     cooldownRemainMs > 0;
 
   useEffect(() => {
