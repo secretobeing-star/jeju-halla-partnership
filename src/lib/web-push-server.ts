@@ -21,6 +21,7 @@ export type WebPushSendResult = {
   skipped: boolean;
   message?: string;
   expiredEndpoints?: string[];
+  errors?: string[];
 };
 
 function getVapidConfig() {
@@ -40,20 +41,30 @@ export async function sendWebPushNotification(
   payload: PushPayload,
 ): Promise<WebPushSendResult> {
   const vapid = getVapidConfig();
+
   if (!vapid) {
     return {
       sent: 0,
       failed: 0,
       skipped: true,
-      message: "VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY 환경 변수가 설정되지 않았습니다.",
+      message:
+        "VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY 환경 변수가 설정되지 않았습니다.",
+      errors: [],
     };
   }
 
   if (subscriptions.length === 0) {
-    return { sent: 0, failed: 0, skipped: true, message: "푸시 구독자가 없습니다." };
+    return {
+      sent: 0,
+      failed: 0,
+      skipped: true,
+      message: "푸시 구독자가 없습니다.",
+      errors: [],
+    };
   }
 
   let webpush: typeof import("web-push");
+
   try {
     webpush = await import("web-push");
   } catch {
@@ -61,11 +72,17 @@ export async function sendWebPushNotification(
       sent: 0,
       failed: 0,
       skipped: true,
-      message: "web-push 패키지가 설치되지 않았습니다. npm install web-push 후 다시 시도해 주세요.",
+      message:
+        "web-push 패키지가 설치되지 않았습니다. npm install web-push 후 다시 시도해 주세요.",
+      errors: [],
     };
   }
 
-  webpush.setVapidDetails(vapid.subject, vapid.publicKey, vapid.privateKey);
+  webpush.setVapidDetails(
+    vapid.subject,
+    vapid.publicKey,
+    vapid.privateKey,
+  );
 
   const body = JSON.stringify({
     title: payload.title,
@@ -79,7 +96,9 @@ export async function sendWebPushNotification(
   const admin = createSupabaseAdmin();
   let sent = 0;
   let failed = 0;
+
   const expiredEndpoints: string[] = [];
+  const errors: string[] = [];
 
   await Promise.all(
     subscriptions.map(async (subscription) => {
@@ -94,10 +113,18 @@ export async function sendWebPushNotification(
           },
           body,
         );
+
         sent += 1;
       } catch (error: any) {
         failed += 1;
-        console.error(`[WebPush] 전송 실패 (Endpoint: ${subscription.endpoint}):`, error?.message || error);
+
+        const errorMessage = error?.message || String(error);
+        errors.push(errorMessage);
+
+        console.error(
+          `[WebPush] 전송 실패 (Endpoint: ${subscription.endpoint}):`,
+          errorMessage,
+        );
 
         if (error?.statusCode === 410 || error?.statusCode === 404) {
           expiredEndpoints.push(subscription.endpoint);
@@ -114,14 +141,25 @@ export async function sendWebPushNotification(
         .in("endpoint", expiredEndpoints);
 
       if (deleteError) {
-        console.error("[WebPush] 만료된 구독 정보 정리 실패:", deleteError.message);
+        console.error(
+          "[WebPush] 만료된 구독 정보 정리 실패:",
+          deleteError.message,
+        );
       } else {
-        console.log(`[WebPush] 만료된 구독 정보 ${expiredEndpoints.length}건 자동 삭제 완료`);
+        console.log(
+          `[WebPush] 만료된 구독 정보 ${expiredEndpoints.length}건 자동 삭제 완료`,
+        );
       }
     } catch (dbErr) {
       console.error("[WebPush] DB 정리 중 예외 발생:", dbErr);
     }
   }
 
-  return { sent, failed, skipped: false, expiredEndpoints };
+  return {
+    sent,
+    failed,
+    skipped: false,
+    expiredEndpoints,
+    errors,
+  };
 }
