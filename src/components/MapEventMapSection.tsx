@@ -147,6 +147,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const activeEvent = liveEvents.find((event) => event.id === activeTabId) ?? null;
   const isDefaultTab = activeTabId === DEFAULT_TAB_ID;
 
+  // 1초마다 실시간 시각 갱신
   useEffect(() => {
     const timer = window.setInterval(() => {
       setNowMs(Date.now());
@@ -167,11 +168,13 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return raw;
   }, [activeEvent, isDefaultTab, props.partners]);
 
+  // 계정 및 이벤트별 쿨다운 키
   const getEventCooldownKey = useCallback(
     (eventId: string) => `site_event_timer_${userId || "guest"}_${eventId}`,
     [userId],
   );
 
+  // 이벤트 탭 진입 시 기존 만료 시각이 없으면 최초 1회 생성
   useEffect(() => {
     if (isDefaultTab || !activeEvent) return;
 
@@ -187,6 +190,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     }
   }, [activeTabId, activeEvent, isDefaultTab, getEventCooldownKey]);
 
+  // 남은 쿨다운 시간 계산
   const currentPlaceCooldownRemainMs = useMemo(() => {
     if (isDefaultTab || !activeEvent) return 0;
 
@@ -245,6 +249,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     void loadProgress();
   }, [loadProgress]);
 
+  // 새로고침 버튼 핸들러
   const handleFullRefresh = useCallback(async () => {
     setRefreshing(true);
     refreshLocationCache();
@@ -261,7 +266,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   async function handleStamp(partner: { id: string; name: string }) {
     if (isDefaultTab || !activeEvent || busy) return;
 
-    // 좋아요 안 된 곳은 클릭 시 팝업 없이 리턴
+    // 좋아요 안 된 곳은 클릭 시 팝업 없이 즉시 리턴
     const isFavorited = Boolean(props.favoritePartnerIds?.has(String(partner.id)));
     if (props.favoritesEnabled && !isFavorited) {
       return;
@@ -287,6 +292,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
     if (stampedPlaceIds.has(partner.id)) return;
 
+    // 클라이언트 쿨다운 검증
     if (currentPlaceCooldownRemainMs > 0) {
       const remainText = formatCooldownRemain(currentPlaceCooldownRemainMs);
       setRewardModal({
@@ -386,6 +392,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         throw new Error(payload.error || "도장을 찍지 못했습니다.");
       }
 
+      // 도장 성공: 다음 쿨다운 만료 시각 갱신
       const cooldownMinutes = Math.max(0, Number(activeEvent.cooldown_minutes) || 0);
       if (cooldownMinutes > 0) {
         localStorage.setItem(getEventCooldownKey(activeEvent.id), String(Date.now() + cooldownMinutes * 60_000));
@@ -497,6 +504,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
             </div>
           </div>
 
+          {/* 스탬프 바 바로 밑 새로고침 버튼 */}
           <div style={{ display: "flex", justifyContent: "flex-end", padding: "4px 8px 8px 8px" }}>
             <button
               type="button"
@@ -525,6 +533,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
       {message ? <p className="map-event-message">{message}</p> : null}
 
+      {/* 지도 상단 플로팅 카운트다운 타이머 */}
       <div style={{ position: "relative", width: "100%", overflow: "visible" }}>
         {!isDefaultTab && activeEvent && !isCompleted && currentPlaceCooldownRemainMs > 0 && (
           <div
