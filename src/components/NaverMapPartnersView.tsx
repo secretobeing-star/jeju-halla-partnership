@@ -214,7 +214,7 @@ export default function NaverMapPartnersView({
       return;
 
     const initialCenter = new window.naver.maps.LatLng(33.3846, 126.5535);
-    const map = new window.naver.maps.Map(mapElementRef.current, {
+    const mapOptions: any = {
       center: initialCenter,
       zoom: 10,
       minZoom: 8,
@@ -223,7 +223,9 @@ export default function NaverMapPartnersView({
       zoomControlOptions: {
         position: window.naver.maps.Position.RIGHT_BOTTOM,
       },
-    });
+    };
+
+    const map = new window.naver.maps.Map(mapElementRef.current, mapOptions);
 
     mapInstanceRef.current = map;
 
