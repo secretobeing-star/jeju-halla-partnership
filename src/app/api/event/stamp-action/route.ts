@@ -203,59 +203,31 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "이미 완주한 이벤트입니다." }, { status: 409 });
   }
 
-  // 서버 강제 쿨다운:
-  // "도장을 찍은 시간"이 아니라 "현재 제휴처 반경에 진입한 시간"을 기준으로 합니다.
-  // 다른 제휴처로 이동하면 cooldown-start API가 current partner를 바꾸고
-  // 새 타이머를 시작합니다.
+  // =========================================================================
+  // 💡 [수정] 쿨다운 검증: 이전 도장 획득 시각(last_stamped_at) 기준 검증
+  // =========================================================================
   const cooldownMinutes = Math.max(0, Number(event.cooldown_minutes) || 0);
   const cooldownMs = cooldownMinutes * 60_000;
 
-  const cooldownPartnerId = String(progressRow?.cooldown_partner_id || "");
-  const cooldownStartedMs = progressRow?.cooldown_started_at
-    ? Date.parse(String(progressRow.cooldown_started_at))
-    : NaN;
+  if (cooldownMinutes > 0 && progressRow?.last_stamped_at) {
+    const lastStampedMs = Date.parse(String(progressRow.last_stamped_at));
+    if (Number.isFinite(lastStampedMs)) {
+      const elapsedMs = Date.now() - lastStampedMs;
+      if (elapsedMs < cooldownMs) {
+        const remainMs = cooldownMs - elapsedMs;
+        const remainMin = Math.floor(remainMs / 60_000);
+        const remainSec = Math.max(1, Math.ceil((remainMs % 60_000) / 1000));
+        const timeText = remainMin > 0 ? `${remainMin}분 ${remainSec}초` : `${remainSec}초`;
 
-  if (!cooldownPartnerId || cooldownPartnerId !== placeId) {
-    return NextResponse.json(
-      {
-        error: "제휴처 반경에 들어온 후 쿨다운 시간이 시작됩니다.",
-        cooldownError: true,
-        cooldownNotStarted: true,
-      },
-      { status: 429 },
-    );
-  }
-
-  if (!Number.isFinite(cooldownStartedMs)) {
-    return NextResponse.json(
-      {
-        error: "제휴처 반경 진입 시간이 확인되지 않았습니다. 잠시 후 다시 시도해 주세요.",
-        cooldownError: true,
-        cooldownNotStarted: true,
-      },
-      { status: 429 },
-    );
-  }
-
-  if (cooldownMinutes > 0) {
-    const remainMs = cooldownStartedMs + cooldownMs - Date.now();
-
-    if (remainMs > 0) {
-      const remainMin = Math.floor(remainMs / 60_000);
-      const remainSec = Math.max(1, Math.ceil((remainMs % 60_000) / 1000));
-      const timeText =
-        remainMin > 0 ? `${remainMin}분 ${remainSec}초` : `${remainSec}초`;
-
-      return NextResponse.json(
-        {
-          error: `${timeText} 후에 도장을 찍을 수 있습니다.`,
-          cooldownError: true,
-          cooldownMs: remainMs,
-          cooldownFrom: "partner_entered_at",
-          cooldownPartnerId: placeId,
-        },
-        { status: 429 },
-      );
+        return NextResponse.json(
+          {
+            error: `${timeText} 후에 도장을 찍을 수 있습니다.`,
+            cooldownError: true,
+            cooldownMs: remainMs,
+          },
+          { status: 429 },
+        );
+      }
     }
   }
 
@@ -304,8 +276,6 @@ export async function POST(request: NextRequest) {
     is_completed: completed,
     stamped_places: nextPlaces,
     last_stamped_at: nowIso,
-    cooldown_partner_id: null,
-    cooldown_started_at: null,
     updated_at: nowIso,
   };
 
@@ -313,9 +283,6 @@ export async function POST(request: NextRequest) {
   let saveError: { message: string } | null = null;
 
   if (progressRow?.id) {
-    // 이미 진행 행이 있다면, 처음 읽었던 last_stamped_at이 그대로일 때만
-    // 저장합니다. 다른 요청이 먼저 저장했다면 이 UPDATE가 0행이 되어
-    // 중복 도장을 막을 수 있습니다.
     let guardedUpdate = admin
       .from("user_event_progress")
       .update(progressPayload)
