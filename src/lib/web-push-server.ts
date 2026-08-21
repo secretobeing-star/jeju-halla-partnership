@@ -20,6 +20,7 @@ export type WebPushSendResult = {
   failed: number;
   skipped: boolean;
   message?: string;
+  expiredEndpoints?: string[];
 };
 
 function getVapidConfig() {
@@ -122,5 +123,5 @@ export async function sendWebPushNotification(
     }
   }
 
-  return { sent, failed, skipped: false };
+  return { sent, failed, skipped: false, expiredEndpoints };
 }
