@@ -177,14 +177,14 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     [userId],
   );
 
-  const getIntroShownKey = useCallback(
-    (eventId: string) => `site_intro_shown_${userId}_${eventId}`,
+  const getIntroConfirmedKey = useCallback(
+    (eventId: string) => `site_intro_confirmed_${userId || "guest"}_${eventId}`,
     [userId],
   );
 
-  // 탭 진입 시 모달 노출 로직:
-  // - 비로그인(isGuest): 탭 진입할 때마다 항상 오픈
-  // - 로그인 유저: 최초 1회만 오픈 (localStorage 기록 체크)
+  // 탭 진입 시 모달 노출 제어:
+  // - 비로그인(isGuest): 탭 진입 시마다 항상 표시
+  // - 로그인 유저: [확인] 버튼을 눌러 승인한 기록이 없을 때만 표시
   useEffect(() => {
     if (isDefaultTab || !activeEvent) {
       setShowIntroModal(false);
@@ -194,25 +194,25 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     if (isGuest) {
       setShowIntroModal(true);
     } else {
-      const hasShown = localStorage.getItem(getIntroShownKey(activeEvent.id));
-      if (!hasShown) {
+      const hasConfirmed = localStorage.getItem(getIntroConfirmedKey(activeEvent.id));
+      if (!hasConfirmed) {
         setShowIntroModal(true);
       } else {
         setShowIntroModal(false);
       }
     }
-  }, [activeTabId, activeEvent, isDefaultTab, isGuest, getIntroShownKey]);
+  }, [activeTabId, activeEvent, isDefaultTab, isGuest, getIntroConfirmedKey]);
 
-  // 팝업에서 [참여하기/확인] 버튼 클릭 시 타이머 시작
-  const handleStartEventWithTimer = useCallback(() => {
+  // 💡 [확인 버튼 클릭 시에만 1회성 완료 기록 & 타이머 시작]
+  const handleConfirmStartEvent = useCallback(() => {
     if (!activeEvent) return;
 
-    // 로그인 유저는 1회성 표시 완료 기록
-    if (!isGuest) {
-      localStorage.setItem(getIntroShownKey(activeEvent.id), "true");
+    // 로그인 유저는 [확인] 클릭 시에만 영구 미표시 기록 저장
+    if (!isGuest && userId) {
+      localStorage.setItem(getIntroConfirmedKey(activeEvent.id), "true");
     }
 
-    // 확인 버튼을 누르는 순간부터 쿨다운 타이머 가동
+    // 쿨다운 타이머 시작
     const cooldownMinutes = Math.max(0, Number(activeEvent.cooldown_minutes) || 0);
     if (cooldownMinutes > 0) {
       const storageKey = getEventCooldownKey(activeEvent.id);
@@ -224,7 +224,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     }
     setNowMs(Date.now());
     setShowIntroModal(false);
-  }, [activeEvent, isGuest, getIntroShownKey, getEventCooldownKey]);
+  }, [activeEvent, isGuest, userId, getIntroConfirmedKey, getEventCooldownKey]);
 
   // 남은 쿨다운 시간 계산
   const currentPlaceCooldownRemainMs = useMemo(() => {
@@ -620,12 +620,12 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         />
       </div>
 
-      {/* 이벤트 참여 안내 팝업 모달 */}
+      {/* 이벤트 참여 안내 팝업 모달: 닫기(X/닫기)는 기록 없이 닫힘, onConfirm은 1회성 확정 기록 + 타이머 시작 */}
       <MapEventIntroModal
         event={activeEvent}
         isOpen={showIntroModal}
         onClose={() => setShowIntroModal(false)}
-        onConfirm={handleStartEventWithTimer}
+        onConfirm={handleConfirmStartEvent}
       />
 
       {/* 보상 / 로그인 요구 모달 */}

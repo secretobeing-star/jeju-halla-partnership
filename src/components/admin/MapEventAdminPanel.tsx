@@ -51,6 +51,10 @@ type EventForm = {
   lose_message: string;
   completion_message: string;
   partner_ids: string[];
+  // 💡 시작 안내 팝업 관리 필드
+  guide_image_url: string;
+  guide_description: string;
+  guide_btn_label: string;
 };
 
 const EMPTY_FORM: EventForm = {
@@ -82,6 +86,9 @@ const EMPTY_FORM: EventForm = {
   lose_message: "",
   completion_message: "완주 보상이 선물함으로 지급되었습니다!",
   partner_ids: [],
+  guide_image_url: "",
+  guide_description: "",
+  guide_btn_label: "참여하기",
 };
 
 function eventToForm(event: MapEvent): EventForm {
@@ -91,6 +98,9 @@ function eventToForm(event: MapEvent): EventForm {
     marker_time_icon?: string;
     marker_time_format?: string;
     login_required_message?: string;
+    guide_image_url?: string;
+    guide_description?: string;
+    guide_btn_label?: string;
   };
 
   return {
@@ -128,6 +138,9 @@ function eventToForm(event: MapEvent): EventForm {
     lose_message: event.lose_popup_message ?? event.lose_message ?? "",
     completion_message: event.completion_popup_message ?? event.completion_message ?? "",
     partner_ids: event.partner_ids ?? [],
+    guide_image_url: extra.guide_image_url ?? "",
+    guide_description: extra.guide_description ?? "",
+    guide_btn_label: extra.guide_btn_label ?? "참여하기",
   };
 }
 
@@ -332,6 +345,10 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
         lose_message: form.lose_message?.trim() || null,
         completion_message: form.completion_message?.trim() || null,
         partner_ids: form.partner_ids,
+        // 💡 팝업 설정 전송
+        guide_image_url: form.guide_image_url || null,
+        guide_description: form.guide_description?.trim() || null,
+        guide_btn_label: form.guide_btn_label?.trim() || "참여하기",
       };
       if (editingId) {
         await adminApiFetch(`/api/map-events/${editingId}`, {
@@ -912,6 +929,50 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
                 </select>
               </label>
             </div>
+          </div>
+
+          {/* 💡 [신규 추가] 시작 안내 팝업 설정 박스 */}
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 space-y-3">
+            <p className="text-sm font-bold text-emerald-900 flex items-center gap-1.5">
+              <span>📢</span> 이벤트 시작 안내 팝업 설정 (선택)
+            </p>
+            <p className="text-xs text-gray-500">
+              사용자가 이벤트 탭에 처음 진입했을 때 뜨는 안내 팝업의 배너 이미지, 설명 문구, 버튼명을 설정합니다.
+            </p>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <ImageField
+                label="안내 팝업 배너 이미지"
+                value={form.guide_image_url}
+                uploading={uploadingKey === "guide_image"}
+                onUpload={async (file) => {
+                  const url = await uploadImage(file, "guide_image");
+                  if (url) setForm((prev) => ({ ...prev, guide_image_url: url }));
+                }}
+                onClear={() => setForm((prev) => ({ ...prev, guide_image_url: "" }))}
+              />
+
+              <label className="block text-sm font-medium text-gray-700">
+                시작 버튼 문구
+                <input
+                  value={form.guide_btn_label}
+                  onChange={(e) => setForm((prev) => ({ ...prev, guide_btn_label: e.target.value }))}
+                  placeholder="참여하기 (비우면 기본값: 참여하기)"
+                  className="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
+                />
+              </label>
+            </div>
+
+            <label className="block text-sm font-medium text-gray-700">
+              안내 상세 문구 (줄바꿈 지원)
+              <textarea
+                rows={3}
+                value={form.guide_description}
+                onChange={(e) => setForm((prev) => ({ ...prev, guide_description: e.target.value }))}
+                placeholder="제휴처를 방문하여 도장을 찍고 풍성한 보상을 받아보세요!"
+                className="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
+              />
+            </label>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
