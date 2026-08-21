@@ -10,7 +10,6 @@ import {
   createPartnerMapMarkerElement,
   createPartnerMapMiniCardElement,
   type MapMarkerCustomSettings,
-  type PartnerMapMiniCardOptions,
   type PartnerMapOverlayLike,
 } from "@/lib/naver-map-partner-ui";
 
