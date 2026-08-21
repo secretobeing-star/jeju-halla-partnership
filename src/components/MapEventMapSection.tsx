@@ -697,6 +697,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
             >
               <span>⏸️</span>
               <span>주변 제휴처를 찾을 수 없어 타이머가 일시정지되었습니다.</span>
+            </div>
           ) : nearestUnstampedPartnerInside && isReadyToStamp ? (
             <div
               style={{
@@ -722,37 +723,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
               <span>지금 바로 도장을 찍어보세요!</span>
             </div>
           ) : null
-          ) : (
-            <div
-              style={{
-                position: "absolute",
-                top: "16px",
-                left: "50%",
-                transform: "translateX(-50%)",
-                zIndex: 20,
-                backgroundColor: "rgba(31, 41, 55, 0.95)",
-                color: "#f9fafb",
-                padding: "8px 18px",
-                borderRadius: "9999px",
-                fontSize: "12px",
-                fontWeight: "600",
-                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.25)",
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-                pointerEvents: "none",
-                border: "1px solid rgba(255, 255, 255, 0.1)",
-                whiteSpace: "nowrap",
-              }}
-            >
-              <span>📍</span>
-              <span>
-                {nearestTargetPartner
-                  ? `${nearestTargetPartner.partner.name} (약 ${Math.round(nearestTargetPartner.distance)}m) · 가까운 제휴 찾으러 가볼까요?`
-                  : "가까운 제휴를 찾을 수 없습니다."}
-              </span>
-            </div>
-          )
         )}
 
         <PartnerMainMapPanel
