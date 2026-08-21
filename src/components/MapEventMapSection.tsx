@@ -27,7 +27,6 @@ const DEFAULT_COOLDOWN_TITLE = "잠시 후 도장을 찍을 수 있어요";
 const DEFAULT_COOLDOWN_MSG = "시간이 조금 더 지난 후({remain})에 도장을 찍을 수 있어요!";
 const DEFAULT_TIMER_TEMPLATE = "다음 도장까지 {remain}";
 
-// 두 좌표 간 거리 계산 함수 (단위: 미터)
 function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371000;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -143,7 +142,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const activeEvent = liveEvents.find((event) => event.id === activeTabId) ?? null;
   const isDefaultTab = activeTabId === DEFAULT_TAB_ID;
 
-  // 1초마다 타이머 시간 갱신
   useEffect(() => {
     const timer = window.setInterval(() => {
       setNowMs(Date.now());
@@ -151,7 +149,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return () => window.clearInterval(timer);
   }, []);
 
-  // 💖 이벤트 탭 제휴처 + 좋아요(즐겨찾기) 필터 결합
   const visiblePartners = useMemo(() => {
     const raw = props.partners || [];
     if (raw.length === 0) return [];
@@ -164,7 +161,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       }
     }
 
-    // 좋아요 모드가 켜져 있는 경우 내가 좋아요 한 매장만 추출
     if (props.favoritesEnabled && props.favoritePartnerIds) {
       list = list.filter((p) => props.favoritePartnerIds!.has(String(p.id)));
     }
@@ -182,7 +178,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     [userId],
   );
 
-  // 📍 실시간 위치 추적
   useEffect(() => {
     if (!navigator.geolocation) return;
 
@@ -202,7 +197,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return () => navigator.geolocation.clearWatch(watchId);
   }, []);
 
-  // 🎯 제휴처 반경 내 도착 시 자동 타이머 시작
   useEffect(() => {
     if (isDefaultTab || !activeEvent || !currentGeo) return;
 
@@ -232,11 +226,9 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     }
   }, [currentGeo, activeEvent, isDefaultTab, visiblePartners, getEventCooldownKey]);
 
-  // 탭 이동 처리 핸들러 (열린 말풍선/선택 카드 강제 닫기)
   const handleTabChange = (nextTabId: string) => {
     if (activeTabId === nextTabId) return;
 
-    // 💡 탭 이동 시 열려 있던 매장 카드 닫기
     if (props.onPartnerSelect) {
       props.onPartnerSelect("");
     }
@@ -246,7 +238,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     setActiveTabId(nextTabId);
   };
 
-  // 탭 진입 시 안내 팝업 노출 여부
   useEffect(() => {
     if (isDefaultTab || !activeEvent) {
       setShowIntroModal(false);
@@ -261,7 +252,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     }
   }, [activeTabId, activeEvent, isDefaultTab, isGuest, getIntroConfirmedKey]);
 
-  // 안내 팝업 참여하기 클릭 시
   const handleConfirmStartEvent = useCallback(() => {
     if (!activeEvent) return;
 
@@ -272,7 +262,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     setShowIntroModal(false);
   }, [activeEvent, isGuest, userId, getIntroConfirmedKey]);
 
-  // 남은 쿨다운 계산
   const currentPlaceCooldownRemainMs = useMemo(() => {
     if (isDefaultTab || !activeEvent) return 0;
 
@@ -630,7 +619,9 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
           </div>
         )}
 
+        {/* 💡 key={activeTabId} 적용으로 탭 이동 시 열려 있던 매장 상세 카드가 즉시 제거됩니다 */}
         <PartnerMainMapPanel
+          key={activeTabId}
           {...props}
           partners={visiblePartners}
           stampAction={
