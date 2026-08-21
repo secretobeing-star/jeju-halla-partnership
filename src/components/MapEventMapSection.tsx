@@ -181,7 +181,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     [userId],
   );
 
-  // 📍 실시간 위치 추적
   useEffect(() => {
     if (!navigator.geolocation) return;
 
@@ -201,7 +200,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return () => navigator.geolocation.clearWatch(watchId);
   }, []);
 
-  // 🎯 현재 미방문 제휴처 중 반경 내에 있는 곳 판별
   const nearestUnstampedPartnerInside = useMemo(() => {
     if (isDefaultTab || !activeEvent || !currentGeo) return null;
 
@@ -222,7 +220,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return null;
   }, [isDefaultTab, activeEvent, currentGeo, visiblePartners, stampedPlaceIds]);
 
-  // 🎯 제휴처 반경 도착 시 타이머 시작 (한 번 시작되면 도장 찍기 전까지 유지)
   useEffect(() => {
     if (isDefaultTab || !activeEvent || !nearestUnstampedPartnerInside) return;
 
@@ -349,7 +346,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     setTimeout(() => setRefreshing(false), 300);
   }, [loadPublic, loadProgress]);
 
-  // 도장 찍기 실행
   async function handleStamp(partner: { id: string; name: string; latitude?: number | string | null; longitude?: number | string | null }) {
     if (isDefaultTab || !activeEvent || busy) return;
 
@@ -457,7 +453,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         throw new Error(payload.error || "도장을 찍지 못했습니다.");
       }
 
-      // 도장 찍기 성공 시 저장된 타이머 삭제하여 다음 장소 준비
       localStorage.removeItem(getEventCooldownKey(activeEvent.id));
 
       if (payload.progress) setProgress(payload.progress);
@@ -593,8 +588,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       {message ? <p className="map-event-message">{message}</p> : null}
 
       <div style={{ position: "relative", width: "100%", overflow: "visible" }}>
-        
-        {/* 상단 알림 배지 */}
         {!isDefaultTab && activeEvent && !isCompleted && !rewardModal && !showIntroModal && (
           currentPlaceCooldownRemainMs > 0 ? (
             <div
@@ -658,23 +651,21 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
               ? {
                   enabled: true,
                   stampedPlaceIds,
-                  // 💡 거리가 멀거나 타이머 대기 중일 때 비활성화(disabled) 판별 함수
                   isPartnerDisabled: (partner: PartnerSource) => {
                     if (busy) return true;
                     if (stampedPlaceIds.has(String(partner.id))) return true;
                     if (currentPlaceCooldownRemainMs > 0) return true;
 
-                    const radius = Number(activeEvent.radius_meters) || 30;
+                    const radius = Number(activeEvent?.radius_meters) || 30;
                     const pLat = Number(partner.latitude);
                     const pLon = Number(partner.longitude);
 
                     if (currentGeo && pLat && pLon && !isNaN(pLat) && !isNaN(pLon)) {
                       const dist = getDistanceInMeters(currentGeo.latitude, currentGeo.longitude, pLat, pLon);
-                      return dist > radius; // 30m 밖이면 true (비활성화)
+                      return dist > radius;
                     }
-                    return true; // 위치 정보가 없으면 안전하게 비활성화
+                    return true;
                   },
-                  // 💡 상태에 맞는 버튼 텍스트 반환
                   getPartnerLabel: (partner: PartnerSource) => {
                     if (busy) return "확인 중...";
                     if (stampedPlaceIds.has(String(partner.id))) return "도장 찍기 완료";
@@ -682,7 +673,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
                       return `${formatCooldownRemain(currentPlaceCooldownRemainMs)} 후 가능`;
                     }
 
-                    const radius = Number(activeEvent.radius_meters) || 30;
+                    const radius = Number(activeEvent?.radius_meters) || 30;
                     const pLat = Number(partner.latitude);
                     const pLon = Number(partner.longitude);
 
