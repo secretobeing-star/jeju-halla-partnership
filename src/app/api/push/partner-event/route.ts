@@ -80,7 +80,35 @@ export async function POST(request: NextRequest) {
 
   if (!subscriptions || subscriptions.length === 0) {
     console.log("푸시 구독 정보를 찾을 수 없음:", userId);
-    return NextResponse.json({ message: "푸시 구독 정보를 찾을 수 없습니다." }, { status: 200 });
+    return NextResponse.json(
+      {
+        success: false,
+        result: {
+          sent: 0,
+          failed: 0,
+          skipped: true,
+          message: "푸시 구독 정보를 찾을 수 없습니다.",
+          errors: [],
+          expiredEndpoints: [],
+          subscriptionCount: 0,
+          targetUserId: userId ?? null,
+          partnerId,
+          partnerName,
+          type,
+          diagnostics: {
+            vapidConfigured: Boolean(
+              process.env.VAPID_PUBLIC_KEY?.trim() &&
+                process.env.VAPID_PRIVATE_KEY?.trim(),
+            ),
+            supabaseAdminConfigured: Boolean(
+              process.env.SUPABASE_SERVICE_ROLE_KEY?.trim(),
+            ),
+            webPushAttempted: false,
+          },
+        },
+      },
+      { status: 200 },
+    );
   }
 
   console.log("구독 정보 조회 완료:", subscriptions.length, "개");
@@ -119,16 +147,34 @@ export async function POST(request: NextRequest) {
   }
 
   const response = {
-    success: true,
+    success: result.failed === 0 && !result.skipped,
     result: {
       sent: result.sent,
       failed: result.failed,
       skipped: result.skipped,
-      message: result.message,
-      errors: result.errors,
+      message: result.message ?? null,
+      errors: result.errors ?? [],
+      expiredEndpoints: result.expiredEndpoints ?? [],
+      subscriptionCount: subscriptions.length,
+      targetUserId: userId ?? null,
+      partnerId,
+      partnerName,
+      type,
+      diagnostics: {
+        vapidConfigured: Boolean(
+          process.env.VAPID_PUBLIC_KEY?.trim() &&
+            process.env.VAPID_PRIVATE_KEY?.trim(),
+        ),
+        supabaseAdminConfigured: Boolean(
+          process.env.SUPABASE_SERVICE_ROLE_KEY?.trim(),
+        ),
+        webPushAttempted: !result.skipped && subscriptions.length > 0,
+      },
     },
   };
 
-  console.log("푸시 발송 응답:", response);
-  return NextResponse.json(response);
+  console.log("푸시 발송 진단 응답:", response);
+  return NextResponse.json(response, {
+    status: result.failed > 0 ? 207 : 200,
+  });
 }
