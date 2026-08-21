@@ -268,10 +268,10 @@ export default function NaverMapPartnersView({
           longitude: lng,
         };
 
-        const markerEl = createPartnerMapMarkerElement(
-          resolvedPartner as any,
+        const markerEl = (createPartnerMapMarkerElement as any)(
+          resolvedPartner,
           isFav,
-          markerSettingsRef.current
+          markerSettingsRef.current ?? undefined
         );
 
         const marker = new naverMaps.Marker({
