@@ -585,7 +585,7 @@ export default function NaverMapPartnersView({
         favoritesEnabledRef.current && favoritePartnerIdsRef.current?.has(partner.id)
       );
 
-      // 즐겨찾기가 켜져 있을 때 좋아요를 안 누른 매장이면 도장 버튼 비활성화
+      // 좋아요 미등록 매장은 비활성화 ('좋아요 필요' 라벨 표기 및 클릭 방지)
       const isStampDisabledByFav = Boolean(favoritesEnabledRef.current && !isFav);
       const isAlreadyStamped = Boolean(activeStampAction?.stampedPlaceIds?.has(partner.id));
 
@@ -675,6 +675,7 @@ export default function NaverMapPartnersView({
 
         const isFav = favoritesEnabled && Boolean(favoritePartnerIds?.has(partner.id));
 
+        // 💡 [복구 완료] 즐겨찾기(좋아요)된 매장만 상단 마커 아이콘(핀 이미지)을 노출하고, 아닌 매장은 topIconImg를 제거
         const favoriteTopIconImg =
           partner.pinImageUrl?.trim() ||
           effectiveMarkerSettings.topIconImg?.trim() ||
