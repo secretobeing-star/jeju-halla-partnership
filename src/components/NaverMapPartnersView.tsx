@@ -39,7 +39,6 @@ const SINGLE_ZOOM = 15;
 const MIN_ZOOM = 12;
 const FIT_BOUNDS_MARGIN = 40;
 
-/** 시간 노출 형식에 맞춰 텍스트 생성 */
 function formatEventTimeBadge(endAt: string, timeIcon = "⏰", timeFormat = "D_DAY_TIME"): string | null {
   if (timeFormat === "NONE") return null;
 
@@ -67,7 +66,6 @@ function formatEventTimeBadge(endAt: string, timeIcon = "⏰", timeFormat = "D_D
     return `${icon}${pad(totalHours)}:${pad(minutes)}:${pad(seconds)}`;
   }
 
-  // D_DAY_TIME
   if (days > 0) {
     return `${icon}${days}일 ${pad(hours)}:${pad(minutes)}`;
   }
@@ -133,7 +131,6 @@ export default function NaverMapPartnersView({
   const favoritesEnabledRef = useRef(favoritesEnabled);
   const favoritesTermRef = useRef(favoritesTerm);
   const mapMarkersSignatureRef = useRef("");
-  const mapMarkersOrderRef = useRef("");
   const holdLoadingOverlayRef = useRef(holdLoadingOverlay);
   const wasHoldingLoadingRef = useRef(holdLoadingOverlay);
   const { locating, locateMessage, handleLocateMe, clearUserLocationOverlay } =
@@ -143,12 +140,10 @@ export default function NaverMapPartnersView({
   const [mapRevealed, setMapRevealed] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  // Supabase에서 활성 이벤트를 실시간으로 직접 조회 (events 테이블 기준)
   const [activeDbEvent, setActiveDbEvent] = useState<MapEvent | null>(null);
 
   useEffect(() => {
     let isCancelled = false;
-
     async function fetchActiveEvent() {
       try {
         const { data, error } = await supabase
@@ -171,11 +166,8 @@ export default function NaverMapPartnersView({
         if (!isCancelled && data && data.length > 0) {
           setActiveDbEvent(data[0] as MapEvent);
         }
-      } catch {
-        // ignore
-      }
+      } catch {}
     }
-
     void fetchActiveEvent();
     return () => {
       isCancelled = true;
@@ -296,43 +288,7 @@ export default function NaverMapPartnersView({
     }
   }, [favoritePartnerIds, favoritesEnabled, favoritesTerm, mapReady]);
 
-  useEffect(() => {
-    if (!mapReady) {
-      return;
-    }
-    const tick = () => {
-      const endAt = favoriteCountdownEndAtRef.current;
-      const settings = markerSettingsRef.current;
-
-      for (const [partnerId, element] of markerElementsRef.current.entries()) {
-        const isFavorite = Boolean(
-          favoritesEnabledRef.current && favoritePartnerIdsRef.current?.has(partnerId),
-        );
-
-        const show = isFavorite && Boolean(endAt);
-
-        let badgeText: string | null = null;
-        if (show && endAt) {
-          if (settings?.timeFormat) {
-            badgeText = formatEventTimeBadge(
-              endAt,
-              settings.timeIcon || "🔥",
-              settings.timeFormat,
-            );
-          } else {
-            badgeText = formatHeartCountdown(endAt);
-          }
-        }
-
-        upsertPartnerMapCountdownBadge(element, badgeText);
-      }
-    };
-
-    tick();
-    const timerId = window.setInterval(tick, 1000);
-    return () => window.clearInterval(timerId);
-  }, [effectiveEndAt, favoritePartnerIds, favoritesEnabled, mapReady, effectiveMarkerSettings]);
-
+  // 지도 초기화
   useEffect(() => {
     let cancelled = false;
     let resizeObserver: ResizeObserver | null = null;
@@ -345,19 +301,12 @@ export default function NaverMapPartnersView({
 
     void loadNaverMapsSdk(clientId, ["markerClustering"], { waitForSubmodules: true })
       .then(() => {
-        if (cancelled) {
-          return;
-        }
+        if (cancelled) return;
 
         const initMap = () => {
-          if (mapRef.current) {
-            return true;
-          }
-
+          if (mapRef.current) return true;
           const mapContainer = mapElementRef.current;
-          if (!mapContainer || !window.naver?.maps) {
-            return false;
-          }
+          if (!mapContainer || !window.naver?.maps) return false;
 
           const map = new window.naver.maps.Map(mapContainer, {
             center: new window.naver.maps.LatLng(JEJU_CENTER.latitude, JEJU_CENTER.longitude),
@@ -375,7 +324,6 @@ export default function NaverMapPartnersView({
                 ignoreNextMapClickRef.current = false;
                 return;
               }
-
               miniCardOverlayRef.current?.close();
               miniCardOverlayRef.current = null;
               miniCardElementRef.current = null;
@@ -416,62 +364,49 @@ export default function NaverMapPartnersView({
 
         let attempts = 0;
         const retryInit = () => {
-          if (cancelled) {
-            return;
-          }
-
+          if (cancelled) return;
           if (initMap()) {
             setMapReady(true);
             return;
           }
-
           attempts += 1;
           if (attempts < 40) {
             requestAnimationFrame(retryInit);
             return;
           }
-
           setLoadError("지도를 초기화하지 못했습니다. 새로고침 후 다시 시도해 주세요.");
         };
 
         requestAnimationFrame(retryInit);
       })
       .catch((error: unknown) => {
-        if (cancelled) {
-          return;
-        }
-
-        const message =
-          error instanceof Error ? error.message : "네이버 지도를 불러오지 못했습니다.";
-        setLoadError(message);
+        if (cancelled) return;
+        setLoadError(error instanceof Error ? error.message : "네이버 지도를 불러오지 못했습니다.");
       });
 
     return () => {
       cancelled = true;
       resizeObserver?.disconnect();
-
       for (const listener of mapListenersRef.current) {
         window.naver?.maps?.Event.removeListener(listener);
       }
       mapListenersRef.current = [];
-
       miniCardOverlayRef.current?.close();
       miniCardOverlayRef.current = null;
       miniCardElementRef.current = null;
       markerClusteringRef.current?.setMap(null);
       markerClusteringRef.current = null;
-
       for (const marker of markersRef.current) {
         marker.setMap(null);
       }
       markersRef.current = [];
       markerElementsRef.current.clear();
       clearUserLocationOverlay();
-
       mapRef.current = null;
     };
   }, [clientId, clearUserLocationOverlay]);
 
+  // 마커 렌더링
   useEffect(() => {
     const map = mapRef.current;
     const mapContainer = mapElementRef.current;
@@ -479,73 +414,40 @@ export default function NaverMapPartnersView({
       return;
     }
 
-    let cancelled = false;
-    let readyTimeoutId: number | null = null;
-    let idleListener: unknown = null;
-
     const activeMap = map;
     const validPartners = normalizedPartners.filter((partner) =>
       hasValidPartnerMapCoords(partner.latitude, partner.longitude),
     );
+
     const favKey = Array.from(favoritePartnerIds ?? []).sort().join(",");
-    const isStampOn = Boolean(stampAction?.enabled);
     const pinSignature = validPartners
       .map((partner) => `${partner.id}:${partner.pinImageUrl ?? ""}`)
       .join("|");
-    const nextSignature = `${getMapPartnerMarkersSignature(validPartners)}:${isStampOn ? effectiveStampLabel : "nostamp"}:${detailButtonLabel ?? ""}:${effectiveMarkerSettings?.borderColor ?? ""}:${effectiveMarkerSettings?.topIconImg ?? ""}:${favKey}:${pinSignature}`;
-    const nextOrderKey = validPartners.map((partner) => partner.id).join("|");
-    const preserveMapView = nextSignature === mapMarkersSignatureRef.current;
-    const orderChanged = nextOrderKey !== mapMarkersOrderRef.current;
+    const nextSignature = `${getMapPartnerMarkersSignature(validPartners)}:${Boolean(stampAction?.enabled)}:${detailButtonLabel ?? ""}:${favKey}:${pinSignature}`;
+
+    if (mapMarkersSignatureRef.current === nextSignature && markersRef.current.length > 0) {
+      return;
+    }
     mapMarkersSignatureRef.current = nextSignature;
-    mapMarkersOrderRef.current = nextOrderKey;
 
-    if (!preserveMapView) {
-      setTilesReady(false);
-      miniCardOverlayRef.current?.close();
-      miniCardOverlayRef.current = null;
-      miniCardElementRef.current = null;
-      selectedPartnerIdRef.current = null;
-
-      markerClusteringRef.current?.setMap(null);
+    // 이전 마커 정리
+    if (markerClusteringRef.current) {
+      markerClusteringRef.current.setMap(null);
       markerClusteringRef.current = null;
-
-      for (const marker of markersRef.current) {
-        marker.setMap(null);
-      }
-      markersRef.current = [];
-      markerElementsRef.current.clear();
     }
+    for (const marker of markersRef.current) {
+      marker.setMap(null);
+    }
+    markersRef.current = [];
+    markerElementsRef.current.clear();
 
-    function markContentReady() {
-      if (cancelled) {
-        return;
-      }
-      if (holdLoadingOverlayRef.current) {
-        return;
-      }
-      if (idleListener) {
-        window.naver?.maps?.Event.removeListener(idleListener);
-        idleListener = null;
-      }
-      if (readyTimeoutId !== null) {
-        window.clearTimeout(readyTimeoutId);
-        readyTimeoutId = null;
-      }
+    if (validPartners.length === 0) {
       setTilesReady(true);
+      return;
     }
 
-    function armContentReady() {
-      if (idleListener) {
-        window.naver?.maps?.Event.removeListener(idleListener);
-        idleListener = null;
-      }
-      if (readyTimeoutId !== null) {
-        window.clearTimeout(readyTimeoutId);
-        readyTimeoutId = null;
-      }
-      idleListener = window.naver.maps.Event.addListener(activeMap, "idle", markContentReady);
-      readyTimeoutId = window.setTimeout(markContentReady, 600);
-    }
+    const bounds = new window.naver.maps.LatLngBounds();
+    const markers: naver.maps.Marker[] = [];
 
     function closeMiniCard(resetSelection = true) {
       miniCardOverlayRef.current?.close();
@@ -557,17 +459,6 @@ export default function NaverMapPartnersView({
           getPartnerMapMarkerButton(element)?.classList.remove("partner-map-marker--selected");
         }
       }
-    }
-
-    function clearRenderedMarkers() {
-      closeMiniCard(true);
-      markerClusteringRef.current?.setMap(null);
-      markerClusteringRef.current = null;
-      for (const marker of markersRef.current) {
-        marker.setMap(null);
-      }
-      markersRef.current = [];
-      markerElementsRef.current.clear();
     }
 
     function openMiniCard(partner: NaverMapPartnerMarker, position: naver.maps.LatLng) {
@@ -586,9 +477,6 @@ export default function NaverMapPartnersView({
         favoritesEnabledRef.current && favoritePartnerIdsRef.current?.has(partner.id)
       );
 
-      // stampAction이 실제로 활성화되어 넘어왔고, 즐겨찾기(좋아요)된 매장일 때만 도장 찍기 버튼 노출
-      const showStampButton = Boolean(activeStampAction?.enabled) && isFav;
-
       const card = createPartnerMapMiniCardElement(partner, () => {
         miniCardOverlayRef.current?.close();
         miniCardOverlayRef.current = null;
@@ -606,7 +494,7 @@ export default function NaverMapPartnersView({
               onFavoriteToggleRef.current?.(partner.id);
             }
           : undefined,
-        stamp: showStampButton
+        stamp: activeStampAction?.enabled
           ? {
               visible: true,
               disabled: Boolean(activeStampAction?.stampedPlaceIds?.has(partner.id)),
@@ -634,205 +522,84 @@ export default function NaverMapPartnersView({
       ignoreNextMapClickRef.current = true;
       window.requestAnimationFrame(() => {
         miniCardOverlayRef.current?.draw?.();
-        window.requestAnimationFrame(() => {
-          miniCardOverlayRef.current?.draw?.();
-        });
       });
     }
 
-    function renderMarkers(useClustering: boolean) {
-      if (cancelled) {
-        return;
-      }
+    for (const partner of validPartners) {
+      const position = new window.naver.maps.LatLng(partner.latitude, partner.longitude);
+      bounds.extend(position);
 
-      if (preserveMapView && markersRef.current.length > 0) {
-        return;
-      }
+      const isFav = favoritesEnabled && Boolean(favoritePartnerIds?.has(partner.id));
 
-      clearRenderedMarkers();
+      const markerElement = createPartnerMapMarkerElement(
+        partner,
+        false,
+        isFav,
+        effectiveMarkerSettings,
+      );
+      markerElementsRef.current.set(partner.id, markerElement);
 
-      const bounds = new window.naver.maps.LatLngBounds();
-      const markers: naver.maps.Marker[] = [];
-
-      for (const partner of validPartners) {
-        const latitude = parsePartnerMapCoordinate(partner.latitude);
-        const longitude = parsePartnerMapCoordinate(partner.longitude);
-        if (
-          latitude === null ||
-          longitude === null ||
-          !hasValidPartnerMapCoords(latitude, longitude)
-        ) {
-          continue;
-        }
-
-        const position = new window.naver.maps.LatLng(latitude as number, longitude as number);
-        bounds.extend(position);
-
-        const isFav = favoritesEnabled && Boolean(favoritePartnerIds?.has(partner.id));
-
-        const favoriteTopIconImg =
-          partner.pinImageUrl?.trim() ||
-          effectiveMarkerSettings.topIconImg?.trim() ||
-          null;
-
-        const customSettingsForMarker = isFav
-          ? { ...effectiveMarkerSettings, topIconImg: favoriteTopIconImg }
-          : { ...effectiveMarkerSettings, topIconImg: null };
-
-        const markerElement = createPartnerMapMarkerElement(
-          partner,
-          false,
-          isFav,
-          customSettingsForMarker,
-        );
-        markerElementsRef.current.set(partner.id, markerElement);
-
-        const marker = new window.naver.maps.Marker({
-          position,
-          title: partner.name,
-          icon: {
-            ...createPartnerMapHtmlIcon(markerElement, {
-              width: MARKER_SIZE.width,
-              height: MARKER_SIZE.height,
-              anchorX: MARKER_ANCHOR.x,
-              anchorY: MARKER_ANCHOR.y,
-            }),
-          },
-        });
-        markers.push(marker);
-
-        const markerButton = getPartnerMapMarkerButton(markerElement);
-        markerButton?.addEventListener("click", (event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          openMiniCard(partner, position);
-        });
-      }
-
-      markersRef.current = markers;
-
-      if (useClustering && markers.length > 1) {
-        try {
-          const MarkerClusteringCtor = window.naver.maps.MarkerClustering;
-          if (MarkerClusteringCtor) {
-            markerClusteringRef.current = new MarkerClusteringCtor({
-              map: activeMap,
-              markers,
-              minClusterSize: 2,
-              maxZoom: 18,
-              gridSize: 140,
-              disableClickZoom: false,
-              icons: [
-                createPartnerMapClusterIcon(40),
-                createPartnerMapClusterIcon(46),
-                createPartnerMapClusterIcon(52),
-                createPartnerMapClusterIcon(58),
-              ],
-              indexGenerator: [10, 30, 60, 100],
-              stylingFunction: stylePartnerMapClusterMarker,
-            });
-          } else {
-            for (const marker of markers) {
-              marker.setMap(activeMap);
-            }
-          }
-        } catch {
-          for (const marker of markers) {
-            marker.setMap(activeMap);
-          }
-        }
-      } else {
-        for (const marker of markers) {
-          marker.setMap(activeMap);
-        }
-      }
-
-      if (validPartners.length === 1) {
-        const partner = validPartners[0];
-        activeMap.setCenter(new window.naver.maps.LatLng(partner.latitude as number, partner.longitude as number));
-        activeMap.setZoom(SINGLE_ZOOM);
-      } else if (validPartners.length > 1) {
-        activeMap.fitBounds(bounds, FIT_BOUNDS_MARGIN);
-        window.setTimeout(() => {
-          const fittedZoom = activeMap.getZoom();
-          if (fittedZoom < MIN_ZOOM) {
-            activeMap.setZoom(MIN_ZOOM);
-          }
-        }, 0);
-      } else {
-        activeMap.setCenter(new window.naver.maps.LatLng(JEJU_CENTER.latitude, JEJU_CENTER.longitude));
-        activeMap.setZoom(EMPTY_ZOOM);
-      }
-
-      refreshMapLayout(activeMap, () => {
-        if (validPartners.length > 1) {
-          activeMap.fitBounds(bounds, FIT_BOUNDS_MARGIN);
-        }
-        miniCardOverlayRef.current?.draw?.();
+      const marker = new window.naver.maps.Marker({
+        position,
+        title: partner.name,
+        map: activeMap,
+        icon: {
+          ...createPartnerMapHtmlIcon(markerElement, {
+            width: MARKER_SIZE.width,
+            height: MARKER_SIZE.height,
+            anchorX: MARKER_ANCHOR.x,
+            anchorY: MARKER_ANCHOR.y,
+          }),
+        },
       });
+      markers.push(marker);
 
-      armContentReady();
-    }
-
-    if (preserveMapView && markersRef.current.length > 0) {
-      if (orderChanged) {
-        armContentReady();
-      }
-      return () => {
-        cancelled = true;
-        if (idleListener) {
-          window.naver?.maps?.Event.removeListener(idleListener);
-        }
-        if (readyTimeoutId !== null) {
-          window.clearTimeout(readyTimeoutId);
-        }
-      };
-    }
-
-    if (validPartners.length <= 1) {
-      renderMarkers(false);
-      return () => {
-        cancelled = true;
-        if (idleListener) {
-          window.naver?.maps?.Event.removeListener(idleListener);
-        }
-        if (readyTimeoutId !== null) {
-          window.clearTimeout(readyTimeoutId);
-        }
-      };
-    }
-
-    void loadNaverMapsSdk(clientId, ["markerClustering"], { waitForSubmodules: true })
-      .then(() => {
-        if (cancelled) {
-          return;
-        }
-
-        markerClusteringRef.current?.setMap(null);
-        markerClusteringRef.current = null;
-        for (const marker of markersRef.current) {
-          marker.setMap(null);
-        }
-
-        renderMarkers(Boolean(window.naver.maps.MarkerClustering));
-      })
-      .catch(() => {
-        if (cancelled) {
-          return;
-        }
-
-        renderMarkers(false);
+      const markerButton = getPartnerMapMarkerButton(markerElement);
+      markerButton?.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        openMiniCard(partner, position);
       });
+    }
 
-    return () => {
-      cancelled = true;
-      if (idleListener) {
-        window.naver?.maps?.Event.removeListener(idleListener);
-      }
-      if (readyTimeoutId !== null) {
-        window.clearTimeout(readyTimeoutId);
-      }
-    };
+    markersRef.current = markers;
+
+    // 클러스터링 적용
+    if (markers.length > 1 && window.naver.maps.MarkerClustering) {
+      try {
+        markerClusteringRef.current = new window.naver.maps.MarkerClustering({
+          map: activeMap,
+          markers,
+          minClusterSize: 2,
+          maxZoom: 18,
+          gridSize: 140,
+          disableClickZoom: false,
+          icons: [
+            createPartnerMapClusterIcon(40),
+            createPartnerMapClusterIcon(46),
+            createPartnerMapClusterIcon(52),
+            createPartnerMapClusterIcon(58),
+          ],
+          indexGenerator: [10, 30, 60, 100],
+          stylingFunction: stylePartnerMapClusterMarker,
+        });
+      } catch {}
+    }
+
+    if (validPartners.length === 1) {
+      activeMap.setCenter(new window.naver.maps.LatLng(validPartners[0].latitude, validPartners[0].longitude));
+      activeMap.setZoom(SINGLE_ZOOM);
+    } else if (validPartners.length > 1) {
+      activeMap.fitBounds(bounds, FIT_BOUNDS_MARGIN);
+      window.setTimeout(() => {
+        if (activeMap.getZoom() < MIN_ZOOM) {
+          activeMap.setZoom(MIN_ZOOM);
+        }
+      }, 0);
+    }
+
+    setTilesReady(true);
+    refreshMapLayout(activeMap);
   }, [
     clientId,
     detailButtonLabel,
@@ -848,15 +615,11 @@ export default function NaverMapPartnersView({
   useEffect(() => {
     const wasHolding = wasHoldingLoadingRef.current;
     wasHoldingLoadingRef.current = holdLoadingOverlay;
-
     if (holdLoadingOverlay) {
       setTilesReady(false);
       return;
     }
-
-    if (!wasHolding || !mapReady) {
-      return;
-    }
+    if (!wasHolding || !mapReady) return;
 
     const map = mapRef.current;
     if (!map || !window.naver?.maps) {
@@ -864,39 +627,8 @@ export default function NaverMapPartnersView({
       return;
     }
 
-    let cancelled = false;
-    let idleListener: unknown = null;
-    let readyTimeoutId: number | null = null;
-
-    const markReady = () => {
-      if (cancelled || holdLoadingOverlayRef.current) {
-        return;
-      }
-      if (idleListener) {
-        window.naver?.maps?.Event.removeListener(idleListener);
-        idleListener = null;
-      }
-      if (readyTimeoutId !== null) {
-        window.clearTimeout(readyTimeoutId);
-        readyTimeoutId = null;
-      }
-      setTilesReady(true);
-    };
-
-    setTilesReady(false);
+    setTilesReady(true);
     refreshMapLayout(map);
-    idleListener = window.naver.maps.Event.addListener(map, "idle", markReady);
-    readyTimeoutId = window.setTimeout(markReady, 700);
-
-    return () => {
-      cancelled = true;
-      if (idleListener) {
-        window.naver?.maps?.Event.removeListener(idleListener);
-      }
-      if (readyTimeoutId !== null) {
-        window.clearTimeout(readyTimeoutId);
-      }
-    };
   }, [holdLoadingOverlay, mapReady]);
 
   useEffect(() => {
@@ -908,14 +640,11 @@ export default function NaverMapPartnersView({
   useEffect(() => {
     const refreshVisibleMap = () => {
       const map = mapRef.current;
-      if (!map) {
-        return;
-      }
+      if (!map) return;
       refreshMapLayout(map, () => {
         miniCardOverlayRef.current?.draw?.();
       });
     };
-
     window.addEventListener(SITE_MAP_REFRESH_EVENT, refreshVisibleMap);
     return () => window.removeEventListener(SITE_MAP_REFRESH_EVENT, refreshVisibleMap);
   }, []);
@@ -957,9 +686,7 @@ export default function NaverMapPartnersView({
           onLocate={() => void handleLocateMe(mapRef.current)}
           onRefresh={() => {
             const map = mapRef.current;
-            if (!map) {
-              return;
-            }
+            if (!map) return;
             refreshMapLayout(map, () => {
               miniCardOverlayRef.current?.draw?.();
             });
