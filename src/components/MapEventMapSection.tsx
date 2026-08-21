@@ -45,9 +45,10 @@ function stampBarCssVars(
 type PartnerSource = {
   id: string;
   name: string;
-  latitude: number | null;
-  longitude: number | null;
+  latitude: number | string | null;
+  longitude: number | string | null;
   image_url?: string | null;
+  pinImageUrl?: string | null;
   category?: string | null;
   address?: string | null;
   benefit?: string | null;
@@ -199,16 +200,23 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return () => window.clearInterval(timer);
   }, []);
 
-  // 마커 데이터 원본 보존
+  // [수정 핵심] 마커 데이터가 어떤 경우에도 비워지지 않도록 완전 방어
   const visiblePartners = useMemo(() => {
-    const allowed = activeEvent?.partner_ids ?? [];
-    if (activeEvent && allowed.length > 0) {
-      return props.partners.filter((partner) => allowed.includes(partner.id));
-    }
-    return props.partners;
-  }, [activeEvent, props.partners]);
+    const rawPartners = props.partners || [];
+    if (rawPartners.length === 0) return [];
+    if (isDefaultTab || !activeEvent) return rawPartners;
 
-  // 실시간 GPS 감지: 제휴처 A -> B 이동 시 A 타이머 취소 및 B 진입 시각 등록
+    const allowed = (activeEvent.partner_ids ?? []).map((id) => String(id));
+    if (allowed.length > 0) {
+      const filtered = rawPartners.filter((partner) =>
+        allowed.includes(String(partner.id)),
+      );
+      return filtered.length > 0 ? filtered : rawPartners;
+    }
+    return rawPartners;
+  }, [activeEvent, isDefaultTab, props.partners]);
+
+  // 실시간 GPS 반경 감지: A -> B 이동 시 A 타이머 취소 및 B 진입 시각 등록
   useEffect(() => {
     if (!lastKnownGeoRef.current || visiblePartners.length === 0) return;
 
@@ -217,13 +225,16 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     const radius = activeEvent?.radius_meters || 50;
 
     const nearby = visiblePartners.find((partner) => {
-      if (!partner.latitude || !partner.longitude) return false;
-      const dLat = ((partner.latitude - currentLat) * Math.PI) / 180;
-      const dLng = ((partner.longitude - currentLng) * Math.PI) / 180;
+      const lat = Number(partner.latitude);
+      const lng = Number(partner.longitude);
+      if (isNaN(lat) || isNaN(lng)) return false;
+
+      const dLat = ((lat - currentLat) * Math.PI) / 180;
+      const dLng = ((lng - currentLng) * Math.PI) / 180;
       const a =
         Math.sin(dLat / 2) * Math.sin(dLat / 2) +
         Math.cos((currentLat * Math.PI) / 180) *
-          Math.cos((partner.latitude * Math.PI) / 180) *
+          Math.cos((lat * Math.PI) / 180) *
           Math.sin(dLng / 2) *
           Math.sin(dLng / 2);
       const d = 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
@@ -243,7 +254,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     }
   }, [nowMs, activeEvent, visiblePartners, activeNearbyPlaceId]);
 
-  // 현재 제휴처의 쿨다운 계산
+  // 현재 제휴처 쿨다운 계산
   const currentPlaceCooldownRemainMs = useMemo(() => {
     if (!activeEvent || !activeNearbyPlaceId) return 0;
 
@@ -751,7 +762,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
       {message ? <p className="map-event-message">{message}</p> : null}
 
-      {/* 지도 패널 및 상단 중앙 실시간 제휴처 타이머 플로팅 뱃지 */}
+      {/* 지도 패널 및 실시간 타이머 플로팅 오버레이 */}
       <div style={{ position: "relative", width: "100%", overflow: "visible" }}>
         {!isDefaultTab && activeEvent && !isCompleted && currentPlaceCooldownRemainMs > 0 && (
           <div
@@ -784,9 +795,14 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
           </div>
         )}
 
+        {/* 일반 지도와 동일하게 모든 props를 온전히 전달하여 마커와 하트 복구 */}
         <PartnerMainMapPanel
           {...props}
           partners={visiblePartners}
+          favoritesEnabled={props.favoritesEnabled}
+          favoritePartnerIds={props.favoritePartnerIds}
+          onFavoriteToggle={props.onFavoriteToggle}
+          markerSettings={props.markerSettings}
           stampAction={
             isStampFeatureActive
               ? {
