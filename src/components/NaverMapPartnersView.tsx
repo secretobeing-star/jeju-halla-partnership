@@ -477,6 +477,10 @@ export default function NaverMapPartnersView({
         favoritesEnabledRef.current && favoritePartnerIdsRef.current?.has(partner.id)
       );
 
+      // 즐겨찾기가 활성화된 상태에서 좋아요가 안 된 매장은 비활성화 처리
+      const isStampDisabledByFav = Boolean(favoritesEnabledRef.current && !isFav);
+      const isAlreadyStamped = Boolean(activeStampAction?.stampedPlaceIds?.has(partner.id));
+
       const card = createPartnerMapMiniCardElement(partner, () => {
         miniCardOverlayRef.current?.close();
         miniCardOverlayRef.current = null;
@@ -497,9 +501,14 @@ export default function NaverMapPartnersView({
         stamp: activeStampAction?.enabled
           ? {
               visible: true,
-              disabled: Boolean(activeStampAction?.stampedPlaceIds?.has(partner.id)),
-              label: activeStampAction?.label || effectiveStampLabel,
+              disabled: isAlreadyStamped || isStampDisabledByFav,
+              label: isStampDisabledByFav
+                ? "좋아요 필요"
+                : isAlreadyStamped
+                  ? "도장 완료"
+                  : (activeStampAction?.label || effectiveStampLabel),
               onStamp: () => {
+                if (isStampDisabledByFav || isAlreadyStamped) return;
                 activeStampAction?.onStamp(partner);
               },
             }
