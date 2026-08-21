@@ -24,8 +24,9 @@ const DEFAULT_STAMP_BAR_BG = "#ecfdf5";
 const DEFAULT_DISTANCE_ERROR_MSG = "제휴처와의 거리가 {distance}m 남았습니다. 지정된 반경({radius}m) 내에서 도장을 찍어주세요.";
 const DEFAULT_LOGIN_REQUIRED_MSG = "로그인 후 이벤트 도장을 찍고 보상을 받을 수 있습니다. 로그인하시겠습니까?";
 const DEFAULT_COOLDOWN_TITLE = "잠시 후 도장을 찍을 수 있어요";
-const DEFAULT_COOLDOWN_MSG = "{remain} 후에 도장을 찍을 수 있습니다.";
+const DEFAULT_COOLDOWN_MSG = "시간이 조금 더 지난 후({remain})에 도장을 찍을 수 있어요!";
 const DEFAULT_TIMER_TEMPLATE = "다음 도장까지 {remain}";
+const LOCAL_STORAGE_COOLDOWN_KEY = "site_place_cooldown_map";
 
 function stampBarCssVars(
   event: Pick<MapEvent, "stamp_bar_bg_color" | "stamp_bar_bg_img">,
@@ -163,9 +164,17 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const [rewardModal, setRewardModal] = useState<RewardModalState | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
 
-  const [placeEnteredAtMap, setPlaceEnteredAtMap] = useState<Record<string, string>>({});
-  const [activeNearbyPlaceId, setActiveNearbyPlaceId] = useState<string | null>(null);
+  const [placeEnteredAtMap, setPlaceEnteredAtMap] = useState<Record<string, string>>(() => {
+    if (typeof window === "undefined") return {};
+    try {
+      const saved = localStorage.getItem(LOCAL_STORAGE_COOLDOWN_KEY);
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
 
+  const [activeNearbyPlaceId, setActiveNearbyPlaceId] = useState<string | null>(null);
   const lastKnownGeoRef = useRef<{ latitude: number; longitude: number } | null>(null);
 
   const refreshLocationCache = useCallback(() => {
@@ -216,6 +225,29 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return raw;
   }, [activeEvent, isDefaultTab, props.partners]);
 
+  // 이벤트 탭 진입 시 즉시 시작 시간 등록
+  useEffect(() => {
+    if (isDefaultTab || !activeEvent || visiblePartners.length === 0) return;
+
+    const cooldownMinutes = Math.max(0, Number(activeEvent.cooldown_minutes) || 0);
+    if (cooldownMinutes <= 0) return;
+
+    const targetPlaceId = activeNearbyPlaceId || visiblePartners[0]?.id;
+    if (!targetPlaceId) return;
+
+    if (!placeEnteredAtMap[targetPlaceId]) {
+      const nowIso = new Date().toISOString();
+      setPlaceEnteredAtMap((prev) => {
+        const next = { ...prev, [targetPlaceId]: nowIso };
+        try {
+          localStorage.setItem(LOCAL_STORAGE_COOLDOWN_KEY, JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+    }
+  }, [activeTabId, activeEvent, isDefaultTab, visiblePartners, activeNearbyPlaceId, placeEnteredAtMap]);
+
+  // 실시간 GPS 감지
   useEffect(() => {
     if (!lastKnownGeoRef.current || visiblePartners.length === 0) return;
 
@@ -243,28 +275,38 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     if (nearby) {
       if (activeNearbyPlaceId !== nearby.id) {
         setActiveNearbyPlaceId(nearby.id);
-        setPlaceEnteredAtMap((prev) => ({
-          ...prev,
-          [nearby.id]: prev[nearby.id] || new Date().toISOString(),
-        }));
+        setPlaceEnteredAtMap((prev) => {
+          const next = {
+            ...prev,
+            [nearby.id]: prev[nearby.id] || new Date().toISOString(),
+          };
+          try {
+            localStorage.setItem(LOCAL_STORAGE_COOLDOWN_KEY, JSON.stringify(next));
+          } catch {}
+          return next;
+        });
       }
     } else {
       setActiveNearbyPlaceId(null);
     }
   }, [nowMs, activeEvent, visiblePartners, activeNearbyPlaceId]);
 
+  // 남은 쿨다운 시간 계산
   const currentPlaceCooldownRemainMs = useMemo(() => {
-    if (!activeEvent || !activeNearbyPlaceId) return 0;
+    if (!activeEvent) return 0;
 
     const cooldownMinutes = Math.max(0, Number(activeEvent.cooldown_minutes) || 0);
     if (cooldownMinutes <= 0) return 0;
 
-    const enteredAt = placeEnteredAtMap[activeNearbyPlaceId];
+    const targetPlaceId = activeNearbyPlaceId || visiblePartners[0]?.id;
+    if (!targetPlaceId) return 0;
+
+    const enteredAt = placeEnteredAtMap[targetPlaceId];
     if (!enteredAt) return 0;
 
     const enteredMs = Date.parse(enteredAt);
     return Math.max(0, enteredMs + cooldownMinutes * 60_000 - nowMs);
-  }, [activeEvent, activeNearbyPlaceId, placeEnteredAtMap, nowMs]);
+  }, [activeEvent, activeNearbyPlaceId, visiblePartners, placeEnteredAtMap, nowMs]);
 
   useEffect(() => {
     if (activeTabId === DEFAULT_TAB_ID) return;
@@ -402,8 +444,9 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
     if (stampedPlaceIds.has(partner.id)) return;
 
+    // 클라이언트단 쿨다운 체크
     const cooldownMinutes = Math.max(0, Number(activeEvent.cooldown_minutes) || 0);
-    const enteredAt = placeEnteredAtMap[partner.id];
+    const enteredAt = placeEnteredAtMap[partner.id] || placeEnteredAtMap[visiblePartners[0]?.id];
     const currentPlaceCooldown = (cooldownMinutes > 0 && enteredAt)
       ? Math.max(0, Date.parse(enteredAt) + cooldownMinutes * 60_000 - Date.now())
       : 0;
@@ -497,8 +540,12 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       };
 
       if (!response.ok) {
+        // [수정] 서버에서 어색한 에러 문구가 와도, 설정된 커스텀 문구를 깔끔하게 치환하여 보여줌
         if (payload.cooldownError) {
-          const remainText = payload.cooldownMs ? formatCooldownRemain(payload.cooldownMs) : "잠시";
+          const remainText = payload.cooldownMs
+            ? formatCooldownRemain(payload.cooldownMs)
+            : formatCooldownRemain(currentPlaceCooldownRemainMs || 60_000);
+
           const customTitle =
             activeEvent.cooldown_popup_title?.trim() ||
             activeEvent.cooldown_title?.trim() ||
@@ -514,7 +561,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
           setRewardModal({
             kind: "lose",
             title: customTitle,
-            body: payload.error || template.replace(/\{remain\}/g, remainText),
+            body: template.replace(/\{remain\}/g, remainText),
             banner: null,
             rewardName: null,
             rewardImg: null,
@@ -540,7 +587,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
           setRewardModal({
             kind: "distance",
             title: "거리 확인 안내",
-            body: payload.error || formattedBody,
+            body: formattedBody,
             banner: activeEvent.banner_img || null,
             rewardName: null,
             rewardImg: null,
@@ -676,7 +723,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     config.event_stamp_btn_label ||
     DEFAULT_STAMP_BTN_LABEL;
 
-  // 관리자 설정 템플릿 또는 기본 템플릿 적용
   const timerTemplate =
     activeEvent?.cooldown_timer_template?.trim() ||
     config.cooldown_timer_template?.trim() ||
@@ -761,7 +807,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
       {message ? <p className="map-event-message">{message}</p> : null}
 
-      {/* 지도 패널 및 실시간 타이머 플로팅 오버레이 (어드민 커스텀 지원) */}
+      {/* 지도 상단 실시간 타이머 플로팅 오버레이 */}
       <div style={{ position: "relative", width: "100%", overflow: "visible" }}>
         {!isDefaultTab && activeEvent && !isCompleted && currentPlaceCooldownRemainMs > 0 && (
           <div
