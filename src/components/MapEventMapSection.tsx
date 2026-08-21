@@ -149,24 +149,23 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return () => window.clearInterval(timer);
   }, []);
 
+  // 💡 visiblePartners: 이벤트 탭 지정 제휴처 필터링만 수행 (좋아요 필터링은 PartnerMainMapPanel에 위임)
   const visiblePartners = useMemo(() => {
     const raw = props.partners || [];
     if (raw.length === 0) return [];
 
-    let list = raw;
-    if (!isDefaultTab && activeEvent) {
-      const allowed = (activeEvent.partner_ids ?? []).map(String);
-      if (allowed.length > 0) {
-        list = raw.filter((p) => allowed.includes(String(p.id)));
-      }
+    if (isDefaultTab || !activeEvent) {
+      return raw;
     }
 
-    if (props.favoritesEnabled && props.favoritePartnerIds) {
-      list = list.filter((p) => props.favoritePartnerIds!.has(String(p.id)));
+    const allowed = (activeEvent.partner_ids ?? []).map(String);
+    if (allowed.length > 0) {
+      const filtered = raw.filter((p) => allowed.includes(String(p.id)));
+      return filtered.length > 0 ? filtered : raw;
     }
 
-    return list;
-  }, [activeEvent, isDefaultTab, props.partners, props.favoritesEnabled, props.favoritePartnerIds]);
+    return raw;
+  }, [activeEvent, isDefaultTab, props.partners]);
 
   const getEventCooldownKey = useCallback(
     (eventId: string) => `site_event_timer_${userId || "guest"}_${eventId}`,
@@ -619,7 +618,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
           </div>
         )}
 
-        {/* 💡 key={activeTabId} 적용으로 탭 이동 시 열려 있던 매장 상세 카드가 즉시 제거됩니다 */}
         <PartnerMainMapPanel
           key={activeTabId}
           {...props}
