@@ -130,9 +130,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [currentGeo, setCurrentGeo] = useState<{ latitude: number; longitude: number } | null>(null);
 
-  // 🎯 하단 필터 상태 (좋아요 필터 활성화 여부)
-  const [isFavoritesOnly, setIsFavoritesOnly] = useState(false);
-
   const student = getSiteMemberSession()?.student;
   const userId = student?.studentId?.trim() || "";
   const isGuest = !userId;
@@ -203,16 +200,18 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return () => navigator.geolocation.clearWatch(watchId);
   }, []);
 
-  // 🎯 가장 가까운 제휴 정보 계산
+  // 🎯 좋아요(찜) 등록된 제휴처를 우선으로 가장 가까운 대상 계산
   const nearestTargetPartner = useMemo(() => {
     if (isDefaultTab || !activeEvent || !currentGeo) return null;
 
     const radius = Number(activeEvent?.radius_meters) || 30;
     let closest: { partner: PartnerSource; distance: number; isInside: boolean } | null = null;
 
-    // 좋아요 필터가 활성화된 경우 좋아요한 제휴만 대상
-    const targets = isFavoritesOnly && props.favoritePartnerIds
-      ? visiblePartners.filter((p) => props.favoritePartnerIds!.has(String(p.id)))
+    // 찜한 제휴 목록이 있으면 찜한 목록에서 우선 검색, 없으면 표시 목록 전체 대상
+    const favSet = props.favoritePartnerIds;
+    const hasFavs = Boolean(favSet && favSet.size > 0);
+    const targets = hasFavs
+      ? visiblePartners.filter((p) => favSet!.has(String(p.id)))
       : visiblePartners;
 
     for (const p of targets) {
@@ -228,7 +227,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       }
     }
     return closest;
-  }, [isDefaultTab, activeEvent, currentGeo, isFavoritesOnly, props.favoritePartnerIds, visiblePartners, stampedPlaceIds]);
+  }, [isDefaultTab, activeEvent, currentGeo, props.favoritePartnerIds, visiblePartners, stampedPlaceIds]);
 
   // 반경 내 제휴 (도장 대상)
   const nearestUnstampedPartnerInside = useMemo(() => {
@@ -545,6 +544,9 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     ? timerTemplate.replace(/\{remain\}/g, formatCooldownRemain(currentPlaceCooldownRemainMs))
     : `${timerTemplate} ${formatCooldownRemain(currentPlaceCooldownRemainMs)}`;
 
+  // 🎯 찜(좋아요) 제휴가 있는지 여부
+  const hasFavorites = Boolean(props.favoritePartnerIds && props.favoritePartnerIds.size > 0);
+
   return (
     <div className="map-event-shell" style={{ position: "relative" }}>
       {/* 탭 네비게이션 */}
@@ -625,8 +627,8 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
       <div style={{ position: "relative", width: "100%", overflow: "visible" }}>
         
-        {/* 🎯 '좋아요' 필터 선택 시에만 상단 배지 노출 */}
-        {!isDefaultTab && activeEvent && !isCompleted && !rewardModal && !showIntroModal && isFavoritesOnly && (
+        {/* 🎯 이벤트 탭에서 상태별 상단 배지 노출 */}
+        {!isDefaultTab && activeEvent && !isCompleted && !rewardModal && !showIntroModal && (
           nearestUnstampedPartnerInside ? (
             currentPlaceCooldownRemainMs > 0 ? (
               // 1. 반경 내 + 쿨다운 대기 중
@@ -681,7 +683,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
               </div>
             ) : null
           ) : (
-            // 3. 🎯 찜한 제휴와 거리가 멀 때: "가까운 제휴 찾으러 가볼까요?" 문구 노출
+            // 3. 반경 밖: 가까운 제휴 안내
             <div
               style={{
                 position: "absolute",
@@ -708,7 +710,9 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
               <span>
                 {nearestTargetPartner
                   ? `${nearestTargetPartner.partner.name} (약 ${Math.round(nearestTargetPartner.distance)}m) · 가까운 제휴 찾으러 가볼까요?`
-                  : "찜한 제휴가 없습니다. 제휴의 ❤️를 먼저 눌러주세요!"}
+                  : hasFavorites
+                    ? "가까운 제휴를 찾을 수 없습니다."
+                    : "찜한 제휴가 없습니다. 제휴의 ❤️를 먼저 눌러주세요!"}
               </span>
             </div>
           )
@@ -718,7 +722,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
           key={activeTabId}
           {...props}
           partners={visiblePartners}
-          onFavoritesFilterChange={(favOnly) => setIsFavoritesOnly(favOnly)}
           stampAction={
             isStampFeatureActive
               ? {
