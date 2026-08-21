@@ -327,11 +327,10 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     if (isGuest) {
       setShowIntroModal(true);
     } else {
-      // DB에서 타이머 상태 로드 후 인트로 확인 여부 확인
-      void loadTimerState();
+      // 타이머 상태 로드는 별도로 처리하고, 여기서는 초기 상태만 설정
       setShowIntroModal(!timerState.intro_confirmed);
     }
-  }, [activeTabId, activeEvent, isDefaultTab, isGuest, timerState.intro_confirmed, loadTimerState]);
+  }, [activeTabId, activeEvent, isDefaultTab, isGuest, timerState.intro_confirmed]);
 
   const handleConfirmStartEvent = useCallback(() => {
     if (!activeEvent) return;
@@ -823,7 +822,12 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
                   isPartnerDisabled: (partner: PartnerSource) => {
                     if (busy) return true;
                     if (stampedPlaceIds.has(String(partner.id))) return true;
+                    
+                    // 쿨다운 타이머가 끝나지 않았으면 비활성화
                     if (currentPlaceCooldownRemainMs > 0) return true;
+                    
+                    // 쿨다운 타이머가 없고 제로 쿨다운 이벤트가 아니면 비활성화
+                    if (!hasTimerKey && !isZeroCooldownEvent) return true;
 
                     const radius = Number(activeEvent?.radius_meters) || 30;
                     const pLat = Number(partner.latitude);

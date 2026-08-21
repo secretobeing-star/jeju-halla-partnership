@@ -52,8 +52,6 @@ type EventForm = {
   lose_message: string;
   completion_message: string;
   partner_ids: string[];
-  // 💡 설명란 안내 이미지
-  guide_image_url: string;
 };
 
 const EMPTY_FORM: EventForm = {
@@ -85,7 +83,6 @@ const EMPTY_FORM: EventForm = {
   lose_message: "",
   completion_message: "완주 보상이 선물함으로 지급되었습니다!",
   partner_ids: [],
-  guide_image_url: "",
 };
 
 function eventToForm(event: MapEvent): EventForm {
@@ -95,7 +92,6 @@ function eventToForm(event: MapEvent): EventForm {
     marker_time_icon?: string;
     marker_time_format?: string;
     login_required_message?: string;
-    guide_image_url?: string;
   };
 
   return {
@@ -133,7 +129,6 @@ function eventToForm(event: MapEvent): EventForm {
     lose_message: event.lose_popup_message ?? event.lose_message ?? "",
     completion_message: event.completion_popup_message ?? event.completion_message ?? "",
     partner_ids: event.partner_ids ?? [],
-    guide_image_url: extra.guide_image_url ?? "",
   };
 }
 
@@ -339,8 +334,6 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
         lose_message: form.lose_message?.trim() || null,
         completion_message: form.completion_message?.trim() || null,
         partner_ids: form.partner_ids,
-        // 💡 설명란 이미지 URL 연동
-        guide_image_url: form.guide_image_url || null,
       };
       if (editingId) {
         await adminApiFetch(`/api/map-events/${editingId}`, {
@@ -604,8 +597,8 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
             </label>
           </div>
 
-          {/* 💡 [수정] 설명 입력란과 설명란 이미지 업로드란을 한 블록으로 구성 */}
-          <div className="grid gap-4 sm:grid-cols-2 items-start">
+          {/* 설명 입력란 */}
+          <div className="grid gap-4">
             <label className="text-sm font-medium text-gray-700">
               설명
               <RichTextEditor
@@ -615,16 +608,6 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
                 minHeightClassName="min-h-32"
               />
             </label>
-            <ImageField
-              label="설명 이미지 (팝업 대표 이미지)"
-              value={form.guide_image_url}
-              uploading={uploadingKey === "guide_image"}
-              onUpload={async (file) => {
-                const url = await uploadImage(file, "guide_image");
-                if (url) setForm((prev) => ({ ...prev, guide_image_url: url }));
-              }}
-              onClear={() => setForm((prev) => ({ ...prev, guide_image_url: "" }))}
-            />
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">

@@ -15,33 +15,12 @@ export default function MapEventIntroModal({
   isOpen,
   onConfirm,
 }: MapEventIntroModalProps) {
-  const { imageUrl, description, btnLabel, title } = useMemo(() => {
+  const { description, btnLabel, title } = useMemo(() => {
     if (!event) {
-      return { imageUrl: null, description: "", btnLabel: "참여하기", title: "이벤트 안내" };
+      return { description: "", btnLabel: "참여하기", title: "이벤트 안내" };
     }
 
     const obj = event as Record<string, unknown>;
-
-    // 💡 이미지 탐색: 등록된 모든 이미지 관련 키를 순차 확인 (빈 문자열 제외)
-    const candidates = [
-      obj.guide_image_url,
-      obj.guideImageUrl,
-      event.banner_img,
-      obj.bannerImg,
-      obj.image_url,
-      obj.imageUrl,
-      obj.thumbnail_url,
-      obj.thumbnailUrl,
-      event.stamp_bar_bg_img,
-    ];
-
-    let foundImg: string | null = null;
-    for (const item of candidates) {
-      if (typeof item === "string" && item.trim().length > 0) {
-        foundImg = item.trim();
-        break;
-      }
-    }
 
     // 상세 설명 문구
     const rawDesc =
@@ -58,7 +37,6 @@ export default function MapEventIntroModal({
       "참여하기";
 
     return {
-      imageUrl: foundImg,
       description: typeof rawDesc === "string" ? rawDesc.trim() : "",
       btnLabel: typeof rawBtn === "string" && rawBtn.trim().length > 0 ? rawBtn.trim() : "참여하기",
       title: event.title || event.tab_name || "이벤트 안내",
@@ -83,18 +61,6 @@ export default function MapEventIntroModal({
 
         {/* 본문 콘텐츠 스크롤 영역 */}
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
-          {/* 🖼️ 안내 이미지 출력 영역 */}
-          {imageUrl ? (
-            <div className="w-full overflow-hidden rounded-xl border border-slate-100 bg-slate-50 flex items-center justify-center">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={imageUrl}
-                alt={title}
-                className="w-full max-h-80 object-contain rounded-xl"
-              />
-            </div>
-          ) : null}
-
           {/* 상세 설명 텍스트 */}
           {description ? (
             <div className="rounded-xl bg-slate-50 p-4 text-sm leading-relaxed text-slate-700 whitespace-pre-line border border-slate-100/80">
