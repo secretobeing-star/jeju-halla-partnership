@@ -159,11 +159,15 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const [activeTabId, setActiveTabId] = useState(DEFAULT_TAB_ID);
   const [progress, setProgress] = useState<UserEventProgress | null>(null);
   const [busy, setBusy] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [rewardModal, setRewardModal] = useState<RewardModalState | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
 
   const lastKnownGeoRef = useRef<{ latitude: number; longitude: number } | null>(null);
+
+  const student = getSiteMemberSession()?.student;
+  const userId = student?.studentId?.trim() || "";
 
   const refreshLocationCache = useCallback(() => {
     void getCurrentGeolocation({
@@ -214,11 +218,13 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return raw;
   }, [activeEvent, isDefaultTab, props.partners]);
 
-  const getEventCooldownKey = useCallback((eventId: string) => {
-    return `site_event_timer_end_${eventId}`;
-  }, []);
+  // 계정 및 이벤트별 쿨다운 키
+  const getEventCooldownKey = useCallback(
+    (eventId: string) => `site_event_timer_${userId || "guest"}_${eventId}`,
+    [userId],
+  );
 
-  // 탭 진입 시 기존 종료 시각이 없으면 최초 1회 생성
+  // 이벤트 탭 진입 시 기존 종료 시각이 없으면 최초 1회 생성
   useEffect(() => {
     if (isDefaultTab || !activeEvent) return;
 
@@ -234,7 +240,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     }
   }, [activeTabId, activeEvent, isDefaultTab, getEventCooldownKey]);
 
-  // 남은 쿨다운 계산
+  // 남은 쿨다운 시간 계산
   const currentPlaceCooldownRemainMs = useMemo(() => {
     if (isDefaultTab || !activeEvent) return 0;
 
@@ -302,9 +308,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     void loadPublic();
   }, [loadPublic]);
 
-  const student = getSiteMemberSession()?.student;
-  const userId = student?.studentId?.trim() || "";
-
   const loadProgress = useCallback(async () => {
     if (!activeEvent || !userId) {
       setProgress(null);
@@ -326,11 +329,13 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     void loadProgress();
   }, [loadProgress]);
 
-  // 통합 새로고침 (진행도 + 이벤트 + 위치 캐시 강제 갱신)
+  // 스탬프 바 밑 [새로고침] 클릭 핸들러
   const handleFullRefresh = useCallback(async () => {
+    setRefreshing(true);
     refreshLocationCache();
     await Promise.all([loadPublic(), loadProgress()]);
     setNowMs(Date.now());
+    setTimeout(() => setRefreshing(false), 300);
   }, [loadPublic, loadProgress, refreshLocationCache]);
 
   useEffect(() => {
@@ -398,7 +403,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
     if (stampedPlaceIds.has(partner.id)) return;
 
-    // 클라이언트 쿨다운 체크
+    // 클라이언트 쿨다운 검증
     if (currentPlaceCooldownRemainMs > 0) {
       const remainText = formatCooldownRemain(currentPlaceCooldownRemainMs);
       const customTitle =
@@ -467,6 +472,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
           department: sessionDepartment,
           latitude: geo.latitude,
           longitude: geo.longitude,
+          timestamp: Date.now(),
         }),
       });
 
@@ -489,8 +495,8 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
       if (!response.ok) {
         if (payload.cooldownError) {
-          // 서버에서 남은 시간을 알려주면 로컬스토리지 목표 시각을 서버에 정확히 동기화
           const remainMs = payload.cooldownMs ?? 60_000;
+
           if (activeEvent && payload.cooldownMs) {
             const correctEndTime = Date.now() + payload.cooldownMs;
             localStorage.setItem(getEventCooldownKey(activeEvent.id), String(correctEndTime));
@@ -720,71 +726,84 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       </div>
 
       {activeEvent && !isDefaultTab ? (
-        <div className="map-event-stamp-bar" style={stampBarCssVars(activeEvent)}>
-          <div className="map-event-stamp-bar__copy">
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+        <>
+          <div className="map-event-stamp-bar" style={stampBarCssVars(activeEvent)}>
+            <div className="map-event-stamp-bar__copy">
               <p className="map-event-stamp-bar__title">{activeEvent.title}</p>
-              <button
-                type="button"
-                onClick={() => void handleFullRefresh()}
-                title="상태 새로고침"
-                style={{
-                  background: "rgba(0,0,0,0.06)",
-                  border: "none",
-                  borderRadius: "50%",
-                  width: "22px",
-                  height: "22px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: "pointer",
-                  fontSize: "12px",
-                }}
-              >
-                🔄
-              </button>
+              {!isEventLive(activeEvent) ? (
+                <p className="map-event-stamp-bar__meta">기간 종료</p>
+              ) : null}
+              {activeEvent.guide_text ? (
+                <p className="map-event-stamp-bar__guide">{activeEvent.guide_text}</p>
+              ) : null}
             </div>
-            {!isEventLive(activeEvent) ? (
-              <p className="map-event-stamp-bar__meta">기간 종료</p>
-            ) : null}
-            {activeEvent.guide_text ? (
-              <p className="map-event-stamp-bar__guide">{activeEvent.guide_text}</p>
-            ) : null}
-          </div>
-          <div className="map-event-stamps" aria-hidden="true">
-            {Array.from({ length: maxStamps }, (_, index) => {
-              const filled = index < current;
-              const src = filled
-                ? activeEvent.stamp_active_img
-                : activeEvent.stamp_inactive_img;
-              return src ? (
-                <img
-                  key={index}
-                  src={src}
-                  alt=""
-                  className={`map-event-stamp ${filled ? "map-event-stamp--on" : "map-event-stamp--off"}`}
-                />
-              ) : (
-                <span
-                  key={index}
-                  className={`map-event-stamp map-event-stamp--fallback ${filled ? "map-event-stamp--on" : ""}`}
-                />
-              );
-            })}
-            {completionBadgeSrc || completionPreview ? (
-              <span
-                className="map-event-completion-reward"
-                title={completionPreview?.reward_name || "완주 보상"}
-              >
-                {completionBadgeSrc ? (
-                  <img src={completionBadgeSrc} alt="" />
+            <div className="map-event-stamps" aria-hidden="true">
+              {Array.from({ length: maxStamps }, (_, index) => {
+                const filled = index < current;
+                const src = filled
+                  ? activeEvent.stamp_active_img
+                  : activeEvent.stamp_inactive_img;
+                return src ? (
+                  <img
+                    key={index}
+                    src={src}
+                    alt=""
+                    className={`map-event-stamp ${filled ? "map-event-stamp--on" : "map-event-stamp--off"}`}
+                  />
                 ) : (
-                  <span className="map-event-completion-reward__fallback" />
-                )}
-              </span>
-            ) : null}
+                  <span
+                    key={index}
+                    className={`map-event-stamp map-event-stamp--fallback ${filled ? "map-event-stamp--on" : ""}`}
+                  />
+                );
+              })}
+              {completionBadgeSrc || completionPreview ? (
+                <span
+                  className="map-event-completion-reward"
+                  title={completionPreview?.reward_name || "완주 보상"}
+                >
+                  {completionBadgeSrc ? (
+                    <img src={completionBadgeSrc} alt="" />
+                  ) : (
+                    <span className="map-event-completion-reward__fallback" />
+                  )}
+                </span>
+              ) : null}
+            </div>
           </div>
-        </div>
+
+          {/* 스탬프 바 바로 밑 [새로고침] 전용 컨트롤 바 */}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              padding: "4px 8px 8px 8px",
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => void handleFullRefresh()}
+              disabled={refreshing}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "4px",
+                padding: "4px 10px",
+                fontSize: "12px",
+                fontWeight: "600",
+                color: "#4b5563",
+                backgroundColor: "#f3f4f6",
+                border: "1px solid #e5e7eb",
+                borderRadius: "6px",
+                cursor: refreshing ? "not-allowed" : "pointer",
+                transition: "all 0.15s ease",
+              }}
+            >
+              <span style={{ display: "inline-block", transform: refreshing ? "rotate(180deg)" : "none", transition: "transform 0.3s" }}>🔄</span>
+              <span>{refreshing ? "갱신 중..." : "새로고침"}</span>
+            </button>
+          </div>
+        </>
       ) : null}
 
       {message ? <p className="map-event-message">{message}</p> : null}
