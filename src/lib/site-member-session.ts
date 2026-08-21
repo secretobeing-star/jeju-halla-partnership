@@ -3,6 +3,7 @@ import type {
   StudentApprovalStatus,
   StudentGraduationStatus,
 } from "@/lib/site-student-auth-settings";
+import { registerPushSubscription } from "@/lib/register-push";
 
 export const SITE_MEMBER_SESSION_KEY = "jeju-halla-member-session";
 export const SITE_MEMBER_SESSION_EVENT = "site-member-session-changed";
@@ -38,6 +39,12 @@ export function getSiteMemberSession(): SiteMemberSession | null {
 export function setSiteMemberSession(session: SiteMemberSession | null): void {
   if (session) {
     writeDeviceJson(SITE_MEMBER_SESSION_KEY, session);
+    
+    // 로그인 시 푸시 구독 등록
+    const clientKey = session.displayName?.trim() || session.student?.studentId || "";
+    if (clientKey) {
+      void registerPushSubscription(clientKey);
+    }
   } else {
     writeDeviceJson(SITE_MEMBER_SESSION_KEY, null);
   }

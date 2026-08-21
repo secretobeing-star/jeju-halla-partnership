@@ -200,7 +200,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return () => navigator.geolocation.clearWatch(watchId);
   }, []);
 
-  // 반경 내 제휴처 체크 (이벤트 탭에서만 활성화)
+  // 반경 내 미방문 제휴처 감지 (이벤트 탭에서만 활성화)
   const nearestUnstampedPartnerInside = useMemo(() => {
     if (isDefaultTab || !activeEvent || !currentGeo) return null;
 
@@ -221,7 +221,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return null;
   }, [isDefaultTab, activeEvent, currentGeo, visiblePartners, stampedPlaceIds]);
 
-  // 타이머 롤백 및 시작 (이벤트 탭 전용)
+  // 반경 이탈 시 타이머 즉시 롤백 및 진입 시 타이머 생성
   useEffect(() => {
     if (isDefaultTab || !activeEvent) return;
 
@@ -253,9 +253,15 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       props.onPartnerSelect("");
     }
 
+    // 탭 전환 시 기존 활성 이벤트의 타이머 캐시 정리
+    if (activeEvent) {
+      localStorage.removeItem(getEventCooldownKey(activeEvent.id));
+    }
+
     setShowIntroModal(false);
     setMessage(null);
     setActiveTabId(nextTabId);
+    setNowMs(Date.now());
   };
 
   useEffect(() => {
@@ -283,7 +289,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   }, [activeEvent, isGuest, userId, getIntroConfirmedKey]);
 
   const currentPlaceCooldownRemainMs = useMemo(() => {
-    if (isDefaultTab || !activeEvent) return 0;
+    if (isDefaultTab || !activeEvent || !nearestUnstampedPartnerInside) return 0;
 
     const storageKey = getEventCooldownKey(activeEvent.id);
     let targetEndTimeStr: string | null = null;
@@ -297,13 +303,13 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     if (isNaN(targetEndTime) || targetEndTime <= 0) return 0;
 
     return Math.max(0, targetEndTime - nowMs);
-  }, [activeEvent, isDefaultTab, getEventCooldownKey, nowMs]);
+  }, [activeEvent, isDefaultTab, nearestUnstampedPartnerInside, getEventCooldownKey, nowMs]);
 
   const hasTimerKey = useMemo(() => {
-    if (isDefaultTab || !activeEvent) return false;
+    if (isDefaultTab || !activeEvent || !nearestUnstampedPartnerInside) return false;
     const storageKey = getEventCooldownKey(activeEvent.id);
     return Boolean(localStorage.getItem(storageKey));
-  }, [activeEvent, isDefaultTab, getEventCooldownKey]);
+  }, [activeEvent, isDefaultTab, nearestUnstampedPartnerInside, getEventCooldownKey]);
 
   const isCooldownOver = hasTimerKey && currentPlaceCooldownRemainMs === 0;
   const isZeroCooldownEvent = Number(activeEvent?.cooldown_minutes || 0) <= 0;
@@ -651,8 +657,8 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
       <div style={{ position: "relative", width: "100%", overflow: "visible" }}>
         
-        {/* 🎯 '전체' 탭(isDefaultTab)이 아니고 이벤트 탭일 때만 상단 배지 노출 */}
-        {!isDefaultTab && activeEvent && !isCompleted && !rewardModal && !showIntroModal && (
+        {/* 상단 알림 배지: 반경 내에 들어온 매장이 실제로 존재할 때(nearestUnstampedPartnerInside)만 렌더링 */}
+        {!isDefaultTab && activeEvent && !isCompleted && !rewardModal && !showIntroModal && nearestUnstampedPartnerInside && (
           currentPlaceCooldownRemainMs > 0 ? (
             <div
               style={{
