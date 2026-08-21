@@ -127,8 +127,10 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const [message, setMessage] = useState<string | null>(null);
   const [rewardModal, setRewardModal] = useState<RewardModalState | null>(null);
   const [showIntroModal, setShowIntroModal] = useState(false);
-  const [nowMs, setNowMs] = useState(() => Date.now());
   const [currentGeo, setCurrentGeo] = useState<{ latitude: number; longitude: number } | null>(null);
+  
+  // 🎯 남은 잔여 시간(밀리초) 상태
+  const [cooldownRemainMs, setCooldownRemainMs] = useState<number>(0);
 
   const student = getSiteMemberSession()?.student;
   const userId = student?.studentId?.trim() || "";
@@ -138,8 +140,8 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const hasFavorites = Boolean(props.favoritePartnerIds && props.favoritePartnerIds.size > 0);
 
   const liveEvents = useMemo(
-    () => events.filter((event) => isEventLive(event, nowMs)),
-    [events, nowMs],
+    () => events.filter((event) => isEventLive(event)),
+    [events],
   );
 
   const activeEvent = useMemo(
@@ -166,7 +168,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   );
 
   const getEventCooldownKey = useCallback(
-    (eventId: string) => `site_event_timer_${userId || "guest"}_${eventId}`,
+    (eventId: string) => `site_event_remain_seconds_${userId || "guest"}_${eventId}`,
     [userId],
   );
 
@@ -194,7 +196,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return () => navigator.geolocation.clearWatch(watchId);
   }, []);
 
-  // 🎯 오직 찜(좋아요)한 제휴 중에서만 가장 가까운 제휴 및 거리 계산
+  // 🎯 찜한 제휴 중에서만 가장 가까운 제휴 및 거리 계산
   const nearestTargetPartner = useMemo(() => {
     if (isDefaultTab || !activeEvent || !currentGeo || !hasFavorites) return null;
 
@@ -219,7 +221,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return closest;
   }, [isDefaultTab, activeEvent, currentGeo, hasFavorites, props.favoritePartnerIds, visiblePartners, stampedPlaceIds]);
 
-  // 반경 내에 있는 찜 제휴
   const nearestUnstampedPartnerInside = useMemo(() => {
     if (nearestTargetPartner && nearestTargetPartner.isInside) {
       return { partner: nearestTargetPartner.partner, distance: nearestTargetPartner.distance };
@@ -227,40 +228,51 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return null;
   }, [nearestTargetPartner]);
 
-  // 🎯 제휴를 찾을 수 없는지 여부 (타이머 중단 조건)
+  // 🎯 초기 남은 쿨타임 로컬스토리지에서 로드
+  useEffect(() => {
+    if (isDefaultTab || !activeEvent || isGuest) {
+      setCooldownRemainMs(0);
+      return;
+    }
+
+    const storageKey = getEventCooldownKey(activeEvent.id);
+    const savedRemain = localStorage.getItem(storageKey);
+
+    if (savedRemain !== null) {
+      setCooldownRemainMs(Math.max(0, Number(savedRemain)));
+    } else {
+      // 신규 진입 시 쿨타임 설정
+      const cooldownMinutes = Math.max(0, Number(activeEvent?.cooldown_minutes) || 0);
+      if (cooldownMinutes > 0 && nearestUnstampedPartnerInside) {
+        const initialMs = cooldownMinutes * 60_000;
+        localStorage.setItem(storageKey, String(initialMs));
+        setCooldownRemainMs(initialMs);
+      }
+    }
+  }, [activeEvent, isDefaultTab, isGuest, getEventCooldownKey, nearestUnstampedPartnerInside]);
+
+  // 🎯 [핵심] 제휴처 반경 안에 있을 때만 1초마다 남은 시간 1000ms씩 차감 (벗어나거나 없으면 완벽 정지)
+  useEffect(() => {
+    if (isDefaultTab || !activeEvent || isGuest || !hasFavorites || !nearestUnstampedPartnerInside || cooldownRemainMs <= 0) {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      setCooldownRemainMs((prev) => {
+        const next = Math.max(0, prev - 1000);
+        const storageKey = getEventCooldownKey(activeEvent.id);
+        localStorage.setItem(storageKey, String(next));
+        return next;
+      });
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [isDefaultTab, activeEvent, isGuest, hasFavorites, nearestUnstampedPartnerInside, cooldownRemainMs, getEventCooldownKey]);
+
   const isTimerPaused = useMemo(() => {
     if (isDefaultTab || !activeEvent) return false;
     return visiblePartners.length === 0 || !nearestTargetPartner;
   }, [isDefaultTab, activeEvent, visiblePartners.length, nearestTargetPartner]);
-
-  // 🎯 제휴를 찾을 수 있을 때만 타이머 갱신 (못 찾으면 정지)
-  useEffect(() => {
-    if (isTimerPaused) return;
-
-    const timer = window.setInterval(() => {
-      setNowMs(Date.now());
-    }, 1000);
-    return () => window.clearInterval(timer);
-  }, [isTimerPaused]);
-
-  // 로그인 상태이고 찜한 제휴 반경에 들어왔을 때만 쿨다운 타이머 시작
-  useEffect(() => {
-    if (isDefaultTab || !activeEvent || isGuest || !hasFavorites) return;
-
-    const storageKey = getEventCooldownKey(activeEvent.id);
-
-    if (nearestUnstampedPartnerInside) {
-      const cooldownMinutes = Math.max(0, Number(activeEvent?.cooldown_minutes) || 0);
-      if (cooldownMinutes <= 0) return;
-
-      const existingEndTime = localStorage.getItem(storageKey);
-      if (!existingEndTime) {
-        const targetEndTime = Date.now() + cooldownMinutes * 60_000;
-        localStorage.setItem(storageKey, String(targetEndTime));
-        setNowMs(Date.now());
-      }
-    }
-  }, [activeEvent, isDefaultTab, nearestUnstampedPartnerInside, getEventCooldownKey, isGuest, hasFavorites]);
 
   const handleTabChange = (nextTabId: string) => {
     if (activeTabId === nextTabId) return;
@@ -272,7 +284,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     setShowIntroModal(false);
     setMessage(null);
     setActiveTabId(nextTabId);
-    setNowMs(Date.now());
   };
 
   useEffect(() => {
@@ -299,30 +310,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     setShowIntroModal(false);
   }, [activeEvent, isGuest, userId, getIntroConfirmedKey]);
 
-  const currentPlaceCooldownRemainMs = useMemo(() => {
-    if (isDefaultTab || !activeEvent || !nearestUnstampedPartnerInside || isGuest || !hasFavorites || isTimerPaused) return 0;
-
-    const storageKey = getEventCooldownKey(activeEvent.id);
-    let targetEndTimeStr: string | null = null;
-    try {
-      targetEndTimeStr = localStorage.getItem(storageKey);
-    } catch {}
-
-    if (!targetEndTimeStr) return 0;
-
-    const targetEndTime = Number(targetEndTimeStr);
-    if (isNaN(targetEndTime) || targetEndTime <= 0) return 0;
-
-    return Math.max(0, targetEndTime - nowMs);
-  }, [activeEvent, isDefaultTab, nearestUnstampedPartnerInside, getEventCooldownKey, isGuest, hasFavorites, isTimerPaused, nowMs]);
-
-  const hasTimerKey = useMemo(() => {
-    if (isDefaultTab || !activeEvent || !nearestUnstampedPartnerInside || isGuest || !hasFavorites) return false;
-    const storageKey = getEventCooldownKey(activeEvent.id);
-    return Boolean(localStorage.getItem(storageKey));
-  }, [activeEvent, isDefaultTab, nearestUnstampedPartnerInside, getEventCooldownKey, isGuest, hasFavorites]);
-
-  const isCooldownOver = hasTimerKey && currentPlaceCooldownRemainMs === 0;
+  const isCooldownOver = cooldownRemainMs === 0;
   const isZeroCooldownEvent = Number(activeEvent?.cooldown_minutes || 0) <= 0;
   const isReadyToStamp = !isDefaultTab && !isGuest && hasFavorites && Boolean(nearestUnstampedPartnerInside) && (isCooldownOver || isZeroCooldownEvent);
 
@@ -367,7 +355,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const handleFullRefresh = useCallback(async () => {
     setRefreshing(true);
     await Promise.all([loadPublic(), loadProgress()]);
-    setNowMs(Date.now());
     setTimeout(() => setRefreshing(false), 300);
   }, [loadPublic, loadProgress]);
 
@@ -391,8 +378,8 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       return;
     }
 
-    if (currentPlaceCooldownRemainMs > 0) {
-      const remainText = formatCooldownRemain(currentPlaceCooldownRemainMs);
+    if (cooldownRemainMs > 0) {
+      const remainText = formatCooldownRemain(cooldownRemainMs);
       setRewardModal({
         kind: "lose",
         title: config.cooldown_popup_title || DEFAULT_COOLDOWN_TITLE,
@@ -464,8 +451,8 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         if (payload.cooldownError) {
           const remainMs = payload.cooldownMs ?? 60_000;
           if (activeEvent && payload.cooldownMs) {
-            localStorage.setItem(getEventCooldownKey(activeEvent.id), String(Date.now() + payload.cooldownMs));
-            setNowMs(Date.now());
+            localStorage.setItem(getEventCooldownKey(activeEvent.id), String(payload.cooldownMs));
+            setCooldownRemainMs(payload.cooldownMs);
           }
           const remainText = formatCooldownRemain(remainMs);
           setRewardModal({
@@ -501,10 +488,11 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         throw new Error(payload.error || "도장을 찍지 못했습니다.");
       }
 
+      // 도장 완료 시 쿨타임 초기화
       localStorage.removeItem(getEventCooldownKey(activeEvent.id));
+      setCooldownRemainMs(0);
 
       if (payload.progress) setProgress(payload.progress);
-      setNowMs(Date.now());
 
       const popupKind = payload.popup || (payload.completion?.reached ? "completion" : (payload.giftCount ?? 0) > 0 ? "win" : "lose");
 
@@ -556,12 +544,11 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
   const timerTemplate = config.cooldown_timer_template || DEFAULT_TIMER_TEMPLATE;
   const timerBadgeText = timerTemplate.includes("{remain}")
-    ? timerTemplate.replace(/\{remain\}/g, formatCooldownRemain(currentPlaceCooldownRemainMs))
-    : `${timerTemplate} ${formatCooldownRemain(currentPlaceCooldownRemainMs)}`;
+    ? timerTemplate.replace(/\{remain\}/g, formatCooldownRemain(cooldownRemainMs))
+    : `${timerTemplate} ${formatCooldownRemain(cooldownRemainMs)}`;
 
   return (
     <div className="map-event-shell" style={{ position: "relative" }}>
-      {/* 탭 목록 */}
       <div className="map-event-tabs" role="tablist">
         <button
           type="button"
@@ -582,7 +569,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         ))}
       </div>
 
-      {/* 이벤트 탭 전용 프로그레스 바 */}
       {!isDefaultTab && activeEvent ? (
         <>
           <div className="map-event-stamp-bar" style={stampBarCssVars(activeEvent)}>
@@ -639,10 +625,8 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
       <div style={{ position: "relative", width: "100%", overflow: "visible" }}>
         
-        {/* 상단 배지 노출 로직 */}
         {!isDefaultTab && activeEvent && !isCompleted && !rewardModal && !showIntroModal && (
           isGuest ? (
-            // 1. 비로그인 상태 -> 로그인 유도
             <div
               onClick={openLoginModal}
               style={{
@@ -668,7 +652,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
               <span>🔒 로그인 후 도장을 찍을 수 있어요!</span>
             </div>
           ) : !hasFavorites ? (
-            // 2. 로그인 상태지만 좋아요(찜)한 제휴가 없을 때
             <div
               style={{
                 position: "absolute",
@@ -695,7 +678,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
               <span>찜한 제휴가 없습니다. 제휴의 ❤️를 먼저 눌러주세요!</span>
             </div>
           ) : isTimerPaused ? (
-            // 🎯 3. 제휴처를 찾을 수 없어 타이머가 일시정지(대기)된 경우
             <div
               style={{
                 position: "absolute",
@@ -722,8 +704,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
               <span>주변 제휴처를 찾을 수 없어 타이머가 일시정지되었습니다.</span>
             </div>
           ) : nearestUnstampedPartnerInside ? (
-            currentPlaceCooldownRemainMs > 0 ? (
-              // 4. 좋아요 제휴 반경 내 + 쿨다운 대기 중 -> 타이머 배지 노출
+            cooldownRemainMs > 0 ? (
               <div
                 style={{
                   position: "absolute",
@@ -749,7 +730,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
                 <span>{timerBadgeText}</span>
               </div>
             ) : isReadyToStamp ? (
-              // 5. 좋아요 제휴 반경 내 + 도장 찍기 가능
               <div
                 style={{
                   position: "absolute",
@@ -775,7 +755,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
               </div>
             ) : null
           ) : (
-            // 6. 좋아요 제휴가 있지만 거리가 멀 때 -> 거리 안내
             <div
               style={{
                 position: "absolute",
@@ -821,7 +800,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
                     if (busy) return true;
                     if (isGuest) return false;
                     if (stampedPlaceIds.has(String(partner.id))) return true;
-                    if (currentPlaceCooldownRemainMs > 0) return true;
+                    if (cooldownRemainMs > 0) return true;
 
                     const radius = Number(activeEvent?.radius_meters) || 30;
                     const pLat = Number(partner.latitude);
@@ -837,8 +816,8 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
                     if (busy) return "확인 중...";
                     if (isGuest) return "로그인 후 도장 가능";
                     if (stampedPlaceIds.has(String(partner.id))) return "도장 찍기 완료";
-                    if (currentPlaceCooldownRemainMs > 0) {
-                      return `${formatCooldownRemain(currentPlaceCooldownRemainMs)} 후 가능`;
+                    if (cooldownRemainMs > 0) {
+                      return `${formatCooldownRemain(cooldownRemainMs)} 후 가능`;
                     }
 
                     const radius = Number(activeEvent?.radius_meters) || 30;
@@ -871,7 +850,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         onConfirm={handleConfirmStartEvent}
       />
 
-      {/* 보상 / 로그인 모달 */}
       {rewardModal ? (
         <div
           className="map-event-modal"
