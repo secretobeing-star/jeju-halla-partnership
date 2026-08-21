@@ -203,31 +203,42 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "이미 완주한 이벤트입니다." }, { status: 409 });
   }
 
-  // 서버에서 쿨다운을 강제합니다.
-  //
-  // 원하는 규칙:
-  // 1) 이벤트 시작(created_at)부터 cooldown_minutes가 지나야 첫 도장 가능
-  // 2) 첫 도장 이후에는 last_stamped_at + cooldown_minutes가 지나야 다음 도장 가능
-  //
-  // events 테이블에는 별도의 start_at 컬럼이 없으므로 현재 스키마에서는
-  // created_at을 이벤트 시작 시각으로 사용합니다.
+  // 서버 강제 쿨다운:
+  // "도장을 찍은 시간"이 아니라 "현재 제휴처 반경에 진입한 시간"을 기준으로 합니다.
+  // 다른 제휴처로 이동하면 cooldown-start API가 current partner를 바꾸고
+  // 새 타이머를 시작합니다.
   const cooldownMinutes = Math.max(0, Number(event.cooldown_minutes) || 0);
   const cooldownMs = cooldownMinutes * 60_000;
 
-  const lastStampedMs = progressRow?.last_stamped_at
-    ? Date.parse(String(progressRow.last_stamped_at))
+  const cooldownPartnerId = String(progressRow?.cooldown_partner_id || "");
+  const cooldownStartedMs = progressRow?.cooldown_started_at
+    ? Date.parse(String(progressRow.cooldown_started_at))
     : NaN;
 
-  const eventCreatedMs = event.created_at
-    ? Date.parse(String(event.created_at))
-    : NaN;
+  if (!cooldownPartnerId || cooldownPartnerId !== placeId) {
+    return NextResponse.json(
+      {
+        error: "제휴처 반경에 들어온 후 쿨다운 시간이 시작됩니다.",
+        cooldownError: true,
+        cooldownNotStarted: true,
+      },
+      { status: 429 },
+    );
+  }
 
-  let cooldownBaseMs = Number.isFinite(lastStampedMs)
-    ? lastStampedMs
-    : eventCreatedMs;
+  if (!Number.isFinite(cooldownStartedMs)) {
+    return NextResponse.json(
+      {
+        error: "제휴처 반경 진입 시간이 확인되지 않았습니다. 잠시 후 다시 시도해 주세요.",
+        cooldownError: true,
+        cooldownNotStarted: true,
+      },
+      { status: 429 },
+    );
+  }
 
-  if (cooldownMinutes > 0 && Number.isFinite(cooldownBaseMs)) {
-    const remainMs = cooldownBaseMs + cooldownMs - Date.now();
+  if (cooldownMinutes > 0) {
+    const remainMs = cooldownStartedMs + cooldownMs - Date.now();
 
     if (remainMs > 0) {
       const remainMin = Math.floor(remainMs / 60_000);
@@ -240,9 +251,8 @@ export async function POST(request: NextRequest) {
           error: `${timeText} 후에 도장을 찍을 수 있습니다.`,
           cooldownError: true,
           cooldownMs: remainMs,
-          cooldownFrom: Number.isFinite(lastStampedMs)
-            ? "last_stamped_at"
-            : "event_created_at",
+          cooldownFrom: "partner_entered_at",
+          cooldownPartnerId: placeId,
         },
         { status: 429 },
       );
@@ -294,6 +304,8 @@ export async function POST(request: NextRequest) {
     is_completed: completed,
     stamped_places: nextPlaces,
     last_stamped_at: nowIso,
+    cooldown_partner_id: null,
+    cooldown_started_at: null,
     updated_at: nowIso,
   };
 
