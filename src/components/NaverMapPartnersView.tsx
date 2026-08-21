@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   DEFAULT_BENEFIT_BTN_LABEL,
   DEFAULT_STAMP_BTN_LABEL,
-  type MapStampActionOptions,
 } from "@/lib/map-events";
 import {
   createPartnerMapClusterIconElement,
@@ -25,6 +24,13 @@ type PartnerPoint = {
   image_url?: string | null;
   pinImageUrl?: string | null;
   benefit?: string | null;
+};
+
+type MapStampActionOptions = {
+  enabled: boolean;
+  stampedPlaceIds?: ReadonlySet<string> | Set<string>;
+  label?: string;
+  onStamp: (partner: { id: string; name: string }) => void;
 };
 
 type NaverMapPartnersViewProps = {
