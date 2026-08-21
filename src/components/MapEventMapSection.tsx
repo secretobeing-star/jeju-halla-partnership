@@ -204,10 +204,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return () => window.clearInterval(timer);
   }, []);
 
-  const maxStamps = activeEvent?.max_stamps ?? 0;
-  const current = progress?.current_stamps ?? 0;
-  const isCompleted = Boolean(progress?.is_completed || (maxStamps > 0 && current >= maxStamps));
-
   const cooldownRemainMs = useMemo(() => {
     if (!activeEvent) return 0;
 
@@ -246,6 +242,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const showStampTimer =
     !hideStampTimer &&
     Boolean(activeEvent) &&
+    !isCompleted &&
     cooldownRemainMs > 0;
 
   useEffect(() => {
@@ -330,7 +327,8 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const visiblePartners = useMemo(() => {
     const pin =
       activeEvent?.marker_icon_img?.trim() ||
-      (!activeEvent ? config.default_map_marker_img.trim() : "") ||
+      props.markerSettings?.topIconImg?.trim() ||
+      config.default_map_marker_img.trim() ||
       null;
     const allowed = activeEvent?.partner_ids ?? [];
     const filtered =
@@ -657,6 +655,9 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     }
   }
 
+  const maxStamps = activeEvent?.max_stamps ?? 0;
+  const current = progress?.current_stamps ?? 0;
+  const isCompleted = Boolean(progress?.is_completed || (maxStamps > 0 && current >= maxStamps));
   const completionPreview = activeEvent ? completionRewardsOf(activeEvent)[0] : null;
   const completionBadgeSrc =
     activeEvent?.completion_badge_img?.trim() || completionPreview?.reward_img || null;
@@ -665,7 +666,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
   const currentStampBtnLabel =
     (activeEvent as unknown as { stamp_btn_label?: string })?.stamp_btn_label?.trim() ||
-    config.event_stamp_btn_label?.trim() ||
+    config.event_stamp_btn_label ||
     DEFAULT_STAMP_BTN_LABEL;
 
   return (
@@ -698,14 +699,14 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         <div className="map-event-stamp-bar" style={stampBarCssVars(activeEvent)}>
           <div className="map-event-stamp-bar__copy">
             <p className="map-event-stamp-bar__title">{activeEvent.title}</p>
-            {(!isEventLive(activeEvent) || showStampTimer) ? (
-              <p className="map-event-stamp-bar__meta">
-                {!isEventLive(activeEvent) ? "기간 종료" : ""}
-                {showStampTimer
-                  ? `${!isEventLive(activeEvent) ? " · " : ""}${stampCountdownText} 후 도장 가능`
-                  : ""}
-              </p>
-            ) : null}
+            <p className="map-event-stamp-bar__meta">
+              {current} / {maxStamps}
+              {isCompleted ? " · 완주" : ""}
+              {!isEventLive(activeEvent) ? " · 기간 종료" : ""}
+              {showStampTimer
+                ? ` · ${stampCountdownText} 후 도장 가능`
+                : ""}
+            </p>
             {showStampTimer ? (
               <button
                 type="button"
@@ -778,6 +779,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
                 ) : (
                   <span className="map-event-completion-reward__fallback" />
                 )}
+                <span className="map-event-completion-reward__label">완주</span>
               </span>
             ) : null}
           </div>

@@ -489,7 +489,10 @@ export default function NaverMapPartnersView({
     );
     const favKey = Array.from(favoritePartnerIds ?? []).sort().join(",");
     const isStampOn = Boolean(stampAction?.enabled);
-    const nextSignature = `${getMapPartnerMarkersSignature(validPartners)}:${isStampOn ? effectiveStampLabel : "nostamp"}:${detailButtonLabel ?? ""}:${effectiveMarkerSettings?.borderColor ?? ""}:${effectiveMarkerSettings?.topIconImg ?? ""}:${favKey}`;
+    const pinSignature = validPartners
+      .map((partner) => `${partner.id}:${partner.pinImageUrl ?? ""}`)
+      .join("|");
+    const nextSignature = `${getMapPartnerMarkersSignature(validPartners)}:${isStampOn ? effectiveStampLabel : "nostamp"}:${detailButtonLabel ?? ""}:${effectiveMarkerSettings?.borderColor ?? ""}:${effectiveMarkerSettings?.topIconImg ?? ""}:${favKey}:${pinSignature}`;
     const nextOrderKey = validPartners.map((partner) => partner.id).join("|");
     const preserveMapView = nextSignature === mapMarkersSignatureRef.current;
     const orderChanged = nextOrderKey !== mapMarkersOrderRef.current;
@@ -667,8 +670,13 @@ export default function NaverMapPartnersView({
 
         const isFav = favoritesEnabled && Boolean(favoritePartnerIds?.has(partner.id));
 
+        const favoriteTopIconImg =
+          partner.pinImageUrl?.trim() ||
+          effectiveMarkerSettings.topIconImg?.trim() ||
+          null;
+
         const customSettingsForMarker = isFav
-          ? effectiveMarkerSettings
+          ? { ...effectiveMarkerSettings, topIconImg: favoriteTopIconImg }
           : { ...effectiveMarkerSettings, topIconImg: null };
 
         const markerElement = createPartnerMapMarkerElement(
