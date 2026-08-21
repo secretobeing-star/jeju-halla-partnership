@@ -24,19 +24,8 @@ const DEFAULT_TAB_ID = "__default_partners__";
 const DEFAULT_STAMP_BAR_BG = "#ecfdf5";
 const DEFAULT_DISTANCE_ERROR_MSG = "제휴처와의 거리가 {distance}m 남았습니다. 지정된 반경({radius}m) 내에서 도장을 찍어주세요.";
 const DEFAULT_LOGIN_REQUIRED_MSG = "로그인 후 이벤트 도장을 찍고 보상을 받을 수 있습니다. 로그인하시겠습니까?";
-
-function formatStampCountdown(ms: number): string {
-  const totalSec = Math.max(0, Math.ceil(ms / 1000));
-  const hours = Math.floor(totalSec / 3600);
-  const minutes = Math.floor((totalSec % 3600) / 60);
-  const seconds = totalSec % 60;
-
-  if (hours > 0) {
-    return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-  }
-
-  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-}
+const DEFAULT_COOLDOWN_TITLE = "잠시 후 도장을 찍을 수 있어요";
+const DEFAULT_COOLDOWN_MSG = "{remain} 후에 도장을 찍을 수 있습니다.";
 
 function stampBarCssVars(
   event: Pick<MapEvent, "stamp_bar_bg_color" | "stamp_bar_bg_img">,
@@ -47,6 +36,9 @@ function stampBarCssVars(
   const bgImg = event.stamp_bar_bg_img?.trim();
   if (bgImg) {
     style["--stamp-bar-bg-image"] = `url(${JSON.stringify(bgImg)})`;
+    style.backgroundImage = `url(${JSON.stringify(bgImg)})`;
+    style.backgroundSize = "cover";
+    style.backgroundPosition = "center";
   }
   return style;
 }
@@ -57,6 +49,7 @@ type PartnerSource = {
   latitude: number | null;
   longitude: number | null;
   image_url?: string | null;
+  pinImageUrl?: string | null;
   category?: string | null;
   address?: string | null;
   benefit?: string | null;
@@ -130,6 +123,8 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     MapAppConfig & {
       distance_error_message?: string;
       login_required_message?: string;
+      cooldown_popup_title?: string;
+      cooldown_popup_message?: string;
       win_popup_title?: string;
       completion_popup_title?: string;
     }
@@ -140,6 +135,8 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     event_stamp_btn_label: DEFAULT_STAMP_BTN_LABEL,
     distance_error_message: DEFAULT_DISTANCE_ERROR_MSG,
     login_required_message: DEFAULT_LOGIN_REQUIRED_MSG,
+    cooldown_popup_title: DEFAULT_COOLDOWN_TITLE,
+    cooldown_popup_message: DEFAULT_COOLDOWN_MSG,
     win_popup_title: "당첨",
     completion_popup_title: "완주 보상",
   });
@@ -148,6 +145,10 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     (MapEvent & {
       distance_error_message?: string;
       login_required_message?: string;
+      cooldown_popup_title?: string;
+      cooldown_popup_message?: string;
+      cooldown_title?: string;
+      cooldown_message?: string;
       win_popup_title?: string;
       completion_popup_title?: string;
     })[]
@@ -159,13 +160,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const [rewardModal, setRewardModal] = useState<RewardModalState | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
 
-  // 첫 도장 전에는 이벤트 시작(created_at) 기준,
-  // 첫 도장 이후에는 last_stamped_at 기준으로 쿨다운을 표시합니다.
   const [localLastStampedAt, setLocalLastStampedAt] = useState<string | null>(null);
-
-  // 관리자 설정으로 타이머를 숨길 수 있도록 로컬 UI 상태를 제공합니다.
-  const [hideStampTimer, setHideStampTimer] = useState(false);
-
   const lastKnownGeoRef = useRef<{ latitude: number; longitude: number } | null>(null);
 
   const refreshLocationCache = useCallback(() => {
@@ -196,7 +191,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const activeEvent = liveEvents.find((event) => event.id === activeTabId) ?? null;
   const isDefaultTab = activeTabId === DEFAULT_TAB_ID;
 
-  // 1초마다 실시간 시간 갱신
   useEffect(() => {
     const timer = window.setInterval(() => {
       setNowMs(Date.now());
@@ -207,42 +201,24 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const cooldownRemainMs = useMemo(() => {
     if (!activeEvent) return 0;
 
-    const cooldownMinutes = Math.max(0, Number(activeEvent.cooldown_minutes) || 0);
-    if (cooldownMinutes <= 0) return 0;
-
     const progressLastMs = progress?.last_stamped_at
-      ? Date.parse(String(progress.last_stamped_at))
-      : NaN;
+      ? new Date(progress.last_stamped_at).getTime()
+      : 0;
 
     const localLastMs = localLastStampedAt
-      ? Date.parse(localLastStampedAt)
-      : NaN;
+      ? new Date(localLastStampedAt).getTime()
+      : 0;
 
-    const lastStampedMs = Math.max(
-      Number.isFinite(progressLastMs) ? progressLastMs : 0,
-      Number.isFinite(localLastMs) ? localLastMs : 0,
+    const latestLastStampedAtMs = Math.max(progressLastMs, localLastMs);
+
+    if (!latestLastStampedAtMs) return 0;
+
+    return remainingCooldownMs(
+      new Date(latestLastStampedAtMs).toISOString(),
+      activeEvent.cooldown_minutes ?? 0,
+      nowMs,
     );
-
-    if (lastStampedMs > 0) {
-      return Math.max(0, lastStampedMs + cooldownMinutes * 60_000 - nowMs);
-    }
-
-    // 첫 도장 전에는 이벤트 시작 시각(created_at)부터 쿨다운을 계산합니다.
-    const eventCreatedMs = Date.parse(
-      String((activeEvent as unknown as { created_at?: string | null })?.created_at || ""),
-    );
-
-    if (!Number.isFinite(eventCreatedMs)) return 0;
-
-    return Math.max(0, eventCreatedMs + cooldownMinutes * 60_000 - nowMs);
   }, [activeEvent, progress?.last_stamped_at, localLastStampedAt, nowMs]);
-
-  const isStampCooldownActive = cooldownRemainMs > 0;
-  const stampCountdownText = formatStampCountdown(cooldownRemainMs);
-  const showStampTimer =
-    !hideStampTimer &&
-    Boolean(activeEvent) &&
-    cooldownRemainMs > 0;
 
   useEffect(() => {
     if (activeTabId === DEFAULT_TAB_ID) return;
@@ -262,6 +238,8 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         config?: MapAppConfig & {
           distance_error_message?: string;
           login_required_message?: string;
+          cooldown_popup_title?: string;
+          cooldown_popup_message?: string;
           win_popup_title?: string;
           completion_popup_title?: string;
         };
@@ -270,6 +248,10 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         events?: (MapEvent & {
           distance_error_message?: string;
           login_required_message?: string;
+          cooldown_popup_title?: string;
+          cooldown_popup_message?: string;
+          cooldown_title?: string;
+          cooldown_message?: string;
           win_popup_title?: string;
           completion_popup_title?: string;
         })[];
@@ -323,26 +305,24 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return () => window.removeEventListener("site-stamp-progress-changed", onStampChanged);
   }, [loadProgress]);
 
+  // 원본 마커 이미지 데이터 손상 없이 일반 지도와 100% 동일하게 마커/하트가 렌더링되도록 보장
   const visiblePartners = useMemo(() => {
-    const pin =
+    const customPin =
       activeEvent?.marker_icon_img?.trim() ||
-      props.markerSettings?.topIconImg?.trim() ||
-      config.default_map_marker_img.trim() ||
+      config.default_map_marker_img?.trim() ||
       null;
+
     const allowed = activeEvent?.partner_ids ?? [];
-    const filtered =
+    const targetPartners =
       activeEvent && allowed.length > 0
         ? props.partners.filter((partner) => allowed.includes(partner.id))
         : props.partners;
 
-    return filtered.map((partner) => {
-      const isFav = Boolean(props.favoritePartnerIds?.has(partner.id));
-      return {
-        ...partner,
-        pinImageUrl: isFav ? pin : null,
-      };
-    });
-  }, [activeEvent, config.default_map_marker_img, props.partners, props.favoritePartnerIds]);
+    return targetPartners.map((partner) => ({
+      ...partner,
+      pinImageUrl: customPin || partner.image_url || partner.pinImageUrl || null,
+    }));
+  }, [activeEvent, config.default_map_marker_img, props.partners]);
 
   const stampedPlaceIds = useMemo(
     () => new Set(progress?.stamped_places ?? []),
@@ -395,41 +375,42 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
     if (stampedPlaceIds.has(partner.id)) return;
 
-    // 서버와 동일한 기준으로 첫 도장/재도장을 막습니다.
-    const cooldownMinutes = Math.max(0, Number(activeEvent.cooldown_minutes) || 0);
     const progressLastMs = progress?.last_stamped_at
-      ? Date.parse(String(progress.last_stamped_at))
-      : NaN;
+      ? new Date(progress.last_stamped_at).getTime()
+      : 0;
+
     const localLastMs = localLastStampedAt
-      ? Date.parse(localLastStampedAt)
-      : NaN;
+      ? new Date(localLastStampedAt).getTime()
+      : 0;
 
-    const lastStampedMs = Math.max(
-      Number.isFinite(progressLastMs) ? progressLastMs : 0,
-      Number.isFinite(localLastMs) ? localLastMs : 0,
-    );
+    const latestLastStampedAtMs = Math.max(progressLastMs, localLastMs);
 
-    const now = Date.now();
-
-    const currentRealtimeCooldown =
-      cooldownMinutes > 0
-        ? lastStampedMs > 0
-          ? Math.max(0, lastStampedMs + cooldownMinutes * 60_000 - now)
-          : Math.max(
-              0,
-              Date.parse(
-                String((activeEvent as unknown as { created_at?: string | null })?.created_at || ""),
-              ) +
-                cooldownMinutes * 60_000 -
-                now,
-            )
-        : 0;
+    const currentRealtimeCooldown = latestLastStampedAtMs
+      ? remainingCooldownMs(
+          new Date(latestLastStampedAtMs).toISOString(),
+          activeEvent.cooldown_minutes ?? 0,
+          Date.now(),
+        )
+      : 0;
 
     if (currentRealtimeCooldown > 0) {
+      const remainText = formatCooldownRemain(currentRealtimeCooldown);
+      const customTitle =
+        activeEvent.cooldown_popup_title?.trim() ||
+        activeEvent.cooldown_title?.trim() ||
+        config.cooldown_popup_title?.trim() ||
+        DEFAULT_COOLDOWN_TITLE;
+
+      const template =
+        activeEvent.cooldown_popup_message?.trim() ||
+        activeEvent.cooldown_message?.trim() ||
+        config.cooldown_popup_message?.trim() ||
+        DEFAULT_COOLDOWN_MSG;
+
       setRewardModal({
         kind: "lose",
-        title: "잠시 후 도장을 찍을 수 있어요",
-        body: `${formatStampCountdown(currentRealtimeCooldown)} 후에 도장을 찍을 수 있습니다.`,
+        title: customTitle,
+        body: template.replace(/\{remain\}/g, remainText),
         banner: null,
         rewardName: null,
         rewardImg: null,
@@ -502,10 +483,23 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
       if (!response.ok) {
         if (payload.cooldownError) {
+          const remainText = payload.cooldownMs ? formatCooldownRemain(payload.cooldownMs) : "잠시";
+          const customTitle =
+            activeEvent.cooldown_popup_title?.trim() ||
+            activeEvent.cooldown_title?.trim() ||
+            config.cooldown_popup_title?.trim() ||
+            DEFAULT_COOLDOWN_TITLE;
+
+          const template =
+            activeEvent.cooldown_popup_message?.trim() ||
+            activeEvent.cooldown_message?.trim() ||
+            config.cooldown_popup_message?.trim() ||
+            DEFAULT_COOLDOWN_MSG;
+
           setRewardModal({
             kind: "lose",
-            title: "잠시 후 도장을 찍을 수 있어요",
-            body: payload.error || "쿨다운 시간 이후에 다시 시도해 주세요.",
+            title: customTitle,
+            body: payload.error || template.replace(/\{remain\}/g, remainText),
             banner: null,
             rewardName: null,
             rewardImg: null,
@@ -542,7 +536,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         throw new Error(payload.error || "도장을 찍지 못했습니다.");
       }
 
-      // 도장 성공 즉시 로컬 마지막 도장 시간을 기록해 화면 타이머도 바로 시작합니다.
       const stampedNow = new Date().toISOString();
       setLocalLastStampedAt(stampedNow);
 
@@ -560,7 +553,15 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
                 last_stamped_at: stampedNow,
                 stamped_places: [...(prev.stamped_places || []), partner.id],
               }
-            : null,
+            : {
+                event_id: activeEvent.id,
+                user_id: sessionUserId,
+                current_stamps: 1,
+                max_stamps: activeEvent.max_stamps ?? 0,
+                last_stamped_at: stampedNow,
+                stamped_places: [partner.id],
+                is_completed: false,
+              },
         );
       }
       setNowMs(Date.now());
@@ -669,7 +670,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     DEFAULT_STAMP_BTN_LABEL;
 
   return (
-    <div className="map-event-shell">
+    <div className="map-event-shell" style={{ position: "relative" }}>
       <div className="map-event-tabs" role="tablist" aria-label="지도 이벤트 탭">
         <button
           type="button"
@@ -698,52 +699,14 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         <div className="map-event-stamp-bar" style={stampBarCssVars(activeEvent)}>
           <div className="map-event-stamp-bar__copy">
             <p className="map-event-stamp-bar__title">{activeEvent.title}</p>
-            {(!isEventLive(activeEvent) || showStampTimer) ? (
+            {(!isCompleted && (!isEventLive(activeEvent) || cooldownRemainMs > 0)) ? (
               <p className="map-event-stamp-bar__meta">
                 {!isEventLive(activeEvent) ? "기간 종료" : ""}
-                {showStampTimer
-                  ? `${!isEventLive(activeEvent) ? " · " : ""}${stampCountdownText} 후 도장 가능`
+                {!isCompleted && cooldownRemainMs > 0
+                  ? `${formatCooldownRemain(cooldownRemainMs)} 후 도장 가능`
                   : ""}
               </p>
             ) : null}
-            {showStampTimer ? (
-              <button
-                type="button"
-                className="map-event-stamp-bar__timer-toggle"
-                onClick={() => setHideStampTimer(true)}
-                aria-label="도장 타이머 숨기기"
-                style={{
-                  marginTop: "6px",
-                  border: "0",
-                  background: "transparent",
-                  padding: 0,
-                  fontSize: "12px",
-                  cursor: "pointer",
-                  opacity: 0.75,
-                }}
-              >
-                타이머 숨기기
-              </button>
-            ) : hideStampTimer && isStampCooldownActive ? (
-              <button
-                type="button"
-                className="map-event-stamp-bar__timer-toggle"
-                onClick={() => setHideStampTimer(false)}
-                aria-label="도장 타이머 표시하기"
-                style={{
-                  marginTop: "6px",
-                  border: "0",
-                  background: "transparent",
-                  padding: 0,
-                  fontSize: "12px",
-                  cursor: "pointer",
-                  opacity: 0.75,
-                }}
-              >
-                타이머 표시
-              </button>
-            ) : null}
-
             {activeEvent.guide_text ? (
               <p className="map-event-stamp-bar__guide">{activeEvent.guide_text}</p>
             ) : null}
@@ -786,36 +749,69 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
       {message ? <p className="map-event-message">{message}</p> : null}
 
-      <PartnerMainMapPanel
-        {...props}
-        partners={visiblePartners}
-        markerSettings={props.markerSettings}
-        stampAction={
-          isStampFeatureActive
-            ? {
-                enabled: true,
-                stampedPlaceIds,
-                label:
-                  busy
-                    ? "확인 중..."
-                    : isStampCooldownActive
-                      ? hideStampTimer
-                        ? "잠시 후 가능"
-                        : `${stampCountdownText} 후 가능`
-                      : currentStampBtnLabel,
-                onStamp: (partner) => {
-                  void handleStamp(partner);
-                },
-              }
-            : undefined
-        }
-        favoriteCountdownEndAt={
-          activeEvent?.end_at ||
-          liveEvents.find((event) => event.end_at)?.end_at ||
-          null
-        }
-        detailButtonLabel={config.default_benefit_btn_label || DEFAULT_BENEFIT_BTN_LABEL}
-      />
+      {/* 지도 패널 및 실시간 타이머 플로팅 오버레이 */}
+      <div style={{ position: "relative", width: "100%", overflow: "visible" }}>
+        {!isDefaultTab && activeEvent && !isCompleted && cooldownRemainMs > 0 && (
+          <div
+            style={{
+              position: "absolute",
+              top: "16px",
+              left: "50%",
+              transform: "translateX(-50%)",
+              zIndex: 9999,
+              backgroundColor: "rgba(17, 24, 39, 0.92)",
+              backdropFilter: "blur(6px)",
+              color: "#ffffff",
+              padding: "8px 18px",
+              borderRadius: "9999px",
+              fontSize: "13px",
+              fontWeight: "700",
+              boxShadow: "0 6px 16px rgba(0, 0, 0, 0.3)",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              pointerEvents: "none",
+              letterSpacing: "-0.02em",
+              border: "1px solid rgba(255, 255, 255, 0.15)",
+            }}
+          >
+            <span>⏰</span>
+            <span>다음 도장까지 {formatCooldownRemain(cooldownRemainMs)}</span>
+          </div>
+        )}
+
+        <PartnerMainMapPanel
+          {...props}
+          partners={visiblePartners}
+          markerSettings={props.markerSettings}
+          favoritesEnabled={props.favoritesEnabled}
+          favoritePartnerIds={props.favoritePartnerIds}
+          onFavoriteToggle={props.onFavoriteToggle}
+          stampAction={
+            isStampFeatureActive
+              ? {
+                  enabled: true,
+                  stampedPlaceIds,
+                  label:
+                    busy
+                      ? "확인 중..."
+                      : cooldownRemainMs > 0
+                        ? `${formatCooldownRemain(cooldownRemainMs)} 후 가능`
+                        : currentStampBtnLabel,
+                  onStamp: (partner) => {
+                    void handleStamp(partner);
+                  },
+                }
+              : undefined
+          }
+          favoriteCountdownEndAt={
+            activeEvent?.end_at ||
+            liveEvents.find((event) => event.end_at)?.end_at ||
+            null
+          }
+          detailButtonLabel={config.default_benefit_btn_label || DEFAULT_BENEFIT_BTN_LABEL}
+        />
+      </div>
 
       {rewardModal ? (
         <div className="map-event-modal" role="dialog" aria-modal="true">
