@@ -200,10 +200,11 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return () => navigator.geolocation.clearWatch(watchId);
   }, []);
 
+  // 🎯 현재 미방문 제휴처 중 반경 내에 있는 곳 판별
   const nearestUnstampedPartnerInside = useMemo(() => {
     if (isDefaultTab || !activeEvent || !currentGeo) return null;
 
-    const radius = Number(activeEvent.radius_meters) || 30;
+    const radius = Number(activeEvent?.radius_meters) || 30;
 
     for (const p of visiblePartners) {
       if (stampedPlaceIds.has(String(p.id))) continue;
@@ -220,15 +221,26 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return null;
   }, [isDefaultTab, activeEvent, currentGeo, visiblePartners, stampedPlaceIds]);
 
+  // 🎯 1. 즐겨찾기 해제 및 반경 밖 이탈 시 즉시 타이머 롤백 / 반경 내 진입 시에만 타이머 시작
   useEffect(() => {
-    if (isDefaultTab || !activeEvent || !nearestUnstampedPartnerInside) return;
-
-    const cooldownMinutes = Math.max(0, Number(activeEvent.cooldown_minutes) || 0);
-    if (cooldownMinutes <= 0) return;
+    if (isDefaultTab || !activeEvent) return;
 
     const storageKey = getEventCooldownKey(activeEvent.id);
-    const existingEndTime = localStorage.getItem(storageKey);
 
+    // 반경 내에 미방문 제휴처가 없을 때(거리가 멀거나 목록에서 제외된 경우): 타이머 롤백
+    if (!nearestUnstampedPartnerInside) {
+      if (localStorage.getItem(storageKey)) {
+        localStorage.removeItem(storageKey);
+        setNowMs(Date.now());
+      }
+      return;
+    }
+
+    const cooldownMinutes = Math.max(0, Number(activeEvent?.cooldown_minutes) || 0);
+    if (cooldownMinutes <= 0) return;
+
+    // 반경 내에 도착했을 때만 타이머 시작
+    const existingEndTime = localStorage.getItem(storageKey);
     if (!existingEndTime) {
       const targetEndTime = Date.now() + cooldownMinutes * 60_000;
       localStorage.setItem(storageKey, String(targetEndTime));
@@ -588,6 +600,8 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       {message ? <p className="map-event-message">{message}</p> : null}
 
       <div style={{ position: "relative", width: "100%", overflow: "visible" }}>
+        
+        {/* 상단 알림 배지 (폭죽 이모지 제거 및 간결한 안내 멘트) */}
         {!isDefaultTab && activeEvent && !isCompleted && !rewardModal && !showIntroModal && (
           currentPlaceCooldownRemainMs > 0 ? (
             <div
@@ -636,7 +650,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
                 border: "1px solid rgba(255, 255, 255, 0.2)",
               }}
             >
-              <span>🎉</span>
               <span>지금 바로 도장을 찍어보세요!</span>
             </div>
           ) : null
