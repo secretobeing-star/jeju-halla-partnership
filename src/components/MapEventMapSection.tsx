@@ -204,6 +204,10 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return () => window.clearInterval(timer);
   }, []);
 
+  const maxStamps = activeEvent?.max_stamps ?? 0;
+  const current = progress?.current_stamps ?? 0;
+  const isCompleted = Boolean(progress?.is_completed || (maxStamps > 0 && current >= maxStamps));
+
   const cooldownRemainMs = useMemo(() => {
     if (!activeEvent) return 0;
 
@@ -242,7 +246,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const showStampTimer =
     !hideStampTimer &&
     Boolean(activeEvent) &&
-    !isCompleted &&
     cooldownRemainMs > 0;
 
   useEffect(() => {
@@ -654,9 +657,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     }
   }
 
-  const maxStamps = activeEvent?.max_stamps ?? 0;
-  const current = progress?.current_stamps ?? 0;
-  const isCompleted = Boolean(progress?.is_completed || (maxStamps > 0 && current >= maxStamps));
   const completionPreview = activeEvent ? completionRewardsOf(activeEvent)[0] : null;
   const completionBadgeSrc =
     activeEvent?.completion_badge_img?.trim() || completionPreview?.reward_img || null;
@@ -778,7 +778,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
                 ) : (
                   <span className="map-event-completion-reward__fallback" />
                 )}
-                <span className="map-event-completion-reward__label">완주</span>
               </span>
             ) : null}
           </div>
