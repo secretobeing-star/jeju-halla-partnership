@@ -129,8 +129,14 @@ export default function NaverMapPartnersView({
         favoritesEnabledRef.current && !isFav
       );
 
+      const resolvedPartner = {
+        ...partner,
+        latitude: lat,
+        longitude: lng,
+      };
+
       const cardElement = createPartnerMapMiniCardElement(
-        partner,
+        resolvedPartner as any,
         () => {
           closeMiniCard(true);
           onPartnerClickRef.current?.(partner.id);
@@ -247,8 +253,14 @@ export default function NaverMapPartnersView({
             favoritePartnerIdsRef.current?.has(String(partner.id))
         );
 
+        const resolvedPartner = {
+          ...partner,
+          latitude: lat,
+          longitude: lng,
+        };
+
         const markerEl = createPartnerMapMarkerElement(
-          partner,
+          resolvedPartner as any,
           isFav,
           markerSettingsRef.current
         );
