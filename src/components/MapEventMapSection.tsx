@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import PartnerMainMapPanel from "@/components/PartnerMainMapPanel";
 import MapEventIntroModal from "@/components/MapEventIntroModal";
 import {
@@ -12,7 +12,6 @@ import {
   isEventLive,
   type MapAppConfig,
   type MapEvent,
-  type MapEventReward,
   type UserEventProgress,
 } from "@/lib/map-events";
 import type { MapMarkerCustomSettings } from "@/lib/naver-map-partner-ui";
@@ -28,6 +27,7 @@ const DEFAULT_COOLDOWN_TITLE = "잠시 후 도장을 찍을 수 있어요";
 const DEFAULT_COOLDOWN_MSG = "시간이 조금 더 지난 후({remain})에 도장을 찍을 수 있어요!";
 const DEFAULT_TIMER_TEMPLATE = "다음 도장까지 {remain}";
 
+// 두 좌표 간 거리 계산 함수 (단위: 미터)
 function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371000;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -143,7 +143,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const activeEvent = liveEvents.find((event) => event.id === activeTabId) ?? null;
   const isDefaultTab = activeTabId === DEFAULT_TAB_ID;
 
-  // 1초마다 시각 갱신
+  // 1초마다 타이머 시간 갱신
   useEffect(() => {
     const timer = window.setInterval(() => {
       setNowMs(Date.now());
@@ -151,18 +151,26 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return () => window.clearInterval(timer);
   }, []);
 
+  // 💖 이벤트 탭 제휴처 + 좋아요(즐겨찾기) 필터 결합
   const visiblePartners = useMemo(() => {
     const raw = props.partners || [];
     if (raw.length === 0) return [];
-    if (isDefaultTab || !activeEvent) return raw;
 
-    const allowed = (activeEvent.partner_ids ?? []).map(String);
-    if (allowed.length > 0) {
-      const filtered = raw.filter((p) => allowed.includes(String(p.id)));
-      return filtered.length > 0 ? filtered : raw;
+    let list = raw;
+    if (!isDefaultTab && activeEvent) {
+      const allowed = (activeEvent.partner_ids ?? []).map(String);
+      if (allowed.length > 0) {
+        list = raw.filter((p) => allowed.includes(String(p.id)));
+      }
     }
-    return raw;
-  }, [activeEvent, isDefaultTab, props.partners]);
+
+    // 좋아요 모드가 켜져 있는 경우 내가 좋아요 한 매장만 추출
+    if (props.favoritesEnabled && props.favoritePartnerIds) {
+      list = list.filter((p) => props.favoritePartnerIds!.has(String(p.id)));
+    }
+
+    return list;
+  }, [activeEvent, isDefaultTab, props.partners, props.favoritesEnabled, props.favoritePartnerIds]);
 
   const getEventCooldownKey = useCallback(
     (eventId: string) => `site_event_timer_${userId || "guest"}_${eventId}`,
@@ -174,7 +182,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     [userId],
   );
 
-  // 실시간 GPS 추적
+  // 📍 실시간 위치 추적
   useEffect(() => {
     if (!navigator.geolocation) return;
 
@@ -188,13 +196,57 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         }
       },
       () => {},
-      { enableHighAccuracy: true, maximumAge: 5000, timeout: 4000 },
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 },
     );
 
     return () => navigator.geolocation.clearWatch(watchId);
   }, []);
 
-  // 탭 진입 시 안내 팝업 노출 제어
+  // 🎯 제휴처 반경 내 도착 시 자동 타이머 시작
+  useEffect(() => {
+    if (isDefaultTab || !activeEvent || !currentGeo) return;
+
+    const cooldownMinutes = Math.max(0, Number(activeEvent.cooldown_minutes) || 0);
+    if (cooldownMinutes <= 0) return;
+
+    const radius = Number(activeEvent.radius_meters) || 30;
+
+    const isInsideAnyPartner = visiblePartners.some((p) => {
+      const pLat = Number(p.latitude);
+      const pLon = Number(p.longitude);
+      if (!pLat || !pLon) return false;
+
+      const dist = getDistanceInMeters(currentGeo.latitude, currentGeo.longitude, pLat, pLon);
+      return dist <= radius;
+    });
+
+    if (isInsideAnyPartner) {
+      const storageKey = getEventCooldownKey(activeEvent.id);
+      const existingEndTime = localStorage.getItem(storageKey);
+
+      if (!existingEndTime || Number(existingEndTime) <= Date.now()) {
+        const targetEndTime = Date.now() + cooldownMinutes * 60_000;
+        localStorage.setItem(storageKey, String(targetEndTime));
+        setNowMs(Date.now());
+      }
+    }
+  }, [currentGeo, activeEvent, isDefaultTab, visiblePartners, getEventCooldownKey]);
+
+  // 탭 이동 처리 핸들러 (열린 말풍선/선택 카드 강제 닫기)
+  const handleTabChange = (nextTabId: string) => {
+    if (activeTabId === nextTabId) return;
+
+    // 💡 탭 이동 시 열려 있던 매장 카드 닫기
+    if (props.onPartnerSelect) {
+      props.onPartnerSelect("");
+    }
+
+    setShowIntroModal(false);
+    setMessage(null);
+    setActiveTabId(nextTabId);
+  };
+
+  // 탭 진입 시 안내 팝업 노출 여부
   useEffect(() => {
     if (isDefaultTab || !activeEvent) {
       setShowIntroModal(false);
@@ -205,14 +257,11 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       setShowIntroModal(true);
     } else {
       const hasConfirmed = localStorage.getItem(getIntroConfirmedKey(activeEvent.id));
-      if (!hasConfirmed) {
-        setShowIntroModal(true);
-      } else {
-        setShowIntroModal(false);
-      }
+      setShowIntroModal(!hasConfirmed);
     }
   }, [activeTabId, activeEvent, isDefaultTab, isGuest, getIntroConfirmedKey]);
 
+  // 안내 팝업 참여하기 클릭 시
   const handleConfirmStartEvent = useCallback(() => {
     if (!activeEvent) return;
 
@@ -223,7 +272,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     setShowIntroModal(false);
   }, [activeEvent, isGuest, userId, getIntroConfirmedKey]);
 
-  // 남은 쿨다운 시간 계산 (해당 이벤트 전용)
+  // 남은 쿨다운 계산
   const currentPlaceCooldownRemainMs = useMemo(() => {
     if (isDefaultTab || !activeEvent) return 0;
 
@@ -297,11 +346,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   async function handleStamp(partner: { id: string; name: string }) {
     if (isDefaultTab || !activeEvent || busy) return;
 
-    const isFavorited = Boolean(props.favoritePartnerIds?.has(String(partner.id)));
-    if (props.favoritesEnabled && !isFavorited) {
-      return;
-    }
-
     const sessionStudent = getSiteMemberSession()?.student;
     const sessionUserId = sessionStudent?.studentId?.trim() || "";
     const sessionName = sessionStudent?.name?.trim() || "";
@@ -322,7 +366,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
     if (stampedPlaceIds.has(partner.id)) return;
 
-    // 1. 쿨다운 시간 체크
     if (currentPlaceCooldownRemainMs > 0) {
       const remainText = formatCooldownRemain(currentPlaceCooldownRemainMs);
       setRewardModal({
@@ -337,7 +380,9 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       return;
     }
 
-    // 2. 실시간 GPS 거리 체크
+    setBusy(true);
+    setMessage(null);
+
     let geo = currentGeo;
     if (!geo?.latitude || !geo?.longitude) {
       try {
@@ -354,35 +399,10 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
           rewardImg: null,
           showGiftButton: false,
         });
+        setBusy(false);
         return;
       }
     }
-
-    const pLat = Number(props.partners.find((p) => String(p.id) === String(partner.id))?.latitude);
-    const pLon = Number(props.partners.find((p) => String(p.id) === String(partner.id))?.longitude);
-    const allowedRadius = Number(activeEvent.radius_meters) || 30;
-
-    if (pLat && pLon && geo) {
-      const realDist = getDistanceInMeters(geo.latitude, geo.longitude, pLat, pLon);
-      if (realDist > allowedRadius) {
-        const distDiff = Math.max(0, Math.round(realDist - allowedRadius));
-        setRewardModal({
-          kind: "distance",
-          title: "거리 확인 안내",
-          body: (config.distance_error_message || DEFAULT_DISTANCE_ERROR_MSG)
-            .replace(/\{distance\}/g, String(distDiff))
-            .replace(/\{radius\}/g, String(allowedRadius)),
-          banner: activeEvent.banner_img || null,
-          rewardName: null,
-          rewardImg: null,
-          showGiftButton: false,
-        });
-        return;
-      }
-    }
-
-    setBusy(true);
-    setMessage(null);
 
     try {
       const response = await fetch("/api/event/stamp-action", {
@@ -426,7 +446,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
         if (payload.distanceError) {
           const distanceVal = Math.round(payload.distanceMeters ?? 0);
-          const radiusVal = Math.round(payload.radiusMeters ?? allowedRadius);
+          const radiusVal = Math.round(payload.radiusMeters ?? 50);
           const bodyMsg = (config.distance_error_message || DEFAULT_DISTANCE_ERROR_MSG)
             .replace(/\{distance\}/g, String(distanceVal))
             .replace(/\{radius\}/g, String(radiusVal));
@@ -445,7 +465,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         throw new Error(payload.error || "도장을 찍지 못했습니다.");
       }
 
-      // 도장 성공 시 해당 이벤트에 쿨다운 시간 설정
       const cooldownMinutes = Math.max(0, Number(activeEvent.cooldown_minutes) || 0);
       if (cooldownMinutes > 0) {
         localStorage.setItem(getEventCooldownKey(activeEvent.id), String(Date.now() + cooldownMinutes * 60_000));
@@ -513,7 +532,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         <button
           type="button"
           className={`map-event-tab ${activeTabId === DEFAULT_TAB_ID ? "map-event-tab--active" : ""}`}
-          onClick={() => setActiveTabId(DEFAULT_TAB_ID)}
+          onClick={() => handleTabChange(DEFAULT_TAB_ID)}
         >
           {config.default_map_tab_name || DEFAULT_MAP_TAB_NAME}
         </button>
@@ -522,7 +541,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
             key={event.id}
             type="button"
             className={`map-event-tab ${activeTabId === event.id ? "map-event-tab--active" : ""}`}
-            onClick={() => setActiveTabId(event.id)}
+            onClick={() => handleTabChange(event.id)}
           >
             {event.tab_name || event.title}
           </button>
