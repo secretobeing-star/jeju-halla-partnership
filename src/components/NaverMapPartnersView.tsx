@@ -200,7 +200,11 @@ export default function NaverMapPartnersView({
       overlay.setMap(map);
       miniCardOverlayRef.current = overlay;
 
-      map.panTo(position);
+      if (typeof (map as any).panTo === "function") {
+        (map as any).panTo(position);
+      } else {
+        map.setCenter(position);
+      }
     },
     [closeMiniCard, effectiveStampLabel]
   );
