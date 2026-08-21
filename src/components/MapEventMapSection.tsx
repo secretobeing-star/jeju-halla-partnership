@@ -129,10 +129,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const [showIntroModal, setShowIntroModal] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [currentGeo, setCurrentGeo] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [timerState, setTimerState] = useState<{ cooldown_end_time: string | null; intro_confirmed: boolean }>({
-    cooldown_end_time: null,
-    intro_confirmed: false,
-  });
 
   const student = getSiteMemberSession()?.student;
   const userId = student?.studentId?.trim() || "";
@@ -185,55 +181,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     [userId],
   );
 
-  // DB에서 타이머 상태 로드
-  const loadTimerState = useCallback(async () => {
-    if (!activeEvent || !userId) {
-      setTimerState({ cooldown_end_time: null, intro_confirmed: false });
-      return;
-    }
-    try {
-      const response = await fetch(
-        `/api/event/timer-state?userId=${encodeURIComponent(userId)}&eventId=${encodeURIComponent(activeEvent.id)}`,
-        { cache: "no-store" },
-      );
-      const payload = await response.json();
-      setTimerState({
-        cooldown_end_time: payload.cooldown_end_time || null,
-        intro_confirmed: Boolean(payload.intro_confirmed),
-      });
-    } catch {
-      setTimerState({ cooldown_end_time: null, intro_confirmed: false });
-    }
-  }, [activeEvent, userId]);
-
-  // DB에 타이머 상태 저장
-  const saveTimerState = useCallback(async (cooldownEndTime: string | null, introConfirmed: boolean) => {
-    if (!activeEvent || !userId) return;
-    try {
-      await fetch("/api/event/timer-state", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId,
-          eventId: activeEvent.id,
-          cooldownEndTime,
-          introConfirmed,
-        }),
-      });
-    } catch {}
-  }, [activeEvent, userId]);
-
-  // DB에서 타이머 상태 삭제
-  const deleteTimerState = useCallback(async () => {
-    if (!activeEvent || !userId) return;
-    try {
-      await fetch(
-        `/api/event/timer-state?userId=${encodeURIComponent(userId)}&eventId=${encodeURIComponent(activeEvent.id)}`,
-        { method: "DELETE" },
-      );
-    } catch {}
-  }, [activeEvent, userId]);
-
   useEffect(() => {
     if (!navigator.geolocation) return;
 
@@ -278,11 +225,11 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   useEffect(() => {
     if (isDefaultTab || !activeEvent) return;
 
+    const storageKey = getEventCooldownKey(activeEvent.id);
+
     if (!nearestUnstampedPartnerInside) {
-      // 반경 이탈 시 DB에서 타이머 상태 삭제
-      if (timerState.cooldown_end_time) {
-        void deleteTimerState();
-        setTimerState({ cooldown_end_time: null, intro_confirmed: timerState.intro_confirmed });
+      if (localStorage.getItem(storageKey)) {
+        localStorage.removeItem(storageKey);
         setNowMs(Date.now());
       }
       return;
@@ -291,14 +238,13 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     const cooldownMinutes = Math.max(0, Number(activeEvent?.cooldown_minutes) || 0);
     if (cooldownMinutes <= 0) return;
 
-    // 반경 진입 시 DB에 타이머 상태 저장
-    if (!timerState.cooldown_end_time) {
-      const targetEndTime = new Date(Date.now() + cooldownMinutes * 60_000).toISOString();
-      void saveTimerState(targetEndTime, timerState.intro_confirmed);
-      setTimerState({ cooldown_end_time: targetEndTime, intro_confirmed: timerState.intro_confirmed });
+    const existingEndTime = localStorage.getItem(storageKey);
+    if (!existingEndTime) {
+      const targetEndTime = Date.now() + cooldownMinutes * 60_000;
+      localStorage.setItem(storageKey, String(targetEndTime));
       setNowMs(Date.now());
     }
-  }, [activeEvent, isDefaultTab, nearestUnstampedPartnerInside, timerState, deleteTimerState, saveTimerState]);
+  }, [activeEvent, isDefaultTab, nearestUnstampedPartnerInside, getEventCooldownKey]);
 
   const handleTabChange = (nextTabId: string) => {
     if (activeTabId === nextTabId) return;
@@ -307,9 +253,9 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       props.onPartnerSelect("");
     }
 
-    // 탭 전환 시 기존 활성 이벤트의 타이머 상태 정리
+    // 탭 전환 시 기존 활성 이벤트의 타이머 캐시 정리
     if (activeEvent) {
-      void deleteTimerState();
+      localStorage.removeItem(getEventCooldownKey(activeEvent.id));
     }
 
     setShowIntroModal(false);
@@ -327,39 +273,43 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     if (isGuest) {
       setShowIntroModal(true);
     } else {
-      // 타이머 상태 로드는 별도로 처리하고, 여기서는 초기 상태만 설정
-      setShowIntroModal(!timerState.intro_confirmed);
+      const hasConfirmed = localStorage.getItem(getIntroConfirmedKey(activeEvent.id));
+      setShowIntroModal(!hasConfirmed);
     }
-  }, [activeTabId, activeEvent, isDefaultTab, isGuest, timerState.intro_confirmed]);
+  }, [activeTabId, activeEvent, isDefaultTab, isGuest, getIntroConfirmedKey]);
 
   const handleConfirmStartEvent = useCallback(() => {
     if (!activeEvent) return;
 
     if (!isGuest && userId) {
-      // DB에 인트로 확인 상태 저장
-      void saveTimerState(timerState.cooldown_end_time, true);
-      setTimerState({ cooldown_end_time: timerState.cooldown_end_time, intro_confirmed: true });
+      localStorage.setItem(getIntroConfirmedKey(activeEvent.id), "true");
     }
 
     setShowIntroModal(false);
-  }, [activeEvent, isGuest, userId, timerState, saveTimerState]);
+  }, [activeEvent, isGuest, userId, getIntroConfirmedKey]);
 
   const currentPlaceCooldownRemainMs = useMemo(() => {
     if (isDefaultTab || !activeEvent || !nearestUnstampedPartnerInside) return 0;
 
-    const cooldownEndTime = timerState.cooldown_end_time;
-    if (!cooldownEndTime) return 0;
+    const storageKey = getEventCooldownKey(activeEvent.id);
+    let targetEndTimeStr: string | null = null;
+    try {
+      targetEndTimeStr = localStorage.getItem(storageKey);
+    } catch {}
 
-    const targetEndTime = new Date(cooldownEndTime).getTime();
+    if (!targetEndTimeStr) return 0;
+
+    const targetEndTime = Number(targetEndTimeStr);
     if (isNaN(targetEndTime) || targetEndTime <= 0) return 0;
 
     return Math.max(0, targetEndTime - nowMs);
-  }, [activeEvent, isDefaultTab, nearestUnstampedPartnerInside, timerState.cooldown_end_time, nowMs]);
+  }, [activeEvent, isDefaultTab, nearestUnstampedPartnerInside, getEventCooldownKey, nowMs]);
 
   const hasTimerKey = useMemo(() => {
     if (isDefaultTab || !activeEvent || !nearestUnstampedPartnerInside) return false;
-    return Boolean(timerState.cooldown_end_time);
-  }, [activeEvent, isDefaultTab, nearestUnstampedPartnerInside, timerState.cooldown_end_time]);
+    const storageKey = getEventCooldownKey(activeEvent.id);
+    return Boolean(localStorage.getItem(storageKey));
+  }, [activeEvent, isDefaultTab, nearestUnstampedPartnerInside, getEventCooldownKey]);
 
   const isCooldownOver = hasTimerKey && currentPlaceCooldownRemainMs === 0;
   const isZeroCooldownEvent = Number(activeEvent?.cooldown_minutes || 0) <= 0;
@@ -373,65 +323,24 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
           ? `${partnerName}에서 지금 바로 이벤트 도장을 찍어보세요!`
           : `${partnerName} 근처에 도착했습니다. 스탬프를 확인해 보세요!`;
 
-      console.log(`푸시 알림 시도: ${type} - ${partnerName}`);
-
-      // PWA 환경에서는 로컬 Notification API보다 Web Push에 의존
       if (typeof window !== "undefined" && "Notification" in window) {
         if (Notification.permission === "granted") {
           try {
-            // PWA에서도 로컬 알림 시도 (Service Worker가 활성화된 경우)
-            if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
-              // Service Worker를 통한 알림
-              const registration = await navigator.serviceWorker.getRegistration();
-              if (registration) {
-                await registration.showNotification(title, {
-                  body,
-                  icon: "/icons/icon-192x192.png",
-                  badge: "/icons/icon-192x192.png",
-                  tag: `partner-${partnerId}-${type}`,
-                  requireInteraction: true,
-                });
-                console.log("Service Worker를 통한 알림 전송 성공");
-              }
-            } else {
-              // Service Worker가 없는 경우 기본 Notification
-              new Notification(title, { body, icon: "/icons/icon-192x192.png" });
-              console.log("로컬 Notification 전송 성공");
-            }
-          } catch (error) {
-            console.error("로컬 알림 전송 실패:", error);
-          }
-        } else if (Notification.permission === "default") {
-          console.log("알림 권한 요청 필요");
-          // 권한 요청은 사용자 동작에서만 가능하므로 여기서는 로그만 남김
-        } else {
-          console.warn("알림 권한이 거부됨");
+            new Notification(title, { body, icon: "/icons/icon-192x192.png" });
+          } catch {}
+        } else if (Notification.permission !== "denied") {
+          Notification.requestPermission();
         }
       }
 
-      // 서버 기반 Web Push 발송
-      if (!userId) {
-        console.warn("userId가 없어 서버 푸시 발송 불가");
-        return;
-      }
-
+      if (!userId) return;
       try {
-        console.log("서버 푸시 API 호출 시작...");
-        const response = await fetch("/api/push/partner-event", {
+        await fetch("/api/push/partner-event", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ userId, partnerId, partnerName, type }),
         });
-
-        if (response.ok) {
-          const result = await response.json();
-          console.log("서버 푸시 발송 성공:", result);
-        } else {
-          console.error("서버 푸시 발송 실패:", response.status);
-        }
-      } catch (error) {
-        console.error("서버 푸시 API 호출 실패:", error);
-      }
+      } catch {}
     },
     [userId]
   );
@@ -497,11 +406,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   useEffect(() => {
     void loadProgress();
   }, [loadProgress]);
-
-  // 활성 이벤트 변경 시 타이머 상태 로드
-  useEffect(() => {
-    void loadTimerState();
-  }, [loadTimerState]);
 
   const handleFullRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -580,9 +484,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         if (payload.cooldownError) {
           const remainMs = payload.cooldownMs ?? 60_000;
           if (activeEvent && payload.cooldownMs) {
-            const targetEndTime = new Date(Date.now() + payload.cooldownMs).toISOString();
-            void saveTimerState(targetEndTime, timerState.intro_confirmed);
-            setTimerState({ cooldown_end_time: targetEndTime, intro_confirmed: timerState.intro_confirmed });
+            localStorage.setItem(getEventCooldownKey(activeEvent.id), String(Date.now() + payload.cooldownMs));
             setNowMs(Date.now());
           }
           const remainText = formatCooldownRemain(remainMs);
@@ -619,8 +521,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         throw new Error(payload.error || "도장을 찍지 못했습니다.");
       }
 
-      void deleteTimerState();
-      setTimerState({ cooldown_end_time: null, intro_confirmed: timerState.intro_confirmed });
+      localStorage.removeItem(getEventCooldownKey(activeEvent.id));
 
       if (payload.progress) setProgress(payload.progress);
       setNowMs(Date.now());
@@ -822,12 +723,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
                   isPartnerDisabled: (partner: PartnerSource) => {
                     if (busy) return true;
                     if (stampedPlaceIds.has(String(partner.id))) return true;
-                    
-                    // 쿨다운 타이머가 끝나지 않았으면 비활성화
                     if (currentPlaceCooldownRemainMs > 0) return true;
-                    
-                    // 쿨다운 타이머가 없고 제로 쿨다운 이벤트가 아니면 비활성화
-                    if (!hasTimerKey && !isZeroCooldownEvent) return true;
 
                     const radius = Number(activeEvent?.radius_meters) || 30;
                     const pLat = Number(partner.latitude);
@@ -856,9 +752,9 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
                         return "매장 방문 시 도장 가능";
                       }
                     }
-                    return config.stamp_button_label || config.event_stamp_btn_label || DEFAULT_STAMP_BTN_LABEL;
+                    return config.event_stamp_btn_label || DEFAULT_STAMP_BTN_LABEL;
                   },
-                  label: config.stamp_button_label || config.event_stamp_btn_label || DEFAULT_STAMP_BTN_LABEL,
+                  label: config.event_stamp_btn_label || DEFAULT_STAMP_BTN_LABEL,
                   onStamp: (partner) => {
                     void handleStamp(partner);
                   },
