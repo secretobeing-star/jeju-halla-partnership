@@ -136,6 +136,9 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
   const isDefaultTab = !activeTabId || activeTabId === DEFAULT_TAB_ID;
 
+  // 🎯 찜(좋아요)한 제휴가 있는지 여부
+  const hasFavorites = Boolean(props.favoritePartnerIds && props.favoritePartnerIds.size > 0);
+
   const liveEvents = useMemo(
     () => events.filter((event) => isEventLive(event, nowMs)),
     [events, nowMs],
@@ -200,19 +203,15 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return () => navigator.geolocation.clearWatch(watchId);
   }, []);
 
-  // 🎯 좋아요(찜) 등록된 제휴처를 우선으로 가장 가까운 대상 계산
+  // 🎯 오직 찜(좋아요)한 제휴 중에서만 가장 가까운 제휴 및 거리 계산
   const nearestTargetPartner = useMemo(() => {
-    if (isDefaultTab || !activeEvent || !currentGeo) return null;
+    if (isDefaultTab || !activeEvent || !currentGeo || !hasFavorites) return null;
 
     const radius = Number(activeEvent?.radius_meters) || 30;
     let closest: { partner: PartnerSource; distance: number; isInside: boolean } | null = null;
 
-    // 찜한 제휴 목록이 있으면 찜한 목록에서 우선 검색, 없으면 표시 목록 전체 대상
-    const favSet = props.favoritePartnerIds;
-    const hasFavs = Boolean(favSet && favSet.size > 0);
-    const targets = hasFavs
-      ? visiblePartners.filter((p) => favSet!.has(String(p.id)))
-      : visiblePartners;
+    const favSet = props.favoritePartnerIds!;
+    const targets = visiblePartners.filter((p) => favSet.has(String(p.id)));
 
     for (const p of targets) {
       if (stampedPlaceIds.has(String(p.id))) continue;
@@ -227,9 +226,9 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       }
     }
     return closest;
-  }, [isDefaultTab, activeEvent, currentGeo, props.favoritePartnerIds, visiblePartners, stampedPlaceIds]);
+  }, [isDefaultTab, activeEvent, currentGeo, hasFavorites, props.favoritePartnerIds, visiblePartners, stampedPlaceIds]);
 
-  // 반경 내 제휴 (도장 대상)
+  // 반경 내에 있는 찜 제휴
   const nearestUnstampedPartnerInside = useMemo(() => {
     if (nearestTargetPartner && nearestTargetPartner.isInside) {
       return { partner: nearestTargetPartner.partner, distance: nearestTargetPartner.distance };
@@ -237,9 +236,9 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return null;
   }, [nearestTargetPartner]);
 
-  // 반경 진입 시 타이머 세팅
+  // 로그인 상태이고 찜한 제휴 반경에 들어왔을 때만 쿨다운 타이머 시작
   useEffect(() => {
-    if (isDefaultTab || !activeEvent) return;
+    if (isDefaultTab || !activeEvent || isGuest || !hasFavorites) return;
 
     const storageKey = getEventCooldownKey(activeEvent.id);
 
@@ -254,7 +253,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         setNowMs(Date.now());
       }
     }
-  }, [activeEvent, isDefaultTab, nearestUnstampedPartnerInside, getEventCooldownKey]);
+  }, [activeEvent, isDefaultTab, nearestUnstampedPartnerInside, getEventCooldownKey, isGuest, hasFavorites]);
 
   const handleTabChange = (nextTabId: string) => {
     if (activeTabId === nextTabId) return;
@@ -293,8 +292,9 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     setShowIntroModal(false);
   }, [activeEvent, isGuest, userId, getIntroConfirmedKey]);
 
+  // 🎯 좋아요가 없으면 남은 시간 계산도 무조건 0으로 반환
   const currentPlaceCooldownRemainMs = useMemo(() => {
-    if (isDefaultTab || !activeEvent || !nearestUnstampedPartnerInside) return 0;
+    if (isDefaultTab || !activeEvent || !nearestUnstampedPartnerInside || isGuest || !hasFavorites) return 0;
 
     const storageKey = getEventCooldownKey(activeEvent.id);
     let targetEndTimeStr: string | null = null;
@@ -308,17 +308,17 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     if (isNaN(targetEndTime) || targetEndTime <= 0) return 0;
 
     return Math.max(0, targetEndTime - nowMs);
-  }, [activeEvent, isDefaultTab, nearestUnstampedPartnerInside, getEventCooldownKey, nowMs]);
+  }, [activeEvent, isDefaultTab, nearestUnstampedPartnerInside, getEventCooldownKey, isGuest, hasFavorites, nowMs]);
 
   const hasTimerKey = useMemo(() => {
-    if (isDefaultTab || !activeEvent || !nearestUnstampedPartnerInside) return false;
+    if (isDefaultTab || !activeEvent || !nearestUnstampedPartnerInside || isGuest || !hasFavorites) return false;
     const storageKey = getEventCooldownKey(activeEvent.id);
     return Boolean(localStorage.getItem(storageKey));
-  }, [activeEvent, isDefaultTab, nearestUnstampedPartnerInside, getEventCooldownKey]);
+  }, [activeEvent, isDefaultTab, nearestUnstampedPartnerInside, getEventCooldownKey, isGuest, hasFavorites]);
 
   const isCooldownOver = hasTimerKey && currentPlaceCooldownRemainMs === 0;
   const isZeroCooldownEvent = Number(activeEvent?.cooldown_minutes || 0) <= 0;
-  const isReadyToStamp = !isDefaultTab && Boolean(nearestUnstampedPartnerInside) && (isCooldownOver || isZeroCooldownEvent);
+  const isReadyToStamp = !isDefaultTab && !isGuest && hasFavorites && Boolean(nearestUnstampedPartnerInside) && (isCooldownOver || isZeroCooldownEvent);
 
   const loadPublic = useCallback(async () => {
     try {
@@ -365,8 +365,25 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     setTimeout(() => setRefreshing(false), 300);
   }, [loadPublic, loadProgress]);
 
+  const openLoginModal = useCallback(() => {
+    setRewardModal({
+      kind: "login_required",
+      title: "로그인이 필요합니다",
+      body: config.login_required_message || DEFAULT_LOGIN_REQUIRED_MSG,
+      banner: activeEvent?.banner_img || null,
+      rewardName: null,
+      rewardImg: null,
+      showGiftButton: false,
+    });
+  }, [config.login_required_message, activeEvent]);
+
   async function handleStamp(partner: { id: string; name: string; latitude?: number | string | null; longitude?: number | string | null }) {
     if (isDefaultTab || !activeEvent || busy) return;
+
+    if (isGuest) {
+      openLoginModal();
+      return;
+    }
 
     if (currentPlaceCooldownRemainMs > 0) {
       const remainText = formatCooldownRemain(currentPlaceCooldownRemainMs);
@@ -388,15 +405,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     const sessionDepartment = sessionStudent?.department?.trim() || "";
 
     if (!sessionUserId || !sessionStudent || !sessionName) {
-      setRewardModal({
-        kind: "login_required",
-        title: "로그인이 필요합니다",
-        body: config.login_required_message || DEFAULT_LOGIN_REQUIRED_MSG,
-        banner: activeEvent.banner_img || null,
-        rewardName: null,
-        rewardImg: null,
-        showGiftButton: false,
-      });
+      openLoginModal();
       return;
     }
 
@@ -544,12 +553,9 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     ? timerTemplate.replace(/\{remain\}/g, formatCooldownRemain(currentPlaceCooldownRemainMs))
     : `${timerTemplate} ${formatCooldownRemain(currentPlaceCooldownRemainMs)}`;
 
-  // 🎯 찜(좋아요) 제휴가 있는지 여부
-  const hasFavorites = Boolean(props.favoritePartnerIds && props.favoritePartnerIds.size > 0);
-
   return (
     <div className="map-event-shell" style={{ position: "relative" }}>
-      {/* 탭 네비게이션 */}
+      {/* 탭 목록 */}
       <div className="map-event-tabs" role="tablist">
         <button
           type="button"
@@ -570,7 +576,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         ))}
       </div>
 
-      {/* 이벤트 탭 전용 상단 프로그레스 바 */}
+      {/* 이벤트 탭 전용 프로그레스 바 */}
       {!isDefaultTab && activeEvent ? (
         <>
           <div className="map-event-stamp-bar" style={stampBarCssVars(activeEvent)}>
@@ -627,11 +633,64 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
       <div style={{ position: "relative", width: "100%", overflow: "visible" }}>
         
-        {/* 🎯 이벤트 탭에서 상태별 상단 배지 노출 */}
+        {/* 상단 배지 노출 로직 */}
         {!isDefaultTab && activeEvent && !isCompleted && !rewardModal && !showIntroModal && (
-          nearestUnstampedPartnerInside ? (
+          isGuest ? (
+            // 1. 비로그인 상태 -> 로그인 유도
+            <div
+              onClick={openLoginModal}
+              style={{
+                position: "absolute",
+                top: "16px",
+                left: "50%",
+                transform: "translateX(-50%)",
+                zIndex: 20,
+                backgroundColor: "#059669",
+                color: "#ffffff",
+                padding: "8px 18px",
+                borderRadius: "9999px",
+                fontSize: "13px",
+                fontWeight: "700",
+                boxShadow: "0 6px 16px rgba(5, 150, 105, 0.4)",
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                cursor: "pointer",
+                border: "1px solid rgba(255, 255, 255, 0.2)",
+              }}
+            >
+              <span>🔒 로그인 후 도장을 찍을 수 있어요!</span>
+            </div>
+          ) : !hasFavorites ? (
+            // 🎯 2. 로그인 상태지만 좋아요(찜)한 제휴가 없을 때 -> 시간 대신 좋아요 안내 배지만 노출
+            <div
+              style={{
+                position: "absolute",
+                top: "16px",
+                left: "50%",
+                transform: "translateX(-50%)",
+                zIndex: 20,
+                backgroundColor: "rgba(31, 41, 55, 0.95)",
+                color: "#f9fafb",
+                padding: "8px 18px",
+                borderRadius: "9999px",
+                fontSize: "12px",
+                fontWeight: "600",
+                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.25)",
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                pointerEvents: "none",
+                border: "1px solid rgba(255, 255, 255, 0.1)",
+                whiteSpace: "nowrap",
+              }}
+            >
+              <span>❤️</span>
+              <span>찜한 제휴가 없습니다. 제휴의 ❤️를 먼저 눌러주세요!</span>
+            </div>
+          ) : nearestUnstampedPartnerInside ? (
             currentPlaceCooldownRemainMs > 0 ? (
-              // 1. 반경 내 + 쿨다운 대기 중
+              // 3. 좋아요 제휴 반경 내 + 쿨다운 대기 중 -> 타이머 배지 노출
               <div
                 style={{
                   position: "absolute",
@@ -657,7 +716,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
                 <span>{timerBadgeText}</span>
               </div>
             ) : isReadyToStamp ? (
-              // 2. 반경 내 + 도장 가능
+              // 4. 좋아요 제휴 반경 내 + 도장 찍기 가능
               <div
                 style={{
                   position: "absolute",
@@ -683,7 +742,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
               </div>
             ) : null
           ) : (
-            // 3. 반경 밖: 가까운 제휴 안내
+            // 5. 좋아요 제휴가 있지만 거리가 멀 때 -> 거리 안내
             <div
               style={{
                 position: "absolute",
@@ -710,9 +769,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
               <span>
                 {nearestTargetPartner
                   ? `${nearestTargetPartner.partner.name} (약 ${Math.round(nearestTargetPartner.distance)}m) · 가까운 제휴 찾으러 가볼까요?`
-                  : hasFavorites
-                    ? "가까운 제휴를 찾을 수 없습니다."
-                    : "찜한 제휴가 없습니다. 제휴의 ❤️를 먼저 눌러주세요!"}
+                  : "가까운 제휴를 찾을 수 없습니다."}
               </span>
             </div>
           )
@@ -729,6 +786,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
                   stampedPlaceIds,
                   isPartnerDisabled: (partner: PartnerSource) => {
                     if (busy) return true;
+                    if (isGuest) return false;
                     if (stampedPlaceIds.has(String(partner.id))) return true;
                     if (currentPlaceCooldownRemainMs > 0) return true;
 
@@ -744,6 +802,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
                   },
                   getPartnerLabel: (partner: PartnerSource) => {
                     if (busy) return "확인 중...";
+                    if (isGuest) return "로그인 후 도장 가능";
                     if (stampedPlaceIds.has(String(partner.id))) return "도장 찍기 완료";
                     if (currentPlaceCooldownRemainMs > 0) {
                       return `${formatCooldownRemain(currentPlaceCooldownRemainMs)} 후 가능`;
@@ -761,7 +820,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
                     }
                     return config.event_stamp_btn_label || DEFAULT_STAMP_BTN_LABEL;
                   },
-                  label: config.event_stamp_btn_label || DEFAULT_STAMP_BTN_LABEL,
+                  label: isGuest ? "로그인 후 도장 가능" : (config.event_stamp_btn_label || DEFAULT_STAMP_BTN_LABEL),
                   onStamp: (partner) => {
                     void handleStamp(partner);
                   },
@@ -779,7 +838,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         onConfirm={handleConfirmStartEvent}
       />
 
-      {/* 보상 / 안내 모달 */}
+      {/* 보상 / 로그인 모달 */}
       {rewardModal ? (
         <div
           className="map-event-modal"
