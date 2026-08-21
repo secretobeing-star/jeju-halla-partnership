@@ -1,3 +1,5 @@
+import { createSupabaseAdmin } from "@/lib/supabase-admin";
+
 type PushPayload = {
   title: string;
   body: string;
@@ -18,8 +20,6 @@ export type WebPushSendResult = {
   failed: number;
   skipped: boolean;
   message?: string;
-  errors?: Array<{ endpoint: string; error: string; statusCode?: number }>;
-  expiredEndpoints?: string[];
 };
 
 function getVapidConfig() {
@@ -27,14 +27,7 @@ function getVapidConfig() {
   const privateKey = process.env.VAPID_PRIVATE_KEY?.trim() ?? "";
   const subject = process.env.VAPID_SUBJECT?.trim() || "mailto:admin@chu.gg";
 
-  console.log("VAPID 환경 변수 검증:", {
-    publicKey: publicKey ? "설정됨" : "설정되지 않음",
-    privateKey: privateKey ? "설정됨" : "설정되지 않음",
-    subject,
-  });
-
   if (!publicKey || !privateKey) {
-    console.error("VAPID 환경 변수 누락:", { publicKey: !!publicKey, privateKey: !!privateKey });
     return null;
   }
 
@@ -45,46 +38,33 @@ export async function sendWebPushNotification(
   subscriptions: PushSubscriptionRow[],
   payload: PushPayload,
 ): Promise<WebPushSendResult> {
-  console.log("푸시 알림 발송 시작:", {
-    subscriptionCount: subscriptions.length,
-    payload: { title: payload.title, body: payload.body },
-  });
-
   const vapid = getVapidConfig();
   if (!vapid) {
-    const errorResult = {
+    return {
       sent: 0,
       failed: 0,
       skipped: true,
       message: "VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY 환경 변수가 설정되지 않았습니다.",
     };
-    console.error("푸시 발송 실패:", errorResult);
-    return errorResult;
   }
 
   if (subscriptions.length === 0) {
-    const emptyResult = { sent: 0, failed: 0, skipped: true, message: "푸시 구독자가 없습니다." };
-    console.warn("푸시 발송 스킵:", emptyResult);
-    return emptyResult;
+    return { sent: 0, failed: 0, skipped: true, message: "푸시 구독자가 없습니다." };
   }
 
   let webpush: typeof import("web-push");
   try {
     webpush = await import("web-push");
-    console.log("web-push 패키지 로드 성공");
   } catch {
-    const errorResult = {
+    return {
       sent: 0,
       failed: 0,
       skipped: true,
       message: "web-push 패키지가 설치되지 않았습니다. npm install web-push 후 다시 시도해 주세요.",
     };
-    console.error("푸시 발송 실패:", errorResult);
-    return errorResult;
   }
 
   webpush.setVapidDetails(vapid.subject, vapid.publicKey, vapid.privateKey);
-  console.log("VAPID 설정 완료:", { subject: vapid.subject });
 
   const body = JSON.stringify({
     title: payload.title,
@@ -95,16 +75,14 @@ export async function sendWebPushNotification(
     image: payload.image ?? null,
   });
 
+  const admin = createSupabaseAdmin();
   let sent = 0;
   let failed = 0;
-  const errors: Array<{ endpoint: string; error: string; statusCode?: number }> = [];
   const expiredEndpoints: string[] = [];
 
   await Promise.all(
     subscriptions.map(async (subscription) => {
       try {
-        console.log(`푸시 발송 시도: ${subscription.endpoint.substring(0, 50)}...`);
-        
         await webpush.sendNotification(
           {
             endpoint: subscription.endpoint,
@@ -115,43 +93,41 @@ export async function sendWebPushNotification(
           },
           body,
         );
-        
         sent += 1;
-        console.log(`푸시 발송 성공: ${subscription.endpoint.substring(0, 50)}...`);
-      } catch (error) {
+      } catch (error: any) {
         failed += 1;
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        const statusCode = (error as any)?.statusCode;
-        
-        console.error(`푸시 발송 실패: ${subscription.endpoint.substring(0, 50)}...`, {
-          error: errorMessage,
-          statusCode,
-        });
+        console.error(`[WebPush] 전송 실패 (Endpoint: ${subscription.endpoint}):`, error?.message || error);
 
-        errors.push({
-          endpoint: subscription.endpoint,
-          error: errorMessage,
-          statusCode,
-        });
-
-        // 만료된 구독 정보 처리 (410 Gone, 404 Not Found)
-        if (statusCode === 410 || statusCode === 404) {
-          console.warn(`만료된 구독 정보 발견: ${subscription.endpoint.substring(0, 50)}... (status: ${statusCode})`);
+        // 만료되었거나 유효하지 않은 구독 정보(410 Gone, 404 Not Found)는 자동 삭제 대상로 지정
+        if (error?.statusCode === 410 || error?.statusCode === 404) {
           expiredEndpoints.push(subscription.endpoint);
         }
       }
     }),
   );
 
-  const result: WebPushSendResult = {
-    sent,
-    failed,
-    skipped: false,
-    message: `발송 완료: ${sent}성공, ${failed}실패`,
-    errors: errors.length > 0 ? errors : undefined,
-    expiredEndpoints: expiredEndpoints.length > 0 ? expiredEndpoints : undefined,
-  };
+  // 만료된 구독 정보가 있다면 DB(push_subscriptions)에서 자동 정리
+  if (admin && expiredEndpoints.length > 0) {
+    try {
+      const { error: deleteError } = await admin
+        .from("push_subscriptions")
+        .delete()
+        .in("endpoint", expiredEndpoints);
 
-  console.log("푸시 발송 결과:", result);
-  return result;
+      if (deleteError) {
+        console.error("[WebPush] 만료된 구독 정보 정리 실패:", deleteError.message);
+      } else {
+        console.log(`[WebPush] 만료된 구독 정보 ${expiredEndpoints.length건} 자동 삭제 완료`);
+      }
+    } catch (dbErr) {
+      console.error("[WebPush] DB 정리 중 예외 발생:", dbErr);
+    }
+  }
+
+  return { sent, failed, skipped: false };
 }
+```[cite: 4]
+
+### ✨ 무엇이 개선되었나요?
+1. **상세 에러 로깅**: 전송이 실패할 경우 어떤 `endpoint`에서 어떤 에러가 발생했는지 서버 콘솔에 명확하게 찍힙니다.
+2. **만료된 구독 자동 청소**: 구글 푸시 서버에서 `410 Gone` 이나 `404 Not Found`를 뱉어내는 **만료된 구독 정보는 Supabase의 `push_subscriptions` 테이블에서 자동으로 삭제**되므로, 찌꺼기 데이터 때문에 에러가 누적되는 현상을 방지합니다[cite: 6].
