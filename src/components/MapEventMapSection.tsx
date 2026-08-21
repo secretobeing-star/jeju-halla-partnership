@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import PartnerMainMapPanel from "@/components/PartnerMainMapPanel";
+import MapEventIntroModal from "@/components/MapEventIntroModal";
 import {
   DEFAULT_BENEFIT_BTN_LABEL,
   DEFAULT_MAP_TAB_NAME,
@@ -112,6 +113,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const [refreshing, setRefreshing] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [rewardModal, setRewardModal] = useState<RewardModalState | null>(null);
+  const [showIntroModal, setShowIntroModal] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
 
   const lastKnownGeoRef = useRef<{ latitude: number; longitude: number } | null>(null);
@@ -146,6 +148,15 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
   const activeEvent = liveEvents.find((event) => event.id === activeTabId) ?? null;
   const isDefaultTab = activeTabId === DEFAULT_TAB_ID;
+
+  // 이벤트 탭 클릭(전환) 시 해당 이벤트 안내 모달 자동 오픈
+  useEffect(() => {
+    if (!isDefaultTab && activeEvent) {
+      setShowIntroModal(true);
+    } else {
+      setShowIntroModal(false);
+    }
+  }, [activeTabId, activeEvent, isDefaultTab]);
 
   // 1초마다 실시간 시각 갱신
   useEffect(() => {
@@ -401,8 +412,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       if (payload.progress) setProgress(payload.progress);
       setNowMs(Date.now());
 
-      const maxStamps = activeEvent.max_stamps || 5;
-      const nextStampCount = payload.progress?.current_stamps ?? (progress?.current_stamps ?? 0) + 1;
       const popupKind = payload.popup || (payload.completion?.reached ? "completion" : (payload.giftCount ?? 0) > 0 ? "win" : "lose");
 
       if (popupKind === "completion") {
@@ -533,16 +542,16 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
       {message ? <p className="map-event-message">{message}</p> : null}
 
-      {/* 지도 상단 플로팅 카운트다운 타이머 */}
+      {/* 지도 상단 플로팅 카운트다운 타이머 (z-index를 20으로 설정하여 모달 뒤로 정상 배치 및 모달 오픈 시 숨김) */}
       <div style={{ position: "relative", width: "100%", overflow: "visible" }}>
-        {!isDefaultTab && activeEvent && !isCompleted && currentPlaceCooldownRemainMs > 0 && (
+        {!isDefaultTab && activeEvent && !isCompleted && currentPlaceCooldownRemainMs > 0 && !rewardModal && !showIntroModal && (
           <div
             style={{
               position: "absolute",
               top: "16px",
               left: "50%",
               transform: "translateX(-50%)",
-              zIndex: 9999,
+              zIndex: 20,
               backgroundColor: "rgba(17, 24, 39, 0.92)",
               color: "#ffffff",
               padding: "8px 18px",
@@ -586,6 +595,17 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         />
       </div>
 
+      {/* 관리자 커스텀 이벤트 참여 안내 모달 */}
+      <MapEventIntroModal
+        event={activeEvent}
+        isOpen={showIntroModal}
+        onClose={() => setShowIntroModal(false)}
+        onConfirm={() => {
+          setShowIntroModal(false);
+        }}
+      />
+
+      {/* 보상 / 로그인 / 오류 팝업 모달 */}
       {rewardModal ? (
         <div className="map-event-modal" role="dialog" aria-modal="true">
           <div className="map-event-modal__card">
