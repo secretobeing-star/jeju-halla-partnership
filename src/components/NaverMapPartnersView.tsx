@@ -6,7 +6,7 @@ import {
   DEFAULT_STAMP_BTN_LABEL,
 } from "@/lib/map-events";
 import {
-  createPartnerMapClusterIconElement,
+  createPartnerMapClusterIcon,
   createPartnerMapMarkerElement,
   createPartnerMapMiniCardElement,
   type MapMarkerCustomSettings,
@@ -283,7 +283,7 @@ export default function NaverMapPartnersView({
         markers: newMarkers,
         disableClickZoom: false,
         gridSize: 120,
-        icons: [createPartnerMapClusterIconElement()],
+        icons: [createPartnerMapClusterIcon()],
         indexGenerator: [10, 20, 50, 100],
         stylingFunction: (clusterMarker: any, count: number) => {
           const el = clusterMarker
