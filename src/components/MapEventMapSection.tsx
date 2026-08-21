@@ -28,6 +28,21 @@ const DEFAULT_COOLDOWN_TITLE = "잠시 후 도장을 찍을 수 있어요";
 const DEFAULT_COOLDOWN_MSG = "시간이 조금 더 지난 후({remain})에 도장을 찍을 수 있어요!";
 const DEFAULT_TIMER_TEMPLATE = "다음 도장까지 {remain}";
 
+// 두 좌표 간 거리 계산 함수 (단위: 미터)
+function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371000;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
 function stampBarCssVars(
   event: Pick<MapEvent, "stamp_bar_bg_color" | "stamp_bar_bg_img">,
 ): CSSProperties {
@@ -115,32 +130,11 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const [rewardModal, setRewardModal] = useState<RewardModalState | null>(null);
   const [showIntroModal, setShowIntroModal] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
-
-  const lastKnownGeoRef = useRef<{ latitude: number; longitude: number } | null>(null);
+  const [currentGeo, setCurrentGeo] = useState<{ latitude: number; longitude: number } | null>(null);
 
   const student = getSiteMemberSession()?.student;
   const userId = student?.studentId?.trim() || "";
   const isGuest = !userId;
-
-  const refreshLocationCache = useCallback(() => {
-    void getCurrentGeolocation({
-      enableHighAccuracy: true,
-      maximumAge: 60_000,
-      timeout: 4_000,
-    })
-      .then((geo) => {
-        if (geo.latitude && geo.longitude) {
-          lastKnownGeoRef.current = { latitude: geo.latitude, longitude: geo.longitude };
-        }
-      })
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    refreshLocationCache();
-    const interval = window.setInterval(refreshLocationCache, 20_000);
-    return () => window.clearInterval(interval);
-  }, [refreshLocationCache]);
 
   const liveEvents = useMemo(
     () => events.filter((event) => isEventLive(event, nowMs)),
@@ -150,7 +144,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const activeEvent = liveEvents.find((event) => event.id === activeTabId) ?? null;
   const isDefaultTab = activeTabId === DEFAULT_TAB_ID;
 
-  // 1초마다 실시간 시각 갱신
+  // 1초마다 시각 갱신
   useEffect(() => {
     const timer = window.setInterval(() => {
       setNowMs(Date.now());
@@ -171,7 +165,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return raw;
   }, [activeEvent, isDefaultTab, props.partners]);
 
-  // 이벤트별 저장 키
   const getEventCooldownKey = useCallback(
     (eventId: string) => `site_event_timer_${userId || "guest"}_${eventId}`,
     [userId],
@@ -182,9 +175,59 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     [userId],
   );
 
-  // 탭 진입 시 모달 노출 제어:
-  // - 비로그인(isGuest): 탭 진입 시마다 항상 표시
-  // - 로그인 유저: [확인] 버튼을 눌러 승인한 기록이 없을 때만 표시
+  // 📍 실시간 위치 추적 (watchPosition)
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        if (pos.coords.latitude && pos.coords.longitude) {
+          setCurrentGeo({
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+          });
+        }
+      },
+      () => {},
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 },
+    );
+
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, []);
+
+  // 🎯 제휴처 반경 도착 시 자동 타이머 트리거
+  useEffect(() => {
+    if (isDefaultTab || !activeEvent || !currentGeo) return;
+
+    const cooldownMinutes = Math.max(0, Number(activeEvent.cooldown_minutes) || 0);
+    if (cooldownMinutes <= 0) return;
+
+    const radius = Number(activeEvent.radius_meters) || 30;
+
+    // 현재 진입 가능한 이벤트 제휴처 중 하나라도 반경 내에 있는지 확인
+    const isInsideAnyPartner = visiblePartners.some((p) => {
+      const pLat = Number(p.latitude);
+      const pLon = Number(p.longitude);
+      if (!pLat || !pLon) return false;
+
+      const dist = getDistanceInMeters(currentGeo.latitude, currentGeo.longitude, pLat, pLon);
+      return dist <= radius;
+    });
+
+    if (isInsideAnyPartner) {
+      const storageKey = getEventCooldownKey(activeEvent.id);
+      const existingEndTime = localStorage.getItem(storageKey);
+
+      // 이미 진행 중인 타이머가 없을 때만 새로 시작
+      if (!existingEndTime || Number(existingEndTime) <= Date.now()) {
+        const targetEndTime = Date.now() + cooldownMinutes * 60_000;
+        localStorage.setItem(storageKey, String(targetEndTime));
+        setNowMs(Date.now());
+      }
+    }
+  }, [currentGeo, activeEvent, isDefaultTab, visiblePartners, getEventCooldownKey]);
+
+  // 탭 진입 시 안내 팝업 노출 제어
   useEffect(() => {
     if (isDefaultTab || !activeEvent) {
       setShowIntroModal(false);
@@ -203,28 +246,16 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     }
   }, [activeTabId, activeEvent, isDefaultTab, isGuest, getIntroConfirmedKey]);
 
-  // 💡 [확인 버튼 클릭 시에만 1회성 완료 기록 & 타이머 시작]
+  // 안내 팝업 참여하기 클릭 시: 영구 완료 기록 및 팝업 닫기
   const handleConfirmStartEvent = useCallback(() => {
     if (!activeEvent) return;
 
-    // 로그인 유저는 [확인] 클릭 시에만 영구 미표시 기록 저장
     if (!isGuest && userId) {
       localStorage.setItem(getIntroConfirmedKey(activeEvent.id), "true");
     }
 
-    // 쿨다운 타이머 시작
-    const cooldownMinutes = Math.max(0, Number(activeEvent.cooldown_minutes) || 0);
-    if (cooldownMinutes > 0) {
-      const storageKey = getEventCooldownKey(activeEvent.id);
-      const existingEndTime = localStorage.getItem(storageKey);
-      if (!existingEndTime || Number(existingEndTime) <= Date.now()) {
-        const targetEndTime = Date.now() + cooldownMinutes * 60_000;
-        localStorage.setItem(storageKey, String(targetEndTime));
-      }
-    }
-    setNowMs(Date.now());
     setShowIntroModal(false);
-  }, [activeEvent, isGuest, userId, getIntroConfirmedKey, getEventCooldownKey]);
+  }, [activeEvent, isGuest, userId, getIntroConfirmedKey]);
 
   // 남은 쿨다운 시간 계산
   const currentPlaceCooldownRemainMs = useMemo(() => {
@@ -285,14 +316,12 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     void loadProgress();
   }, [loadProgress]);
 
-  // 새로고침 버튼 핸들러
   const handleFullRefresh = useCallback(async () => {
     setRefreshing(true);
-    refreshLocationCache();
     await Promise.all([loadPublic(), loadProgress()]);
     setNowMs(Date.now());
     setTimeout(() => setRefreshing(false), 300);
-  }, [loadPublic, loadProgress, refreshLocationCache]);
+  }, [loadPublic, loadProgress]);
 
   const stampedPlaceIds = useMemo(
     () => new Set(progress?.stamped_places ?? []),
@@ -302,7 +331,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   async function handleStamp(partner: { id: string; name: string }) {
     if (isDefaultTab || !activeEvent || busy) return;
 
-    // 좋아요 안 된 곳은 클릭 시 팝업 없이 즉시 리턴
     const isFavorited = Boolean(props.favoritePartnerIds?.has(String(partner.id)));
     if (props.favoritesEnabled && !isFavorited) {
       return;
@@ -328,7 +356,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
     if (stampedPlaceIds.has(partner.id)) return;
 
-    // 클라이언트 쿨다운 검증
     if (currentPlaceCooldownRemainMs > 0) {
       const remainText = formatCooldownRemain(currentPlaceCooldownRemainMs);
       setRewardModal({
@@ -346,12 +373,12 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     setBusy(true);
     setMessage(null);
 
-    let geo = lastKnownGeoRef.current;
+    let geo = currentGeo;
     if (!geo?.latitude || !geo?.longitude) {
       try {
         const fetched = await getCurrentGeolocation({ enableHighAccuracy: true, timeout: 4000 });
         geo = { latitude: fetched.latitude, longitude: fetched.longitude };
-        lastKnownGeoRef.current = geo;
+        setCurrentGeo(geo);
       } catch {
         setRewardModal({
           kind: "distance",
@@ -428,7 +455,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         throw new Error(payload.error || "도장을 찍지 못했습니다.");
       }
 
-      // 도장 성공: 다음 쿨다운 만료 시각 갱신
       const cooldownMinutes = Math.max(0, Number(activeEvent.cooldown_minutes) || 0);
       if (cooldownMinutes > 0) {
         localStorage.setItem(getEventCooldownKey(activeEvent.id), String(Date.now() + cooldownMinutes * 60_000));
@@ -538,7 +564,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
             </div>
           </div>
 
-          {/* 새로고침 버튼 */}
           <div style={{ display: "flex", justifyContent: "flex-end", padding: "4px 8px 8px 8px" }}>
             <button
               type="button"
@@ -567,7 +592,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
       {message ? <p className="map-event-message">{message}</p> : null}
 
-      {/* 플로팅 카운트다운 배지: z-index 20 및 팝업 모달이 떠 있을 때는 자동 숨김 */}
       <div style={{ position: "relative", width: "100%", overflow: "visible" }}>
         {!isDefaultTab && activeEvent && !isCompleted && currentPlaceCooldownRemainMs > 0 && !rewardModal && !showIntroModal && (
           <div
@@ -620,7 +644,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         />
       </div>
 
-      {/* 이벤트 참여 안내 팝업 모달: 닫기(X/닫기)는 기록 없이 닫힘, onConfirm은 1회성 확정 기록 + 타이머 시작 */}
       <MapEventIntroModal
         event={activeEvent}
         isOpen={showIntroModal}
@@ -628,7 +651,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         onConfirm={handleConfirmStartEvent}
       />
 
-      {/* 보상 / 로그인 요구 모달 */}
       {rewardModal ? (
         <div className="map-event-modal" role="dialog" aria-modal="true">
           <div className="map-event-modal__card">
