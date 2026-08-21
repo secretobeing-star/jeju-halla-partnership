@@ -242,6 +242,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const showStampTimer =
     !hideStampTimer &&
     Boolean(activeEvent) &&
+    !isCompleted &&
     cooldownRemainMs > 0;
 
   useEffect(() => {
@@ -664,7 +665,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
   const currentStampBtnLabel =
     (activeEvent as unknown as { stamp_btn_label?: string })?.stamp_btn_label?.trim() ||
-    config.event_stamp_btn_label ||
+    config.event_stamp_btn_label?.trim() ||
     DEFAULT_STAMP_BTN_LABEL;
 
   return (
@@ -697,14 +698,14 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         <div className="map-event-stamp-bar" style={stampBarCssVars(activeEvent)}>
           <div className="map-event-stamp-bar__copy">
             <p className="map-event-stamp-bar__title">{activeEvent.title}</p>
-            <p className="map-event-stamp-bar__meta">
-              {current} / {maxStamps}
-              {isCompleted ? " · 완주" : ""}
-              {!isEventLive(activeEvent) ? " · 기간 종료" : ""}
-              {showStampTimer
-                ? ` · ${stampCountdownText} 후 도장 가능`
-                : ""}
-            </p>
+            {(!isEventLive(activeEvent) || showStampTimer) ? (
+              <p className="map-event-stamp-bar__meta">
+                {!isEventLive(activeEvent) ? "기간 종료" : ""}
+                {showStampTimer
+                  ? `${!isEventLive(activeEvent) ? " · " : ""}${stampCountdownText} 후 도장 가능`
+                  : ""}
+              </p>
+            ) : null}
             {showStampTimer ? (
               <button
                 type="button"
