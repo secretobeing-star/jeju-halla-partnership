@@ -80,44 +80,6 @@ type RewardModalState = {
   showGiftButton: boolean;
 };
 
-const sendMapStampLog = (params: {
-  action: "도장 찍기" | "스탬프 완주" | "당첨 보상" | "미당첨";
-  eventTitle: string;
-  storeName: string;
-  currentCount: number;
-  maxCount: number;
-  studentId: string;
-  studentName: string;
-  department?: string;
-  rewardMessage?: string;
-}) => {
-  try {
-    const webhookUrl = process.env.NEXT_PUBLIC_GOOGLE_APPS_SCRIPT_WEBHOOK_URL;
-    if (!webhookUrl) return;
-
-    const payload = {
-      sheetName: "이벤트로그",
-      action: params.action,
-      timestamp: new Date().toISOString(),
-      studentId: params.studentId || "비회원/익명",
-      studentName: params.studentName || "-",
-      department: params.department || "-",
-      target: params.storeName || params.eventTitle,
-      details:
-        params.action === "도장 찍기"
-          ? `[${params.eventTitle}] ${params.storeName} (${params.currentCount}/${params.maxCount}번째 도장 획득)`
-          : `[${params.eventTitle}] 완주/보상 (${params.currentCount}/${params.maxCount}) - ${params.rewardMessage || ""}`,
-    };
-
-    fetch(webhookUrl, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify(payload),
-      mode: "no-cors",
-    }).catch(() => {});
-  } catch (_) {}
-};
-
 export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const [config, setConfig] = useState<
     MapAppConfig & {
@@ -143,19 +105,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     completion_popup_title: "완주 보상",
   });
 
-  const [events, setEvents] = useState<
-    (MapEvent & {
-      distance_error_message?: string;
-      login_required_message?: string;
-      cooldown_popup_title?: string;
-      cooldown_popup_message?: string;
-      cooldown_timer_template?: string;
-      cooldown_title?: string;
-      cooldown_message?: string;
-      win_popup_title?: string;
-      completion_popup_title?: string;
-    })[]
-  >([]);
+  const [events, setEvents] = useState<MapEvent[]>([]);
   const [activeTabId, setActiveTabId] = useState(DEFAULT_TAB_ID);
   const [progress, setProgress] = useState<UserEventProgress | null>(null);
   const [busy, setBusy] = useState(false);
@@ -197,7 +147,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const activeEvent = liveEvents.find((event) => event.id === activeTabId) ?? null;
   const isDefaultTab = activeTabId === DEFAULT_TAB_ID;
 
-  // 1초마다 시각 갱신
   useEffect(() => {
     const timer = window.setInterval(() => {
       setNowMs(Date.now());
@@ -218,13 +167,11 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return raw;
   }, [activeEvent, isDefaultTab, props.partners]);
 
-  // 계정 및 이벤트별 쿨다운 키
   const getEventCooldownKey = useCallback(
     (eventId: string) => `site_event_timer_${userId || "guest"}_${eventId}`,
     [userId],
   );
 
-  // 이벤트 탭 진입 시 기존 종료 시각이 없으면 최초 1회 생성
   useEffect(() => {
     if (isDefaultTab || !activeEvent) return;
 
@@ -240,7 +187,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     }
   }, [activeTabId, activeEvent, isDefaultTab, getEventCooldownKey]);
 
-  // 남은 쿨다운 시간 계산
   const currentPlaceCooldownRemainMs = useMemo(() => {
     if (isDefaultTab || !activeEvent) return 0;
 
@@ -261,46 +207,16 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return Math.max(0, targetEndTime - nowMs);
   }, [activeEvent, isDefaultTab, getEventCooldownKey, nowMs]);
 
-  useEffect(() => {
-    if (activeTabId === DEFAULT_TAB_ID) return;
-    if (!liveEvents.some((event) => event.id === activeTabId)) {
-      setActiveTabId(DEFAULT_TAB_ID);
-      setMessage("이벤트 기간이 종료되어 도장을 찍을 수 없습니다.");
-    }
-  }, [activeTabId, liveEvents]);
-
   const loadPublic = useCallback(async () => {
     try {
       const [configRes, eventsRes] = await Promise.all([
         fetch("/api/map-events/config", { cache: "no-store" }),
         fetch("/api/map-events", { cache: "no-store" }),
       ]);
-      const configPayload = (await configRes.json()) as {
-        config?: MapAppConfig & {
-          distance_error_message?: string;
-          login_required_message?: string;
-          cooldown_popup_title?: string;
-          cooldown_popup_message?: string;
-          cooldown_timer_template?: string;
-          win_popup_title?: string;
-          completion_popup_title?: string;
-        };
-      };
-      const eventsPayload = (await eventsRes.json()) as {
-        events?: (MapEvent & {
-          distance_error_message?: string;
-          login_required_message?: string;
-          cooldown_popup_title?: string;
-          cooldown_popup_message?: string;
-          cooldown_timer_template?: string;
-          cooldown_title?: string;
-          cooldown_message?: string;
-          win_popup_title?: string;
-          completion_popup_title?: string;
-        })[];
-      };
+      const configPayload = await configRes.json();
+      const eventsPayload = await eventsRes.json();
       if (configPayload.config) setConfig(configPayload.config);
-      setEvents((eventsPayload.events ?? []).filter((event) => isEventLive(event)));
+      setEvents((eventsPayload.events ?? []).filter((event: MapEvent) => isEventLive(event)));
     } catch {}
   }, []);
 
@@ -318,7 +234,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         `/api/event/progress?userId=${encodeURIComponent(userId)}&eventId=${encodeURIComponent(activeEvent.id)}`,
         { cache: "no-store" },
       );
-      const payload = (await response.json()) as { progress?: UserEventProgress };
+      const payload = await response.json();
       setProgress(payload.progress ?? null);
     } catch {
       setProgress(null);
@@ -329,7 +245,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     void loadProgress();
   }, [loadProgress]);
 
-  // 스탬프 바 밑 [새로고침] 클릭 핸들러
   const handleFullRefresh = useCallback(async () => {
     setRefreshing(true);
     refreshLocationCache();
@@ -338,20 +253,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     setTimeout(() => setRefreshing(false), 300);
   }, [loadPublic, loadProgress, refreshLocationCache]);
 
-  useEffect(() => {
-    (window as unknown as Record<string, unknown>).__activeMapEventId =
-      activeEvent?.id ?? null;
-    return () => {
-      (window as unknown as Record<string, unknown>).__activeMapEventId = null;
-    };
-  }, [activeEvent]);
-
-  useEffect(() => {
-    const onStampChanged = () => void loadProgress();
-    window.addEventListener("site-stamp-progress-changed", onStampChanged);
-    return () => window.removeEventListener("site-stamp-progress-changed", onStampChanged);
-  }, [loadProgress]);
-
   const stampedPlaceIds = useMemo(
     () => new Set(progress?.stamped_places ?? []),
     [progress],
@@ -359,22 +260,10 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
   async function handleStamp(partner: { id: string; name: string }) {
     if (isDefaultTab || !activeEvent || busy) return;
-    if (!isEventLive(activeEvent)) {
-      setMessage("이벤트 기간이 종료되어 도장을 찍을 수 없습니다.");
-      return;
-    }
 
-    const isFavorited = Boolean(props.favoritePartnerIds?.has(partner.id));
+    // 좋아요 안 된 곳은 클릭 시 팝업 없이 리턴
+    const isFavorited = Boolean(props.favoritePartnerIds?.has(String(partner.id)));
     if (props.favoritesEnabled && !isFavorited) {
-      setRewardModal({
-        kind: "lose",
-        title: "좋아요 매장 전용 이벤트",
-        body: `먼저 '${partner.name}' 매장의 좋아요(💖)를 누른 후 도장을 찍어주세요!`,
-        banner: activeEvent.banner_img || null,
-        rewardName: null,
-        rewardImg: null,
-        showGiftButton: false,
-      });
       return;
     }
 
@@ -384,15 +273,10 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     const sessionDepartment = sessionStudent?.department?.trim() || "";
 
     if (!sessionUserId || !sessionStudent || !sessionName) {
-      const loginMsg =
-        activeEvent.login_required_message?.trim() ||
-        config.login_required_message?.trim() ||
-        DEFAULT_LOGIN_REQUIRED_MSG;
-
       setRewardModal({
         kind: "login_required",
         title: "로그인이 필요합니다",
-        body: loginMsg,
+        body: config.login_required_message || DEFAULT_LOGIN_REQUIRED_MSG,
         banner: activeEvent.banner_img || null,
         rewardName: null,
         rewardImg: null,
@@ -403,25 +287,12 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
     if (stampedPlaceIds.has(partner.id)) return;
 
-    // 클라이언트 쿨다운 검증
     if (currentPlaceCooldownRemainMs > 0) {
       const remainText = formatCooldownRemain(currentPlaceCooldownRemainMs);
-      const customTitle =
-        activeEvent.cooldown_popup_title?.trim() ||
-        activeEvent.cooldown_title?.trim() ||
-        config.cooldown_popup_title?.trim() ||
-        DEFAULT_COOLDOWN_TITLE;
-
-      const template =
-        activeEvent.cooldown_popup_message?.trim() ||
-        activeEvent.cooldown_message?.trim() ||
-        config.cooldown_popup_message?.trim() ||
-        DEFAULT_COOLDOWN_MSG;
-
       setRewardModal({
         kind: "lose",
-        title: customTitle,
-        body: template.replace(/\{remain\}/g, remainText),
+        title: config.cooldown_popup_title || DEFAULT_COOLDOWN_TITLE,
+        body: (config.cooldown_popup_message || DEFAULT_COOLDOWN_MSG).replace(/\{remain\}/g, remainText),
         banner: null,
         rewardName: null,
         rewardImg: null,
@@ -434,20 +305,16 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     setMessage(null);
 
     let geo = lastKnownGeoRef.current;
-    if (!geo || !geo.latitude || !geo.longitude) {
+    if (!geo?.latitude || !geo?.longitude) {
       try {
-        const fetched = await getCurrentGeolocation({
-          enableHighAccuracy: true,
-          maximumAge: 30_000,
-          timeout: 4000,
-        });
+        const fetched = await getCurrentGeolocation({ enableHighAccuracy: true, timeout: 4000 });
         geo = { latitude: fetched.latitude, longitude: fetched.longitude };
         lastKnownGeoRef.current = geo;
       } catch {
         setRewardModal({
           kind: "distance",
           title: "위치 권한 확인",
-          body: "현재 위치 정보를 가져올 수 없습니다. 브라우저/기기의 GPS 및 위치 권한을 확인해 주세요.",
+          body: "현재 위치 정보를 가져올 수 없습니다. GPS 권한을 확인해 주세요.",
           banner: activeEvent.banner_img || null,
           rewardName: null,
           rewardImg: null,
@@ -476,50 +343,20 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         }),
       });
 
-      const payload = (await response.json()) as {
-        error?: string;
-        progress?: UserEventProgress;
-        giftCount?: number;
-        popup?: "win" | "lose" | "completion";
-        guaranteed?: { reward?: MapEventReward | null };
-        step?: { won?: boolean; reward?: MapEventReward | null };
-        completion?: { reached?: boolean; reward?: MapEventReward | null };
-        messages?: { win?: string; lose?: string; completion?: string; distance?: string };
-        titles?: { win?: string; completion?: string };
-        distanceError?: boolean;
-        distanceMeters?: number;
-        radiusMeters?: number;
-        cooldownError?: boolean;
-        cooldownMs?: number;
-      };
+      const payload = await response.json();
 
       if (!response.ok) {
         if (payload.cooldownError) {
           const remainMs = payload.cooldownMs ?? 60_000;
-
           if (activeEvent && payload.cooldownMs) {
-            const correctEndTime = Date.now() + payload.cooldownMs;
-            localStorage.setItem(getEventCooldownKey(activeEvent.id), String(correctEndTime));
+            localStorage.setItem(getEventCooldownKey(activeEvent.id), String(Date.now() + payload.cooldownMs));
             setNowMs(Date.now());
           }
-
           const remainText = formatCooldownRemain(remainMs);
-          const customTitle =
-            activeEvent.cooldown_popup_title?.trim() ||
-            activeEvent.cooldown_title?.trim() ||
-            config.cooldown_popup_title?.trim() ||
-            DEFAULT_COOLDOWN_TITLE;
-
-          const template =
-            activeEvent.cooldown_popup_message?.trim() ||
-            activeEvent.cooldown_message?.trim() ||
-            config.cooldown_popup_message?.trim() ||
-            DEFAULT_COOLDOWN_MSG;
-
           setRewardModal({
             kind: "lose",
-            title: customTitle,
-            body: template.replace(/\{remain\}/g, remainText),
+            title: config.cooldown_popup_title || DEFAULT_COOLDOWN_TITLE,
+            body: (config.cooldown_popup_message || DEFAULT_COOLDOWN_MSG).replace(/\{remain\}/g, remainText),
             banner: null,
             rewardName: null,
             rewardImg: null,
@@ -529,23 +366,16 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         }
 
         if (payload.distanceError) {
-          const template =
-            payload.messages?.distance ||
-            activeEvent.distance_error_message ||
-            config.distance_error_message ||
-            DEFAULT_DISTANCE_ERROR_MSG;
-
           const distanceVal = Math.round(payload.distanceMeters ?? 0);
           const radiusVal = Math.round(payload.radiusMeters ?? 50);
-
-          const formattedBody = template
+          const bodyMsg = (config.distance_error_message || DEFAULT_DISTANCE_ERROR_MSG)
             .replace(/\{distance\}/g, String(distanceVal))
             .replace(/\{radius\}/g, String(radiusVal));
 
           setRewardModal({
             kind: "distance",
             title: "거리 확인 안내",
-            body: formattedBody,
+            body: bodyMsg,
             banner: activeEvent.banner_img || null,
             rewardName: null,
             rewardImg: null,
@@ -556,118 +386,48 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         throw new Error(payload.error || "도장을 찍지 못했습니다.");
       }
 
-      // 도장 성공: 다음 쿨다운 시작
-      if (activeEvent) {
-        const cooldownMinutes = Math.max(0, Number(activeEvent.cooldown_minutes) || 0);
-        if (cooldownMinutes > 0) {
-          const nextEndTime = Date.now() + cooldownMinutes * 60_000;
-          localStorage.setItem(getEventCooldownKey(activeEvent.id), String(nextEndTime));
-        }
+      const cooldownMinutes = Math.max(0, Number(activeEvent.cooldown_minutes) || 0);
+      if (cooldownMinutes > 0) {
+        localStorage.setItem(getEventCooldownKey(activeEvent.id), String(Date.now() + cooldownMinutes * 60_000));
       }
 
-      if (payload.progress) {
-        setProgress(payload.progress);
-      } else {
-        setProgress((prev) =>
-          prev
-            ? {
-                ...prev,
-                current_stamps: prev.current_stamps + 1,
-                stamped_places: [...(prev.stamped_places || []), partner.id],
-              }
-            : {
-                event_id: activeEvent.id,
-                user_id: sessionUserId,
-                current_stamps: 1,
-                max_stamps: activeEvent.max_stamps ?? 0,
-                stamped_places: [partner.id],
-                is_completed: false,
-              },
-        );
-      }
+      if (payload.progress) setProgress(payload.progress);
       setNowMs(Date.now());
 
       const maxStamps = activeEvent.max_stamps || 5;
       const nextStampCount = payload.progress?.current_stamps ?? (progress?.current_stamps ?? 0) + 1;
-      const completionReward = payload.completion?.reward;
-      const winReward = payload.step?.reward || payload.guaranteed?.reward || null;
       const popupKind = payload.popup || (payload.completion?.reached ? "completion" : (payload.giftCount ?? 0) > 0 ? "win" : "lose");
 
       if (popupKind === "completion") {
-        const completionTitle =
-          payload.titles?.completion ||
-          activeEvent.completion_popup_title?.trim() ||
-          config.completion_popup_title?.trim() ||
-          "완주 보상";
-
-        const completionMsg =
-          payload.messages?.completion ||
-          (activeEvent as unknown as { completion_popup_message?: string })?.completion_popup_message ||
-          "완주 보상이 선물함으로 지급되었습니다!";
-
         setRewardModal({
           kind: "completion",
-          title: completionTitle,
-          body: completionMsg,
+          title: config.completion_popup_title || "완주 보상",
+          body: payload.messages?.completion || "완주 보상이 선물함으로 지급되었습니다!",
           banner: activeEvent.banner_img,
-          rewardName: completionReward?.reward_name || winReward?.reward_name || null,
-          rewardImg: completionReward?.reward_img || winReward?.reward_img || null,
+          rewardName: payload.completion?.reward?.reward_name || null,
+          rewardImg: payload.completion?.reward?.reward_img || null,
           showGiftButton: (payload.giftCount ?? 0) > 0,
         });
       } else if (popupKind === "win") {
-        const winTitle =
-          payload.titles?.win ||
-          activeEvent.win_popup_title?.trim() ||
-          config.win_popup_title?.trim() ||
-          "당첨";
-
-        const winMsg =
-          payload.messages?.win ||
-          (activeEvent as unknown as { win_popup_message?: string })?.win_popup_message ||
-          "선물함으로 보상이 지급되었습니다!";
-
         setRewardModal({
           kind: "win",
-          title: winTitle,
-          body: winMsg,
+          title: config.win_popup_title || "당첨",
+          body: payload.messages?.win || "선물함으로 보상이 지급되었습니다!",
           banner: activeEvent.banner_img,
-          rewardName: winReward?.reward_name || null,
-          rewardImg: winReward?.reward_img || null,
+          rewardName: payload.step?.reward?.reward_name || null,
+          rewardImg: payload.step?.reward?.reward_img || null,
           showGiftButton: true,
         });
       } else {
-        const loseMsg =
-          payload.messages?.lose ||
-          (activeEvent as unknown as { lose_popup_message?: string })?.lose_popup_message ||
-          "아쉽지만 이번엔 당첨되지 않았습니다.";
-
         setRewardModal({
           kind: "lose",
           title: "미당첨",
-          body: loseMsg,
+          body: payload.messages?.lose || "아쉽지만 이번엔 당첨되지 않았습니다.",
           banner: activeEvent.banner_img,
           rewardName: null,
           rewardImg: null,
           showGiftButton: false,
         });
-      }
-
-      setTimeout(() => {
-        sendMapStampLog({
-          action: popupKind === "completion" ? "스탬프 완주" : "도장 찍기",
-          eventTitle: activeEvent.title,
-          storeName: partner.name,
-          currentCount: nextStampCount,
-          maxCount: maxStamps,
-          studentId: sessionUserId,
-          studentName: sessionName,
-          department: sessionDepartment,
-          rewardMessage: popupKind === "completion" ? (payload.messages?.completion || "") : undefined,
-        });
-      }, 0);
-
-      if ((payload.giftCount ?? 0) > 0) {
-        window.dispatchEvent(new Event("site-gift-inbox-refresh"));
       }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "도장 찍기에 실패했습니다.");
@@ -680,32 +440,20 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const current = progress?.current_stamps ?? 0;
   const isCompleted = Boolean(progress?.is_completed || (maxStamps > 0 && current >= maxStamps));
   const completionPreview = activeEvent ? completionRewardsOf(activeEvent)[0] : null;
-  const completionBadgeSrc =
-    activeEvent?.completion_badge_img?.trim() || completionPreview?.reward_img || null;
+  const completionBadgeSrc = activeEvent?.completion_badge_img?.trim() || completionPreview?.reward_img || null;
 
   const isStampFeatureActive = !isDefaultTab && Boolean(activeEvent) && isEventLive(activeEvent!) && !isCompleted;
 
-  const currentStampBtnLabel =
-    (activeEvent as unknown as { stamp_btn_label?: string })?.stamp_btn_label?.trim() ||
-    config.event_stamp_btn_label ||
-    DEFAULT_STAMP_BTN_LABEL;
-
-  const timerTemplate =
-    activeEvent?.cooldown_timer_template?.trim() ||
-    config.cooldown_timer_template?.trim() ||
-    DEFAULT_TIMER_TEMPLATE;
-
+  const timerTemplate = config.cooldown_timer_template || DEFAULT_TIMER_TEMPLATE;
   const timerBadgeText = timerTemplate.includes("{remain}")
     ? timerTemplate.replace(/\{remain\}/g, formatCooldownRemain(currentPlaceCooldownRemainMs))
     : `${timerTemplate} ${formatCooldownRemain(currentPlaceCooldownRemainMs)}`;
 
   return (
     <div className="map-event-shell" style={{ position: "relative" }}>
-      <div className="map-event-tabs" role="tablist" aria-label="지도 이벤트 탭">
+      <div className="map-event-tabs" role="tablist">
         <button
           type="button"
-          role="tab"
-          aria-selected={activeTabId === DEFAULT_TAB_ID}
           className={`map-event-tab ${activeTabId === DEFAULT_TAB_ID ? "map-event-tab--active" : ""}`}
           onClick={() => setActiveTabId(DEFAULT_TAB_ID)}
         >
@@ -715,8 +463,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
           <button
             key={event.id}
             type="button"
-            role="tab"
-            aria-selected={activeTabId === event.id}
             className={`map-event-tab ${activeTabId === event.id ? "map-event-tab--active" : ""}`}
             onClick={() => setActiveTabId(event.id)}
           >
@@ -730,56 +476,28 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
           <div className="map-event-stamp-bar" style={stampBarCssVars(activeEvent)}>
             <div className="map-event-stamp-bar__copy">
               <p className="map-event-stamp-bar__title">{activeEvent.title}</p>
-              {!isEventLive(activeEvent) ? (
-                <p className="map-event-stamp-bar__meta">기간 종료</p>
-              ) : null}
-              {activeEvent.guide_text ? (
-                <p className="map-event-stamp-bar__guide">{activeEvent.guide_text}</p>
-              ) : null}
+              {!isEventLive(activeEvent) ? <p className="map-event-stamp-bar__meta">기간 종료</p> : null}
+              {activeEvent.guide_text ? <p className="map-event-stamp-bar__guide">{activeEvent.guide_text}</p> : null}
             </div>
             <div className="map-event-stamps" aria-hidden="true">
               {Array.from({ length: maxStamps }, (_, index) => {
                 const filled = index < current;
-                const src = filled
-                  ? activeEvent.stamp_active_img
-                  : activeEvent.stamp_inactive_img;
+                const src = filled ? activeEvent.stamp_active_img : activeEvent.stamp_inactive_img;
                 return src ? (
-                  <img
-                    key={index}
-                    src={src}
-                    alt=""
-                    className={`map-event-stamp ${filled ? "map-event-stamp--on" : "map-event-stamp--off"}`}
-                  />
+                  <img key={index} src={src} alt="" className={`map-event-stamp ${filled ? "map-event-stamp--on" : "map-event-stamp--off"}`} />
                 ) : (
-                  <span
-                    key={index}
-                    className={`map-event-stamp map-event-stamp--fallback ${filled ? "map-event-stamp--on" : ""}`}
-                  />
+                  <span key={index} className={`map-event-stamp map-event-stamp--fallback ${filled ? "map-event-stamp--on" : ""}`} />
                 );
               })}
               {completionBadgeSrc || completionPreview ? (
-                <span
-                  className="map-event-completion-reward"
-                  title={completionPreview?.reward_name || "완주 보상"}
-                >
-                  {completionBadgeSrc ? (
-                    <img src={completionBadgeSrc} alt="" />
-                  ) : (
-                    <span className="map-event-completion-reward__fallback" />
-                  )}
+                <span className="map-event-completion-reward">
+                  {completionBadgeSrc ? <img src={completionBadgeSrc} alt="" /> : <span className="map-event-completion-reward__fallback" />}
                 </span>
               ) : null}
             </div>
           </div>
 
-          {/* 스탬프 바 바로 밑 [새로고침] 전용 컨트롤 바 */}
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "flex-end",
-              padding: "4px 8px 8px 8px",
-            }}
-          >
+          <div style={{ display: "flex", justifyContent: "flex-end", padding: "4px 8px 8px 8px" }}>
             <button
               type="button"
               onClick={() => void handleFullRefresh()}
@@ -796,10 +514,9 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
                 border: "1px solid #e5e7eb",
                 borderRadius: "6px",
                 cursor: refreshing ? "not-allowed" : "pointer",
-                transition: "all 0.15s ease",
               }}
             >
-              <span style={{ display: "inline-block", transform: refreshing ? "rotate(180deg)" : "none", transition: "transform 0.3s" }}>🔄</span>
+              <span>🔄</span>
               <span>{refreshing ? "갱신 중..." : "새로고침"}</span>
             </button>
           </div>
@@ -808,7 +525,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
       {message ? <p className="map-event-message">{message}</p> : null}
 
-      {/* 지도 상단 실시간 타이머 플로팅 오버레이 */}
       <div style={{ position: "relative", width: "100%", overflow: "visible" }}>
         {!isDefaultTab && activeEvent && !isCompleted && currentPlaceCooldownRemainMs > 0 && (
           <div
@@ -819,7 +535,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
               transform: "translateX(-50%)",
               zIndex: 9999,
               backgroundColor: "rgba(17, 24, 39, 0.92)",
-              backdropFilter: "blur(6px)",
               color: "#ffffff",
               padding: "8px 18px",
               borderRadius: "9999px",
@@ -830,7 +545,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
               alignItems: "center",
               gap: "6px",
               pointerEvents: "none",
-              letterSpacing: "-0.02em",
               border: "1px solid rgba(255, 255, 255, 0.15)",
             }}
           >
@@ -852,17 +566,12 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
                       ? "확인 중..."
                       : currentPlaceCooldownRemainMs > 0
                         ? `${formatCooldownRemain(currentPlaceCooldownRemainMs)} 후 가능`
-                        : currentStampBtnLabel,
+                        : config.event_stamp_btn_label || DEFAULT_STAMP_BTN_LABEL,
                   onStamp: (partner) => {
                     void handleStamp(partner);
                   },
                 }
               : undefined
-          }
-          favoriteCountdownEndAt={
-            activeEvent?.end_at ||
-            liveEvents.find((event) => event.end_at)?.end_at ||
-            null
           }
           detailButtonLabel={config.default_benefit_btn_label || DEFAULT_BENEFIT_BTN_LABEL}
         />
@@ -871,65 +580,23 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       {rewardModal ? (
         <div className="map-event-modal" role="dialog" aria-modal="true">
           <div className="map-event-modal__card">
-            {rewardModal.banner ? (
-              <img src={rewardModal.banner} alt="" className="map-event-modal__banner" />
-            ) : null}
+            {rewardModal.banner ? <img src={rewardModal.banner} alt="" className="map-event-modal__banner" /> : null}
             <h3 className="map-event-modal__title">{rewardModal.title}</h3>
             <p className="map-event-modal__body" style={{ whiteSpace: "pre-line" }}>{rewardModal.body}</p>
-            {rewardModal.rewardImg ? (
-              <img src={rewardModal.rewardImg} alt="" className="map-event-modal__reward-img" />
-            ) : null}
-            {rewardModal.rewardName ? (
-              <p className="map-event-modal__reward">{rewardModal.rewardName}</p>
-            ) : null}
+            {rewardModal.rewardImg ? <img src={rewardModal.rewardImg} alt="" className="map-event-modal__reward-img" /> : null}
+            {rewardModal.rewardName ? <p className="map-event-modal__reward">{rewardModal.rewardName}</p> : null}
 
             {rewardModal.kind === "login_required" ? (
               <div style={{ display: "flex", gap: "8px", marginTop: "12px", width: "100%" }}>
-                <button
-                  type="button"
-                  className="map-event-modal__btn"
-                  style={{ background: "#6b7280", flex: 1 }}
-                  onClick={() => setRewardModal(null)}
-                >
-                  닫기
-                </button>
-                <button
-                  type="button"
-                  className="map-event-modal__btn"
-                  style={{ background: "#059669", flex: 1.2 }}
-                  onClick={() => {
-                    setRewardModal(null);
-                    window.dispatchEvent(new Event(SITE_STUDENT_NEED_LOGIN_EVENT));
-                  }}
-                >
-                  로그인하기
-                </button>
+                <button type="button" className="map-event-modal__btn" style={{ background: "#6b7280", flex: 1 }} onClick={() => setRewardModal(null)}>닫기</button>
+                <button type="button" className="map-event-modal__btn" style={{ background: "#059669", flex: 1.2 }} onClick={() => { setRewardModal(null); window.dispatchEvent(new Event(SITE_STUDENT_NEED_LOGIN_EVENT)); }}>로그인하기</button>
               </div>
             ) : (
               <div style={{ display: "flex", gap: "8px", marginTop: "12px", width: "100%" }}>
                 {rewardModal.showGiftButton ? (
-                  <button
-                    type="button"
-                    className="map-event-modal__btn"
-                    onClick={() => {
-                      setRewardModal(null);
-                      window.dispatchEvent(new Event("site-gift-inbox-open"));
-                    }}
-                  >
-                    선물함 열기
-                  </button>
+                  <button type="button" className="map-event-modal__btn" onClick={() => { setRewardModal(null); window.dispatchEvent(new Event("site-gift-inbox-open")); }}>선물함 열기</button>
                 ) : null}
-                <button
-                  type="button"
-                  className="map-event-modal__btn"
-                  style={{ background: "#6b7280", flex: 1 }}
-                  onClick={() => {
-                    setRewardModal(null);
-                    void handleFullRefresh();
-                  }}
-                >
-                  확인
-                </button>
+                <button type="button" className="map-event-modal__btn" style={{ background: "#6b7280" }} onClick={() => { setRewardModal(null); void handleFullRefresh(); }}>확인</button>
               </div>
             )}
           </div>
