@@ -120,6 +120,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
   const student = getSiteMemberSession()?.student;
   const userId = student?.studentId?.trim() || "";
+  const isGuest = !userId;
 
   const refreshLocationCache = useCallback(() => {
     void getCurrentGeolocation({
@@ -149,15 +150,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const activeEvent = liveEvents.find((event) => event.id === activeTabId) ?? null;
   const isDefaultTab = activeTabId === DEFAULT_TAB_ID;
 
-  // 이벤트 탭 클릭(전환) 시 해당 이벤트 안내 모달 자동 오픈
-  useEffect(() => {
-    if (!isDefaultTab && activeEvent) {
-      setShowIntroModal(true);
-    } else {
-      setShowIntroModal(false);
-    }
-  }, [activeTabId, activeEvent, isDefaultTab]);
-
   // 1초마다 실시간 시각 갱신
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -179,27 +171,60 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return raw;
   }, [activeEvent, isDefaultTab, props.partners]);
 
-  // 계정 및 이벤트별 쿨다운 키
+  // 이벤트별 저장 키
   const getEventCooldownKey = useCallback(
     (eventId: string) => `site_event_timer_${userId || "guest"}_${eventId}`,
     [userId],
   );
 
-  // 이벤트 탭 진입 시 기존 만료 시각이 없으면 최초 1회 생성
+  const getIntroShownKey = useCallback(
+    (eventId: string) => `site_intro_shown_${userId}_${eventId}`,
+    [userId],
+  );
+
+  // 탭 진입 시 모달 노출 로직:
+  // - 비로그인(isGuest): 탭 진입할 때마다 항상 오픈
+  // - 로그인 유저: 최초 1회만 오픈 (localStorage 기록 체크)
   useEffect(() => {
-    if (isDefaultTab || !activeEvent) return;
-
-    const cooldownMinutes = Math.max(0, Number(activeEvent.cooldown_minutes) || 0);
-    if (cooldownMinutes <= 0) return;
-
-    const storageKey = getEventCooldownKey(activeEvent.id);
-    const existingEndTime = localStorage.getItem(storageKey);
-
-    if (!existingEndTime) {
-      const targetEndTime = Date.now() + cooldownMinutes * 60_000;
-      localStorage.setItem(storageKey, String(targetEndTime));
+    if (isDefaultTab || !activeEvent) {
+      setShowIntroModal(false);
+      return;
     }
-  }, [activeTabId, activeEvent, isDefaultTab, getEventCooldownKey]);
+
+    if (isGuest) {
+      setShowIntroModal(true);
+    } else {
+      const hasShown = localStorage.getItem(getIntroShownKey(activeEvent.id));
+      if (!hasShown) {
+        setShowIntroModal(true);
+      } else {
+        setShowIntroModal(false);
+      }
+    }
+  }, [activeTabId, activeEvent, isDefaultTab, isGuest, getIntroShownKey]);
+
+  // 팝업에서 [참여하기/확인] 버튼 클릭 시 타이머 시작
+  const handleStartEventWithTimer = useCallback(() => {
+    if (!activeEvent) return;
+
+    // 로그인 유저는 1회성 표시 완료 기록
+    if (!isGuest) {
+      localStorage.setItem(getIntroShownKey(activeEvent.id), "true");
+    }
+
+    // 확인 버튼을 누르는 순간부터 쿨다운 타이머 가동
+    const cooldownMinutes = Math.max(0, Number(activeEvent.cooldown_minutes) || 0);
+    if (cooldownMinutes > 0) {
+      const storageKey = getEventCooldownKey(activeEvent.id);
+      const existingEndTime = localStorage.getItem(storageKey);
+      if (!existingEndTime || Number(existingEndTime) <= Date.now()) {
+        const targetEndTime = Date.now() + cooldownMinutes * 60_000;
+        localStorage.setItem(storageKey, String(targetEndTime));
+      }
+    }
+    setNowMs(Date.now());
+    setShowIntroModal(false);
+  }, [activeEvent, isGuest, getIntroShownKey, getEventCooldownKey]);
 
   // 남은 쿨다운 시간 계산
   const currentPlaceCooldownRemainMs = useMemo(() => {
@@ -513,7 +538,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
             </div>
           </div>
 
-          {/* 스탬프 바 바로 밑 새로고침 버튼 */}
+          {/* 새로고침 버튼 */}
           <div style={{ display: "flex", justifyContent: "flex-end", padding: "4px 8px 8px 8px" }}>
             <button
               type="button"
@@ -542,7 +567,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
       {message ? <p className="map-event-message">{message}</p> : null}
 
-      {/* 지도 상단 플로팅 카운트다운 타이머 (z-index를 20으로 설정하여 모달 뒤로 정상 배치 및 모달 오픈 시 숨김) */}
+      {/* 플로팅 카운트다운 배지: z-index 20 및 팝업 모달이 떠 있을 때는 자동 숨김 */}
       <div style={{ position: "relative", width: "100%", overflow: "visible" }}>
         {!isDefaultTab && activeEvent && !isCompleted && currentPlaceCooldownRemainMs > 0 && !rewardModal && !showIntroModal && (
           <div
@@ -595,17 +620,15 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         />
       </div>
 
-      {/* 관리자 커스텀 이벤트 참여 안내 모달 */}
+      {/* 이벤트 참여 안내 팝업 모달 */}
       <MapEventIntroModal
         event={activeEvent}
         isOpen={showIntroModal}
         onClose={() => setShowIntroModal(false)}
-        onConfirm={() => {
-          setShowIntroModal(false);
-        }}
+        onConfirm={handleStartEventWithTimer}
       />
 
-      {/* 보상 / 로그인 / 오류 팝업 모달 */}
+      {/* 보상 / 로그인 요구 모달 */}
       {rewardModal ? (
         <div className="map-event-modal" role="dialog" aria-modal="true">
           <div className="map-event-modal__card">
