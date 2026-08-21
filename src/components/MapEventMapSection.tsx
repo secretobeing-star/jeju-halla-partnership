@@ -27,6 +27,7 @@ const DEFAULT_COOLDOWN_TITLE = "잠시 후 도장을 찍을 수 있어요";
 const DEFAULT_COOLDOWN_MSG = "시간이 조금 더 지난 후({remain})에 도장을 찍을 수 있어요!";
 const DEFAULT_TIMER_TEMPLATE = "다음 도장까지 {remain}";
 
+// 두 좌표 간 거리 계산 함수 (단위: 미터)
 function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371000;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -142,6 +143,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const activeEvent = liveEvents.find((event) => event.id === activeTabId) ?? null;
   const isDefaultTab = activeTabId === DEFAULT_TAB_ID;
 
+  // 1초마다 시각 갱신
   useEffect(() => {
     const timer = window.setInterval(() => {
       setNowMs(Date.now());
@@ -149,7 +151,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return () => window.clearInterval(timer);
   }, []);
 
-  // 💡 visiblePartners: 이벤트 탭 지정 제휴처 필터링만 수행 (좋아요 필터링은 PartnerMainMapPanel에 위임)
+  // 이벤트 탭별 제휴처 목록
   const visiblePartners = useMemo(() => {
     const raw = props.partners || [];
     if (raw.length === 0) return [];
@@ -177,6 +179,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     [userId],
   );
 
+  // 📍 실시간 위치 추적
   useEffect(() => {
     if (!navigator.geolocation) return;
 
@@ -190,12 +193,13 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         }
       },
       () => {},
-      { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 },
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 5000 },
     );
 
     return () => navigator.geolocation.clearWatch(watchId);
   }, []);
 
+  // 🎯 제휴처 반경 도착 시에만 타이머 시작 (근처가 아니면 타이머 시작 안 함)
   useEffect(() => {
     if (isDefaultTab || !activeEvent || !currentGeo) return;
 
@@ -204,19 +208,21 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
     const radius = Number(activeEvent.radius_meters) || 30;
 
+    // 현재 제휴처 중 하나라도 반경 내에 들어왔는지 정밀 판별
     const isInsideAnyPartner = visiblePartners.some((p) => {
       const pLat = Number(p.latitude);
       const pLon = Number(p.longitude);
-      if (!pLat || !pLon) return false;
+      if (!pLat || !pLon || isNaN(pLat) || isNaN(pLon)) return false;
 
       const dist = getDistanceInMeters(currentGeo.latitude, currentGeo.longitude, pLat, pLon);
       return dist <= radius;
     });
 
-    if (isInsideAnyPartner) {
-      const storageKey = getEventCooldownKey(activeEvent.id);
-      const existingEndTime = localStorage.getItem(storageKey);
+    const storageKey = getEventCooldownKey(activeEvent.id);
 
+    // 💡 제휴처 반경 안에 실제로 들어왔을 때만 타이머 가동
+    if (isInsideAnyPartner) {
+      const existingEndTime = localStorage.getItem(storageKey);
       if (!existingEndTime || Number(existingEndTime) <= Date.now()) {
         const targetEndTime = Date.now() + cooldownMinutes * 60_000;
         localStorage.setItem(storageKey, String(targetEndTime));
@@ -225,6 +231,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     }
   }, [currentGeo, activeEvent, isDefaultTab, visiblePartners, getEventCooldownKey]);
 
+  // 탭 이동 시 열린 카드 닫기 & 팝업 닫기
   const handleTabChange = (nextTabId: string) => {
     if (activeTabId === nextTabId) return;
 
@@ -237,6 +244,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     setActiveTabId(nextTabId);
   };
 
+  // 탭 진입 시 안내 팝업 노출
   useEffect(() => {
     if (isDefaultTab || !activeEvent) {
       setShowIntroModal(false);
@@ -251,6 +259,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     }
   }, [activeTabId, activeEvent, isDefaultTab, isGuest, getIntroConfirmedKey]);
 
+  // 참여하기 클릭 시
   const handleConfirmStartEvent = useCallback(() => {
     if (!activeEvent) return;
 
@@ -261,6 +270,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     setShowIntroModal(false);
   }, [activeEvent, isGuest, userId, getIntroConfirmedKey]);
 
+  // 💡 남은 쿨다운 계산: 제휴처 근처에 없거나 아직 발동 안 됐으면 0ms
   const currentPlaceCooldownRemainMs = useMemo(() => {
     if (isDefaultTab || !activeEvent) return 0;
 
