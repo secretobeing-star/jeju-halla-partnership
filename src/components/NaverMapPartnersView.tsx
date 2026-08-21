@@ -29,16 +29,15 @@ import { supabase } from "@/lib/supabase";
 
 export type { NaverMapPartnerMarker };
 
-// 제주도 전체를 한눈에 볼 수 있는 중심 좌표 및 줌 레벨
+// 제주도 기본 중심 좌표
 const JEJU_CENTER = { latitude: 33.3617, longitude: 126.5292 };
 const MARKER_SIZE = PARTNER_MAP_MARKER_SIZE;
 const MARKER_ANCHOR = PARTNER_MAP_MARKER_ANCHOR;
 const MARKER_VISUAL_TOP_OFFSET = MARKER_ANCHOR.y + 14;
 const MINI_CARD_MARKER_GAP = 12;
 const EMPTY_ZOOM = 10;
-const SINGLE_ZOOM = 14;
-const MIN_ZOOM = 10;
-const FIT_BOUNDS_MARGIN = 50;
+const SINGLE_ZOOM = 15;
+const FIT_BOUNDS_MARGIN = 70;
 
 function formatEventTimeBadge(endAt: string, timeIcon = "⏰", timeFormat = "D_DAY_TIME"): string | null {
   if (timeFormat === "NONE") return null;
@@ -587,19 +586,20 @@ export default function NaverMapPartnersView({
       } catch {}
     }
 
+    // 제휴처 위치 범위에 맞춘 카메라 최적화
     if (validPartners.length === 1) {
       activeMap.setCenter(new window.naver.maps.LatLng(validPartners[0].latitude, validPartners[0].longitude));
       activeMap.setZoom(SINGLE_ZOOM);
     } else if (validPartners.length > 1) {
-      // 제주도 전역을 포함할 수 있도록 Bounds Fitting 적용
       activeMap.fitBounds(bounds, FIT_BOUNDS_MARGIN);
       window.setTimeout(() => {
         const fittedZoom = activeMap.getZoom();
-        // 제주도 전체 윤곽이 항상 보이도록 줌 레벨 조정
-        if (fittedZoom > 11) {
+        if (fittedZoom > 16) {
+          activeMap.setZoom(15);
+        } else if (fittedZoom < 10) {
           activeMap.setZoom(10);
         }
-      }, 0);
+      }, 50);
     } else {
       activeMap.setCenter(new window.naver.maps.LatLng(JEJU_CENTER.latitude, JEJU_CENTER.longitude));
       activeMap.setZoom(EMPTY_ZOOM);
