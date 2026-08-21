@@ -27,7 +27,6 @@ const DEFAULT_COOLDOWN_TITLE = "잠시 후 도장을 찍을 수 있어요";
 const DEFAULT_COOLDOWN_MSG = "시간이 조금 더 지난 후({remain})에 도장을 찍을 수 있어요!";
 const DEFAULT_TIMER_TEMPLATE = "다음 도장까지 {remain}";
 
-// 두 좌표 간 거리 계산 함수 (단위: 미터)
 function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371000;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -143,7 +142,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const activeEvent = liveEvents.find((event) => event.id === activeTabId) ?? null;
   const isDefaultTab = activeTabId === DEFAULT_TAB_ID;
 
-  // 1초마다 시각 갱신
   useEffect(() => {
     const timer = window.setInterval(() => {
       setNowMs(Date.now());
@@ -151,7 +149,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return () => window.clearInterval(timer);
   }, []);
 
-  // 이벤트 탭별 제휴처 목록
   const visiblePartners = useMemo(() => {
     const raw = props.partners || [];
     if (raw.length === 0) return [];
@@ -168,6 +165,11 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
     return raw;
   }, [activeEvent, isDefaultTab, props.partners]);
+
+  const stampedPlaceIds = useMemo(
+    () => new Set(progress?.stamped_places ?? []),
+    [progress],
+  );
 
   const getEventCooldownKey = useCallback(
     (eventId: string) => `site_event_timer_${userId || "guest"}_${eventId}`,
@@ -199,39 +201,44 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return () => navigator.geolocation.clearWatch(watchId);
   }, []);
 
-  // 🎯 제휴처 반경 도착 시에만 타이머 시작 (근처가 아니면 타이머 시작 안 함)
+  // 🎯 현재 미방문 제휴처 중 반경 내에 있는 곳 판별
+  const nearestUnstampedPartnerInside = useMemo(() => {
+    if (isDefaultTab || !activeEvent || !currentGeo) return null;
+
+    const radius = Number(activeEvent.radius_meters) || 30;
+
+    for (const p of visiblePartners) {
+      if (stampedPlaceIds.has(String(p.id))) continue;
+
+      const pLat = Number(p.latitude);
+      const pLon = Number(p.longitude);
+      if (!pLat || !pLon || isNaN(pLat) || isNaN(pLon)) continue;
+
+      const dist = getDistanceInMeters(currentGeo.latitude, currentGeo.longitude, pLat, pLon);
+      if (dist <= radius) {
+        return { partner: p, distance: dist };
+      }
+    }
+    return null;
+  }, [isDefaultTab, activeEvent, currentGeo, visiblePartners, stampedPlaceIds]);
+
+  // 🎯 제휴처 반경 도착 시 타이머 시작 (한 번 시작되면 도장 찍기 전까지 유지)
   useEffect(() => {
-    if (isDefaultTab || !activeEvent || !currentGeo) return;
+    if (isDefaultTab || !activeEvent || !nearestUnstampedPartnerInside) return;
 
     const cooldownMinutes = Math.max(0, Number(activeEvent.cooldown_minutes) || 0);
     if (cooldownMinutes <= 0) return;
 
-    const radius = Number(activeEvent.radius_meters) || 30;
-
-    // 현재 제휴처 중 하나라도 반경 내에 들어왔는지 정밀 판별
-    const isInsideAnyPartner = visiblePartners.some((p) => {
-      const pLat = Number(p.latitude);
-      const pLon = Number(p.longitude);
-      if (!pLat || !pLon || isNaN(pLat) || isNaN(pLon)) return false;
-
-      const dist = getDistanceInMeters(currentGeo.latitude, currentGeo.longitude, pLat, pLon);
-      return dist <= radius;
-    });
-
     const storageKey = getEventCooldownKey(activeEvent.id);
+    const existingEndTime = localStorage.getItem(storageKey);
 
-    // 💡 제휴처 반경 안에 실제로 들어왔을 때만 타이머 가동
-    if (isInsideAnyPartner) {
-      const existingEndTime = localStorage.getItem(storageKey);
-      if (!existingEndTime || Number(existingEndTime) <= Date.now()) {
-        const targetEndTime = Date.now() + cooldownMinutes * 60_000;
-        localStorage.setItem(storageKey, String(targetEndTime));
-        setNowMs(Date.now());
-      }
+    if (!existingEndTime) {
+      const targetEndTime = Date.now() + cooldownMinutes * 60_000;
+      localStorage.setItem(storageKey, String(targetEndTime));
+      setNowMs(Date.now());
     }
-  }, [currentGeo, activeEvent, isDefaultTab, visiblePartners, getEventCooldownKey]);
+  }, [activeEvent, isDefaultTab, nearestUnstampedPartnerInside, getEventCooldownKey]);
 
-  // 탭 이동 시 열린 카드 닫기 & 팝업 닫기
   const handleTabChange = (nextTabId: string) => {
     if (activeTabId === nextTabId) return;
 
@@ -244,7 +251,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     setActiveTabId(nextTabId);
   };
 
-  // 탭 진입 시 안내 팝업 노출
   useEffect(() => {
     if (isDefaultTab || !activeEvent) {
       setShowIntroModal(false);
@@ -259,7 +265,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     }
   }, [activeTabId, activeEvent, isDefaultTab, isGuest, getIntroConfirmedKey]);
 
-  // 참여하기 클릭 시
   const handleConfirmStartEvent = useCallback(() => {
     if (!activeEvent) return;
 
@@ -270,12 +275,8 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     setShowIntroModal(false);
   }, [activeEvent, isGuest, userId, getIntroConfirmedKey]);
 
-  // 💡 남은 쿨다운 계산: 제휴처 근처에 없거나 아직 발동 안 됐으면 0ms
   const currentPlaceCooldownRemainMs = useMemo(() => {
     if (isDefaultTab || !activeEvent) return 0;
-
-    const cooldownMinutes = Math.max(0, Number(activeEvent.cooldown_minutes) || 0);
-    if (cooldownMinutes <= 0) return 0;
 
     const storageKey = getEventCooldownKey(activeEvent.id);
     let targetEndTimeStr: string | null = null;
@@ -290,6 +291,18 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
     return Math.max(0, targetEndTime - nowMs);
   }, [activeEvent, isDefaultTab, getEventCooldownKey, nowMs]);
+
+  const hasTimerStarted = useMemo(() => {
+    if (isDefaultTab || !activeEvent) return false;
+    const storageKey = getEventCooldownKey(activeEvent.id);
+    try {
+      return Boolean(localStorage.getItem(storageKey));
+    } catch {
+      return false;
+    }
+  }, [activeEvent, isDefaultTab, getEventCooldownKey]);
+
+  const isTimerFinished = hasTimerStarted && currentPlaceCooldownRemainMs === 0;
 
   const loadPublic = useCallback(async () => {
     try {
@@ -336,12 +349,8 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     setTimeout(() => setRefreshing(false), 300);
   }, [loadPublic, loadProgress]);
 
-  const stampedPlaceIds = useMemo(
-    () => new Set(progress?.stamped_places ?? []),
-    [progress],
-  );
-
-  async function handleStamp(partner: { id: string; name: string }) {
+  // 도장 찍기 실행
+  async function handleStamp(partner: { id: string; name: string; latitude?: number | string | null; longitude?: number | string | null }) {
     if (isDefaultTab || !activeEvent || busy) return;
 
     const sessionStudent = getSiteMemberSession()?.student;
@@ -364,23 +373,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
     if (stampedPlaceIds.has(partner.id)) return;
 
-    if (currentPlaceCooldownRemainMs > 0) {
-      const remainText = formatCooldownRemain(currentPlaceCooldownRemainMs);
-      setRewardModal({
-        kind: "lose",
-        title: config.cooldown_popup_title || DEFAULT_COOLDOWN_TITLE,
-        body: (config.cooldown_popup_message || DEFAULT_COOLDOWN_MSG).replace(/\{remain\}/g, remainText),
-        banner: null,
-        rewardName: null,
-        rewardImg: null,
-        showGiftButton: false,
-      });
-      return;
-    }
-
-    setBusy(true);
-    setMessage(null);
-
     let geo = currentGeo;
     if (!geo?.latitude || !geo?.longitude) {
       try {
@@ -397,10 +389,12 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
           rewardImg: null,
           showGiftButton: false,
         });
-        setBusy(false);
         return;
       }
     }
+
+    setBusy(true);
+    setMessage(null);
 
     try {
       const response = await fetch("/api/event/stamp-action", {
@@ -444,7 +438,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
         if (payload.distanceError) {
           const distanceVal = Math.round(payload.distanceMeters ?? 0);
-          const radiusVal = Math.round(payload.radiusMeters ?? 50);
+          const radiusVal = Math.round(payload.radiusMeters ?? 30);
           const bodyMsg = (config.distance_error_message || DEFAULT_DISTANCE_ERROR_MSG)
             .replace(/\{distance\}/g, String(distanceVal))
             .replace(/\{radius\}/g, String(radiusVal));
@@ -463,10 +457,8 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         throw new Error(payload.error || "도장을 찍지 못했습니다.");
       }
 
-      const cooldownMinutes = Math.max(0, Number(activeEvent.cooldown_minutes) || 0);
-      if (cooldownMinutes > 0) {
-        localStorage.setItem(getEventCooldownKey(activeEvent.id), String(Date.now() + cooldownMinutes * 60_000));
-      }
+      // 도장 찍기 성공 시 저장된 타이머 삭제하여 다음 장소 준비
+      localStorage.removeItem(getEventCooldownKey(activeEvent.id));
 
       if (payload.progress) setProgress(payload.progress);
       setNowMs(Date.now());
@@ -601,31 +593,60 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       {message ? <p className="map-event-message">{message}</p> : null}
 
       <div style={{ position: "relative", width: "100%", overflow: "visible" }}>
-        {!isDefaultTab && activeEvent && !isCompleted && currentPlaceCooldownRemainMs > 0 && !rewardModal && !showIntroModal && (
-          <div
-            style={{
-              position: "absolute",
-              top: "16px",
-              left: "50%",
-              transform: "translateX(-50%)",
-              zIndex: 20,
-              backgroundColor: "rgba(17, 24, 39, 0.92)",
-              color: "#ffffff",
-              padding: "8px 18px",
-              borderRadius: "9999px",
-              fontSize: "13px",
-              fontWeight: "700",
-              boxShadow: "0 6px 16px rgba(0, 0, 0, 0.3)",
-              display: "flex",
-              alignItems: "center",
-              gap: "6px",
-              pointerEvents: "none",
-              border: "1px solid rgba(255, 255, 255, 0.15)",
-            }}
-          >
-            <span>⏰</span>
-            <span>{timerBadgeText}</span>
-          </div>
+        
+        {/* 상단 알림 배지 */}
+        {!isDefaultTab && activeEvent && !isCompleted && !rewardModal && !showIntroModal && (
+          currentPlaceCooldownRemainMs > 0 ? (
+            <div
+              style={{
+                position: "absolute",
+                top: "16px",
+                left: "50%",
+                transform: "translateX(-50%)",
+                zIndex: 20,
+                backgroundColor: "rgba(17, 24, 39, 0.92)",
+                color: "#ffffff",
+                padding: "8px 18px",
+                borderRadius: "9999px",
+                fontSize: "13px",
+                fontWeight: "700",
+                boxShadow: "0 6px 16px rgba(0, 0, 0, 0.3)",
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                pointerEvents: "none",
+                border: "1px solid rgba(255, 255, 255, 0.15)",
+              }}
+            >
+              <span>⏰</span>
+              <span>{timerBadgeText}</span>
+            </div>
+          ) : isTimerFinished && nearestUnstampedPartnerInside ? (
+            <div
+              style={{
+                position: "absolute",
+                top: "16px",
+                left: "50%",
+                transform: "translateX(-50%)",
+                zIndex: 20,
+                backgroundColor: "#059669",
+                color: "#ffffff",
+                padding: "8px 18px",
+                borderRadius: "9999px",
+                fontSize: "13px",
+                fontWeight: "700",
+                boxShadow: "0 6px 16px rgba(5, 150, 105, 0.4)",
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                pointerEvents: "none",
+                border: "1px solid rgba(255, 255, 255, 0.2)",
+              }}
+            >
+              <span>🎉</span>
+              <span>지금 바로 도장을 찍어보세요!</span>
+            </div>
+          ) : null
         )}
 
         <PartnerMainMapPanel
@@ -637,12 +658,43 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
               ? {
                   enabled: true,
                   stampedPlaceIds,
-                  label:
-                    busy
-                      ? "확인 중..."
-                      : currentPlaceCooldownRemainMs > 0
-                        ? `${formatCooldownRemain(currentPlaceCooldownRemainMs)} 후 가능`
-                        : config.event_stamp_btn_label || DEFAULT_STAMP_BTN_LABEL,
+                  // 💡 거리가 멀거나 타이머 대기 중일 때 비활성화(disabled) 판별 함수
+                  isPartnerDisabled: (partner: PartnerSource) => {
+                    if (busy) return true;
+                    if (stampedPlaceIds.has(String(partner.id))) return true;
+                    if (currentPlaceCooldownRemainMs > 0) return true;
+
+                    const radius = Number(activeEvent.radius_meters) || 30;
+                    const pLat = Number(partner.latitude);
+                    const pLon = Number(partner.longitude);
+
+                    if (currentGeo && pLat && pLon && !isNaN(pLat) && !isNaN(pLon)) {
+                      const dist = getDistanceInMeters(currentGeo.latitude, currentGeo.longitude, pLat, pLon);
+                      return dist > radius; // 30m 밖이면 true (비활성화)
+                    }
+                    return true; // 위치 정보가 없으면 안전하게 비활성화
+                  },
+                  // 💡 상태에 맞는 버튼 텍스트 반환
+                  getPartnerLabel: (partner: PartnerSource) => {
+                    if (busy) return "확인 중...";
+                    if (stampedPlaceIds.has(String(partner.id))) return "도장 찍기 완료";
+                    if (currentPlaceCooldownRemainMs > 0) {
+                      return `${formatCooldownRemain(currentPlaceCooldownRemainMs)} 후 가능`;
+                    }
+
+                    const radius = Number(activeEvent.radius_meters) || 30;
+                    const pLat = Number(partner.latitude);
+                    const pLon = Number(partner.longitude);
+
+                    if (currentGeo && pLat && pLon && !isNaN(pLat) && !isNaN(pLon)) {
+                      const dist = getDistanceInMeters(currentGeo.latitude, currentGeo.longitude, pLat, pLon);
+                      if (dist > radius) {
+                        return "매장 방문 시 도장 가능";
+                      }
+                    }
+                    return config.event_stamp_btn_label || DEFAULT_STAMP_BTN_LABEL;
+                  },
+                  label: config.event_stamp_btn_label || DEFAULT_STAMP_BTN_LABEL,
                   onStamp: (partner) => {
                     void handleStamp(partner);
                   },

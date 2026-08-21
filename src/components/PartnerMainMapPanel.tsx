@@ -35,10 +35,13 @@ type PartnerMainMapPanelProps = {
   onMapReady?: () => void;
   onFavoriteToggle?: (partnerId: string) => void;
   favoritesTerm?: string;
+  // 💡 비활성화 및 동적 라벨 함수가 포함된 stampAction 타입
   stampAction?: {
     enabled: boolean;
     stampedPlaceIds: ReadonlySet<string>;
     label?: string;
+    isPartnerDisabled?: (partner: PartnerMainMapSource) => boolean;
+    getPartnerLabel?: (partner: PartnerMainMapSource) => string;
     onStamp: (partner: { id: string; name: string }) => void;
   };
   favoriteCountdownEndAt?: string | null;
