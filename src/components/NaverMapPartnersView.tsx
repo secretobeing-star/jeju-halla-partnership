@@ -10,7 +10,6 @@ import {
   createPartnerMapMarkerElement,
   createPartnerMapMiniCardElement,
   type MapMarkerCustomSettings,
-  type PartnerMapOverlayLike,
 } from "@/lib/naver-map-partner-ui";
 
 type PartnerPoint = {
@@ -30,6 +29,10 @@ type MapStampActionOptions = {
   stampedPlaceIds?: ReadonlySet<string> | Set<string>;
   label?: string;
   onStamp: (partner: { id: string; name: string }) => void;
+};
+
+type OverlayLike = {
+  setMap: (map: any) => void;
 };
 
 type NaverMapPartnersViewProps = {
@@ -63,7 +66,7 @@ export default function NaverMapPartnersView({
   const mapInstanceRef = useRef<naver.maps.Map | null>(null);
   const markersRef = useRef<naver.maps.Marker[]>([]);
   const clustererRef = useRef<any>(null);
-  const miniCardOverlayRef = useRef<PartnerMapOverlayLike | null>(null);
+  const miniCardOverlayRef = useRef<OverlayLike | null>(null);
   const miniCardElementRef = useRef<HTMLElement | null>(null);
 
   const favoritesEnabledRef = useRef(favoritesEnabled);
