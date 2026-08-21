@@ -39,7 +39,6 @@ const SINGLE_ZOOM = 15;
 const MIN_ZOOM = 12;
 const FIT_BOUNDS_MARGIN = 40;
 
-/** 시간 노출 형식에 맞춰 텍스트 생성 */
 function formatEventTimeBadge(endAt: string, timeIcon = "⏰", timeFormat = "D_DAY_TIME"): string | null {
   if (timeFormat === "NONE") return null;
 
@@ -67,7 +66,6 @@ function formatEventTimeBadge(endAt: string, timeIcon = "⏰", timeFormat = "D_D
     return `${icon}${pad(totalHours)}:${pad(minutes)}:${pad(seconds)}`;
   }
 
-  // D_DAY_TIME
   if (days > 0) {
     return `${icon}${days}일 ${pad(hours)}:${pad(minutes)}`;
   }
@@ -187,6 +185,7 @@ export default function NaverMapPartnersView({
     activeDbEvent?.stamp_btn_label?.trim() ||
     "도장 찍기";
 
+  // 이벤트 탭 전용 마커 설정 구성
   const effectiveMarkerSettings = useMemo<MapMarkerCustomSettings>(() => {
     const extra = (activeDbEvent ?? {}) as unknown as {
       marker_border_color?: string;
@@ -195,10 +194,10 @@ export default function NaverMapPartnersView({
     };
 
     return {
-      borderColor: extra.marker_border_color || initialMarkerSettings?.borderColor || null,
-      topIconImg: activeDbEvent?.marker_icon_img || initialMarkerSettings?.topIconImg || null,
-      timeIcon: extra.marker_time_icon || initialMarkerSettings?.timeIcon || "🔥",
-      timeFormat: extra.marker_time_format || initialMarkerSettings?.timeFormat || "D_DAY_TIME",
+      borderColor: initialMarkerSettings?.borderColor || extra.marker_border_color || null,
+      topIconImg: initialMarkerSettings?.topIconImg || activeDbEvent?.marker_icon_img || null,
+      timeIcon: initialMarkerSettings?.timeIcon || extra.marker_time_icon || "🔥",
+      timeFormat: initialMarkerSettings?.timeFormat || extra.marker_time_format || "D_DAY_TIME",
       thumbnailEnabled: initialMarkerSettings?.thumbnailEnabled ?? true,
       bgImg: initialMarkerSettings?.bgImg || null,
     };
@@ -585,7 +584,6 @@ export default function NaverMapPartnersView({
         favoritesEnabledRef.current && favoritePartnerIdsRef.current?.has(partner.id)
       );
 
-      // 좋아요 미등록 매장은 비활성화 ('좋아요 필요' 라벨 표기 및 클릭 방지)
       const isStampDisabledByFav = Boolean(favoritesEnabledRef.current && !isFav);
       const isAlreadyStamped = Boolean(activeStampAction?.stampedPlaceIds?.has(partner.id));
 
@@ -675,7 +673,8 @@ export default function NaverMapPartnersView({
 
         const isFav = favoritesEnabled && Boolean(favoritePartnerIds?.has(partner.id));
 
-        // 💡 [복구 완료] 즐겨찾기(좋아요)된 매장만 상단 마커 아이콘(핀 이미지)을 노출하고, 아닌 매장은 topIconImg를 제거
+        // 💡 [이벤트 탭 마커 로직]
+        // 이벤트 탭에서는 좋아요를 누른 매장에 대해 핀 이미지 또는 이벤트 마커 아이콘을 노출합니다.
         const favoriteTopIconImg =
           partner.pinImageUrl?.trim() ||
           effectiveMarkerSettings.topIconImg?.trim() ||
