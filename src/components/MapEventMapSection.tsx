@@ -28,7 +28,6 @@ const DEFAULT_COOLDOWN_TITLE = "잠시 후 도장을 찍을 수 있어요";
 const DEFAULT_COOLDOWN_MSG = "시간이 조금 더 지난 후({remain})에 도장을 찍을 수 있어요!";
 const DEFAULT_TIMER_TEMPLATE = "다음 도장까지 {remain}";
 
-// 두 좌표 간 거리 계산 함수 (단위: 미터)
 function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371000;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -175,7 +174,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     [userId],
   );
 
-  // 📍 실시간 위치 추적 (watchPosition)
+  // 실시간 GPS 추적
   useEffect(() => {
     if (!navigator.geolocation) return;
 
@@ -189,43 +188,11 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         }
       },
       () => {},
-      { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 },
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 4000 },
     );
 
     return () => navigator.geolocation.clearWatch(watchId);
   }, []);
-
-  // 🎯 제휴처 반경 도착 시 자동 타이머 트리거
-  useEffect(() => {
-    if (isDefaultTab || !activeEvent || !currentGeo) return;
-
-    const cooldownMinutes = Math.max(0, Number(activeEvent.cooldown_minutes) || 0);
-    if (cooldownMinutes <= 0) return;
-
-    const radius = Number(activeEvent.radius_meters) || 30;
-
-    // 현재 진입 가능한 이벤트 제휴처 중 하나라도 반경 내에 있는지 확인
-    const isInsideAnyPartner = visiblePartners.some((p) => {
-      const pLat = Number(p.latitude);
-      const pLon = Number(p.longitude);
-      if (!pLat || !pLon) return false;
-
-      const dist = getDistanceInMeters(currentGeo.latitude, currentGeo.longitude, pLat, pLon);
-      return dist <= radius;
-    });
-
-    if (isInsideAnyPartner) {
-      const storageKey = getEventCooldownKey(activeEvent.id);
-      const existingEndTime = localStorage.getItem(storageKey);
-
-      // 이미 진행 중인 타이머가 없을 때만 새로 시작
-      if (!existingEndTime || Number(existingEndTime) <= Date.now()) {
-        const targetEndTime = Date.now() + cooldownMinutes * 60_000;
-        localStorage.setItem(storageKey, String(targetEndTime));
-        setNowMs(Date.now());
-      }
-    }
-  }, [currentGeo, activeEvent, isDefaultTab, visiblePartners, getEventCooldownKey]);
 
   // 탭 진입 시 안내 팝업 노출 제어
   useEffect(() => {
@@ -246,7 +213,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     }
   }, [activeTabId, activeEvent, isDefaultTab, isGuest, getIntroConfirmedKey]);
 
-  // 안내 팝업 참여하기 클릭 시: 영구 완료 기록 및 팝업 닫기
   const handleConfirmStartEvent = useCallback(() => {
     if (!activeEvent) return;
 
@@ -257,7 +223,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     setShowIntroModal(false);
   }, [activeEvent, isGuest, userId, getIntroConfirmedKey]);
 
-  // 남은 쿨다운 시간 계산
+  // 남은 쿨다운 시간 계산 (해당 이벤트 전용)
   const currentPlaceCooldownRemainMs = useMemo(() => {
     if (isDefaultTab || !activeEvent) return 0;
 
@@ -356,6 +322,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
     if (stampedPlaceIds.has(partner.id)) return;
 
+    // 1. 쿨다운 시간 체크
     if (currentPlaceCooldownRemainMs > 0) {
       const remainText = formatCooldownRemain(currentPlaceCooldownRemainMs);
       setRewardModal({
@@ -370,9 +337,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       return;
     }
 
-    setBusy(true);
-    setMessage(null);
-
+    // 2. 실시간 GPS 거리 체크
     let geo = currentGeo;
     if (!geo?.latitude || !geo?.longitude) {
       try {
@@ -389,10 +354,35 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
           rewardImg: null,
           showGiftButton: false,
         });
-        setBusy(false);
         return;
       }
     }
+
+    const pLat = Number(props.partners.find((p) => String(p.id) === String(partner.id))?.latitude);
+    const pLon = Number(props.partners.find((p) => String(p.id) === String(partner.id))?.longitude);
+    const allowedRadius = Number(activeEvent.radius_meters) || 30;
+
+    if (pLat && pLon && geo) {
+      const realDist = getDistanceInMeters(geo.latitude, geo.longitude, pLat, pLon);
+      if (realDist > allowedRadius) {
+        const distDiff = Math.max(0, Math.round(realDist - allowedRadius));
+        setRewardModal({
+          kind: "distance",
+          title: "거리 확인 안내",
+          body: (config.distance_error_message || DEFAULT_DISTANCE_ERROR_MSG)
+            .replace(/\{distance\}/g, String(distDiff))
+            .replace(/\{radius\}/g, String(allowedRadius)),
+          banner: activeEvent.banner_img || null,
+          rewardName: null,
+          rewardImg: null,
+          showGiftButton: false,
+        });
+        return;
+      }
+    }
+
+    setBusy(true);
+    setMessage(null);
 
     try {
       const response = await fetch("/api/event/stamp-action", {
@@ -436,7 +426,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
         if (payload.distanceError) {
           const distanceVal = Math.round(payload.distanceMeters ?? 0);
-          const radiusVal = Math.round(payload.radiusMeters ?? 50);
+          const radiusVal = Math.round(payload.radiusMeters ?? allowedRadius);
           const bodyMsg = (config.distance_error_message || DEFAULT_DISTANCE_ERROR_MSG)
             .replace(/\{distance\}/g, String(distanceVal))
             .replace(/\{radius\}/g, String(radiusVal));
@@ -455,6 +445,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         throw new Error(payload.error || "도장을 찍지 못했습니다.");
       }
 
+      // 도장 성공 시 해당 이벤트에 쿨다운 시간 설정
       const cooldownMinutes = Math.max(0, Number(activeEvent.cooldown_minutes) || 0);
       if (cooldownMinutes > 0) {
         localStorage.setItem(getEventCooldownKey(activeEvent.id), String(Date.now() + cooldownMinutes * 60_000));
