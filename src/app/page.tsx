@@ -292,8 +292,40 @@ export default function HomePage() {
   );
   const [mainMapReady, setMainMapReady] = useState(false);
   const partnerListLayout = usePartnerListLayout(settings);
-  const { favoriteIds, favoriteCount, isFavorite, toggle: togglePartnerFavorite } =
+  
+  // 즐겨찾기 훅
+  const { favoriteIds, isFavorite, toggle: togglePartnerFavorite } =
     usePartnerFavorites();
+
+  // 🎯 1. 현재 존재하는 제휴처 ID Set
+  const validPartnerIdSet = useMemo(
+    () => new Set(partners.map((p) => String(p.id))),
+    [partners]
+  );
+
+  // 🎯 2. 실제 존재하는 제휴처만 남긴 유효 즐겨찾기 Set 및 카운트
+  const validFavoriteIds = useMemo(() => {
+    const valid = new Set<string>();
+    for (const id of favoriteIds) {
+      if (validPartnerIdSet.has(String(id))) {
+        valid.add(String(id));
+      }
+    }
+    return valid;
+  }, [favoriteIds, validPartnerIdSet]);
+
+  const validFavoriteCount = validFavoriteIds.size;
+
+  // 🎯 3. 삭제된 제휴처가 즐겨찾기에 남아있으면 자동 정리
+  useEffect(() => {
+    if (partners.length === 0 || favoriteIds.size === 0) return;
+    for (const id of favoriteIds) {
+      if (!validPartnerIdSet.has(String(id))) {
+        togglePartnerFavorite(id);
+      }
+    }
+  }, [partners.length, favoriteIds, validPartnerIdSet, togglePartnerFavorite]);
+
   const userBetaPrefs = useUserBetaSettings();
   const boardInlineEnabled = settings.board_inline_enabled ?? true;
   const boardAbovePartners = isBoardAbovePartners(
@@ -361,43 +393,21 @@ export default function HomePage() {
       return;
     }
 
-    // Service Worker 등록
     const registerServiceWorker = async () => {
       try {
         const existingRegistration = await navigator.serviceWorker.getRegistration();
         if (!existingRegistration) {
-          console.log("Service Worker 등록 시작...");
           const registration = await navigator.serviceWorker.register("/sw.js");
-          console.log("Service Worker 등록 완료:", registration.scope);
           await navigator.serviceWorker.ready;
-          console.log("Service Worker 활성화 완료");
-        } else {
-          console.log("기존 Service Worker 발견:", existingRegistration.scope);
         }
       } catch (error) {
         console.error("Service Worker 등록 실패:", error);
       }
     };
 
-    // 알림 권한 확인
-    const checkNotificationPermission = () => {
-      if ("Notification" in window) {
-        console.log("현재 알림 권한:", Notification.permission);
-        if (Notification.permission === "default") {
-          console.log("알림 권한 요청 가능 (사용자 동작 필요)");
-        } else if (Notification.permission === "denied") {
-          console.warn("알림 권한이 거부됨");
-        } else {
-          console.log("알림 권한이 허용됨");
-        }
-      } else {
-        console.warn("이 브라우저는 알림을 지원하지 않습니다");
-      }
-    };
-
     registerServiceWorker();
-    checkNotificationPermission();
   }, []);
+
   const visibleNavLinks = useMemo(() => {
     if (memberStudentLoggedIn) {
       return activeNavLinks;
@@ -522,7 +532,6 @@ export default function HomePage() {
       partner_categories: getPartnerCategories(data),
       partner_search_keyword_groups: getPartnerSearchKeywordGroups(data),
       site_nav_links: getSiteNavLinks(data),
-      // 공개 페이지에서는 시크릿 코드를 메모리에 두지 않음
       site_student_card_frames: toPublicCardFrames(
         resolveCardFrameCatalog(data.site_student_card_frames),
       ),
@@ -533,7 +542,6 @@ export default function HomePage() {
     }
     cacheSiteLoadingSettings(merged);
     cachePwaLoadingSettings(merged);
-    // 로딩 스플래시 중에도 바로 뒤로가기 종료 설정 적용 (settingsReady 전)
     syncSiteAppBackExitSettings({
       site_pwa_back_exit_enabled: merged.site_pwa_back_exit_enabled,
       site_pwa_back_exit_message: merged.site_pwa_back_exit_message,
@@ -720,6 +728,7 @@ export default function HomePage() {
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [applySiteSettings, loadPartners]);
 
+  // 🎯 Filter Context에 validFavoriteIds 전달
   const partnerListFilterContext = useMemo(
     (): PartnerListFilterContext => ({
       searchQuery,
@@ -731,7 +740,7 @@ export default function HomePage() {
       regionFilterEnabled,
       yearFilterEnabled,
       showFavoritesOnly,
-      favoriteIds,
+      favoriteIds: validFavoriteIds,
       partnerSort,
     }),
     [
@@ -744,7 +753,7 @@ export default function HomePage() {
       regionFilterEnabled,
       yearFilterEnabled,
       showFavoritesOnly,
-      favoriteIds,
+      validFavoriteIds,
       partnerSort,
     ],
   );
@@ -776,7 +785,6 @@ export default function HomePage() {
   }, []);
 
   const partnersPerPage = partnerListLayout.partnersPerPage;
-
   const totalPages = Math.max(1, Math.ceil(sortedPartners.length / partnersPerPage));
 
   const paginatedPartners = useMemo(() => {
@@ -1054,7 +1062,7 @@ export default function HomePage() {
           aria-pressed={showFavoritesOnly}
           aria-label={favoritesFilterAriaLabel(
             showFavoritesOnly,
-            favoriteCount,
+            validFavoriteCount,
             partnerFavoritesDisplay.label,
           )}
         >
@@ -1072,7 +1080,7 @@ export default function HomePage() {
             <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
           </svg>
           {partnerFavoritesDisplay.label}
-          {favoriteCount > 0 ? ` ${favoriteCount}` : ""}
+          {validFavoriteCount > 0 ? ` ${validFavoriteCount}` : ""}
         </button>
       ) : null}
       {showPartnerSort && (
@@ -1179,6 +1187,7 @@ export default function HomePage() {
     </section>
   ) : null;
 
+  // 🎯 지도 패널에 유효한 validFavoriteIds 전달
   const mainMapPanel =
     mainPartnerMapDisplay.enabled && !loading ? (
     <MapEventMapSection
@@ -1187,7 +1196,7 @@ export default function HomePage() {
       defaultExpanded={mainPartnerMapDisplay.defaultExpanded}
       onPartnerSelect={(partnerId) => setSelectedPartnerId(partnerId)}
       favoritesEnabled={partnerFavoritesEnabled}
-      favoritePartnerIds={favoriteIds}
+      favoritePartnerIds={validFavoriteIds}
       locateEnabled={settings.partner_map_locate_enabled ?? true}
       holdLoadingOverlay={pwaHoldMapLoading}
       onMapReady={handleMainMapReady}
@@ -1230,116 +1239,116 @@ export default function HomePage() {
 
   const partnerListToolbar = showPartnerListToolbar ? (
     <div className="partner-list-toolbar site-main-width mx-auto mb-4">
-            <div className="partner-list-toolbar__header flex flex-wrap items-start justify-between gap-3">
-              <div className="partner-list-toolbar__left flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-                {partnerListSummary ? (
-                  <p className="shrink-0 text-sm text-gray-500">{partnerListSummary}</p>
-                ) : (
-                  <span className="flex-1" aria-hidden />
-                )}
-              </div>
-              <div className="partner-list-toolbar__right ml-auto flex flex-col items-end gap-2">
-                {yearFilterEnabled && yearOptions.length > 0 ? (
-                  <PartnerYearFilterDropdown
-                    value={selectedYear}
-                    years={yearOptions}
-                    onChange={(year) => {
-                      setSelectedYear(year);
-                      setCurrentPage(1);
-                    }}
-                  />
-                ) : null}
-              </div>
+      <div className="partner-list-toolbar__header flex flex-wrap items-start justify-between gap-3">
+        <div className="partner-list-toolbar__left flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+          {partnerListSummary ? (
+            <p className="shrink-0 text-sm text-gray-500">{partnerListSummary}</p>
+          ) : (
+            <span className="flex-1" aria-hidden />
+          )}
+        </div>
+        <div className="partner-list-toolbar__right ml-auto flex flex-col items-end gap-2">
+          {yearFilterEnabled && yearOptions.length > 0 ? (
+            <PartnerYearFilterDropdown
+              value={selectedYear}
+              years={yearOptions}
+              onChange={(year) => {
+                setSelectedYear(year);
+                setCurrentPage(1);
+              }}
+            />
+          ) : null}
+        </div>
+      </div>
+      {showToolbarSearch || partnerSortControls ? (
+        <div
+          className={[
+            "partner-list-toolbar__controls-row",
+            isCompactNavViewport ? "partner-list-toolbar__controls-row--mobile-search" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+        >
+          {showToolbarSearch ? (
+            <div
+              className={[
+                "partner-list-toolbar__search-wrap",
+                isCompactNavViewport ? "partner-list-toolbar__search-wrap--mobile" : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+            >
+              <SitePartnerSearch
+                showLeadingIcon={!isCompactNavViewport}
+                iconAside={isCompactNavViewport}
+                searchQuery={searchQuery}
+                onSearchQueryChange={setSearchQuery}
+                placeholder={navSearchPlaceholder}
+                inputId={
+                  isCompactNavViewport
+                    ? "partner-list-search-mobile"
+                    : "partner-list-search"
+                }
+                inputClassName="site-top-nav__search partner-list-toolbar__search"
+              />
             </div>
-            {showToolbarSearch || partnerSortControls ? (
-              <div
-                className={[
-                  "partner-list-toolbar__controls-row",
-                  isCompactNavViewport ? "partner-list-toolbar__controls-row--mobile-search" : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-              >
-                {showToolbarSearch ? (
-                  <div
-                    className={[
-                      "partner-list-toolbar__search-wrap",
-                      isCompactNavViewport ? "partner-list-toolbar__search-wrap--mobile" : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                  >
-                    <SitePartnerSearch
-                      showLeadingIcon={!isCompactNavViewport}
-                      iconAside={isCompactNavViewport}
-                      searchQuery={searchQuery}
-                      onSearchQueryChange={setSearchQuery}
-                      placeholder={navSearchPlaceholder}
-                      inputId={
-                        isCompactNavViewport
-                          ? "partner-list-search-mobile"
-                          : "partner-list-search"
-                      }
-                      inputClassName="site-top-nav__search partner-list-toolbar__search"
-                    />
-                  </div>
-                ) : null}
-                {partnerSortControls ? (
-                  <div className="partner-list-toolbar__sort flex flex-wrap items-center justify-end gap-2">
-                    {partnerSortControls}
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
-        ) : null;
+          ) : null}
+          {partnerSortControls ? (
+            <div className="partner-list-toolbar__sort flex flex-wrap items-center justify-end gap-2">
+              {partnerSortControls}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  ) : null;
 
   const partnerListBody = loading ? (
-          <LoadingStateDisplay
-            message={getPartnersLoadingMessage(settings)}
-            imageUrl={getPartnersLoadingImageUrl(settings)}
-          />
-        ) : sortedPartners.length === 0 ? (
-          <div className="site-main-width mx-auto rounded-2xl bg-white p-8 text-center text-gray-500 shadow-sm">
-            {showFavoritesOnly
-              ? partnerFavoritesDisplay.emptyMessage
-              : "조건에 맞는 제휴 업체가 없습니다."}
-          </div>
-        ) : (
-          <>
-            <PartnerPostGrid
-              partners={paginatedPartners}
-              gridColumns={partnerListLayout.gridColumns}
-              benefitMinHeightMobile={partnerListLayout.benefitMinHeightMobile}
-              benefitMinHeightDesktop={partnerListLayout.benefitMinHeightDesktop}
-              benefitBoxBgColor={settings.partner_benefit_box_bg_color}
-              benefitBoxBorderColor={settings.partner_benefit_box_border_color}
-              businessInfoDefaultExpanded={settings.partner_business_info_default_expanded ?? false}
-              reactionsEnabled={partnerReactionsEnabled}
-              reviewsEnabled={partnerReviewsEnabled}
-              hiddenReviewDisplay={hiddenReviewDisplay}
-              detailEnabled={detailPopupEnabled}
-              localFranchiseByPartnerId={localFranchiseByPartnerId}
-              onPartnerSelect={detailPopupEnabled ? setSelectedPartnerId : undefined}
-              onPartnerReactionChange={handlePartnerReactionChange}
-              onPartnerReviewCountChange={handlePartnerReviewCountChange}
-              favoritesEnabled={partnerFavoritesEnabled}
-              favoritesTerm={partnerFavoritesDisplay.label}
-              isPartnerFavorite={isFavorite}
-              onPartnerFavoriteToggle={togglePartnerFavorite}
-              reportReasons={reportReasons}
-              reportSuccessSettings={settings}
+    <LoadingStateDisplay
+      message={getPartnersLoadingMessage(settings)}
+      imageUrl={getPartnersLoadingImageUrl(settings)}
+    />
+  ) : sortedPartners.length === 0 ? (
+    <div className="site-main-width mx-auto rounded-2xl bg-white p-8 text-center text-gray-500 shadow-sm">
+      {showFavoritesOnly
+        ? partnerFavoritesDisplay.emptyMessage
+        : "조건에 맞는 제휴 업체가 없습니다."}
+    </div>
+  ) : (
+    <>
+      <PartnerPostGrid
+        partners={paginatedPartners}
+        gridColumns={partnerListLayout.gridColumns}
+        benefitMinHeightMobile={partnerListLayout.benefitMinHeightMobile}
+        benefitMinHeightDesktop={partnerListLayout.benefitMinHeightDesktop}
+        benefitBoxBgColor={settings.partner_benefit_box_bg_color}
+        benefitBoxBorderColor={settings.partner_benefit_box_border_color}
+        businessInfoDefaultExpanded={settings.partner_business_info_default_expanded ?? false}
+        reactionsEnabled={partnerReactionsEnabled}
+        reviewsEnabled={partnerReviewsEnabled}
+        hiddenReviewDisplay={hiddenReviewDisplay}
+        detailEnabled={detailPopupEnabled}
+        localFranchiseByPartnerId={localFranchiseByPartnerId}
+        onPartnerSelect={detailPopupEnabled ? setSelectedPartnerId : undefined}
+        onPartnerReactionChange={handlePartnerReactionChange}
+        onPartnerReviewCountChange={handlePartnerReviewCountChange}
+        favoritesEnabled={partnerFavoritesEnabled}
+        favoritesTerm={partnerFavoritesDisplay.label}
+        isPartnerFavorite={isFavorite}
+        onPartnerFavoriteToggle={togglePartnerFavorite}
+        reportReasons={reportReasons}
+        reportSuccessSettings={settings}
         selectedPartnerId={detailPopupEnabled ? selectedPartnerId : null}
       />
       <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={setCurrentPage}
-              scrollTargetId={
-                settings.pagination_scroll_top_enabled ?? true
-                  ? "partner-list-anchor"
-                  : undefined
-              }
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
+        scrollTargetId={
+          settings.pagination_scroll_top_enabled ?? true
+            ? "partner-list-anchor"
+            : undefined
+        }
       />
     </>
   );
