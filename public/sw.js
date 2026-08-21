@@ -1,5 +1,5 @@
 const CACHE_NAME = "jeju-halla-pwa-v1";
-const urlsToCache = ["/", "/icons/icon-192x192.png", "/favicon.ico"];
+const urlsToCache = ["/"];
 
 // Service Worker 설치
 self.addEventListener("install", (event) => {
