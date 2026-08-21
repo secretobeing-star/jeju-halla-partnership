@@ -11,6 +11,7 @@ import {
   DEFAULT_STAMP_BTN_LABEL,
   DEFAULT_TAB_NAME_KEY,
   EVENT_STAMP_BTN_LABEL_KEY,
+  STAMP_BUTTON_LABEL_KEY,
   type MapAppConfig,
 } from "@/lib/map-events";
 
@@ -23,20 +24,34 @@ export async function GET() {
     );
   }
 
-  const { data, error } = await admin.from("app_configs").select("key, value");
-  if (error) {
+  const { data: appConfigs, error: appConfigError } = await admin.from("app_configs").select("key, value");
+  if (appConfigError) {
     return NextResponse.json(
       {
         error:
-          error.message.includes("app_configs")
+          appConfigError.message.includes("app_configs")
             ? "app_configs 테이블이 없습니다. supabase/map-events.sql 을 실행해 주세요."
-            : error.message,
+            : appConfigError.message,
       },
       { status: 500 },
     );
   }
 
-  return NextResponse.json({ config: configFromRows(data ?? []) });
+  // site_settings에서 stamp_button_label 가져오기
+  const { data: siteSettings, error: siteSettingsError } = await admin
+    .from("site_settings")
+    .select("stamp_button_label")
+    .eq("id", 1)
+    .maybeSingle();
+
+  if (siteSettingsError) {
+    // site_settings 에러는 무시하고 기본값 사용
+    console.warn("site_settings 조회 실패:", siteSettingsError.message);
+  }
+
+  const config = configFromRows(appConfigs ?? [], siteSettings?.stamp_button_label);
+
+  return NextResponse.json({ config });
 }
 
 export async function PUT(request: NextRequest) {
@@ -54,9 +69,9 @@ export async function PUT(request: NextRequest) {
     );
   }
 
-  let body: Partial<MapAppConfig>;
+  let body: Partial<MapAppConfig & { stamp_button_label?: string }>;
   try {
-    body = (await request.json()) as Partial<MapAppConfig>;
+    body = (await request.json()) as Partial<MapAppConfig & { stamp_button_label?: string }>;
   } catch {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
@@ -65,8 +80,10 @@ export async function PUT(request: NextRequest) {
   const marker = body.default_map_marker_img?.trim() || "";
   const benefit = body.default_benefit_btn_label?.trim() || DEFAULT_BENEFIT_BTN_LABEL;
   const stamp = body.event_stamp_btn_label?.trim() || DEFAULT_STAMP_BTN_LABEL;
+  const customStampLabel = body.stamp_button_label?.trim() || DEFAULT_STAMP_BTN_LABEL;
   const now = new Date().toISOString();
-  const rows = [
+  
+  const appConfigRows = [
     { key: DEFAULT_MAP_TAB_NAME_KEY, value: tab, updated_at: now },
     { key: DEFAULT_TAB_NAME_KEY, value: tab, updated_at: now },
     { key: DEFAULT_MAP_MARKER_IMG_KEY, value: marker, updated_at: now },
@@ -75,9 +92,19 @@ export async function PUT(request: NextRequest) {
     { key: EVENT_STAMP_BTN_LABEL_KEY, value: stamp, updated_at: now },
   ];
 
-  const { error } = await admin.from("app_configs").upsert(rows, { onConflict: "key" });
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  const { error: appConfigError } = await admin.from("app_configs").upsert(appConfigRows, { onConflict: "key" });
+  if (appConfigError) {
+    return NextResponse.json({ error: appConfigError.message }, { status: 500 });
+  }
+
+  // site_settings에 stamp_button_label 업데이트
+  const { error: siteSettingsError } = await admin
+    .from("site_settings")
+    .update({ stamp_button_label: customStampLabel })
+    .eq("id", 1);
+
+  if (siteSettingsError) {
+    return NextResponse.json({ error: siteSettingsError.message }, { status: 500 });
   }
 
   return NextResponse.json({
@@ -87,6 +114,7 @@ export async function PUT(request: NextRequest) {
       default_map_marker_img: marker,
       default_benefit_btn_label: benefit,
       event_stamp_btn_label: stamp,
-    } satisfies MapAppConfig,
+      stamp_button_label: customStampLabel,
+    } satisfies MapAppConfig & { stamp_button_label?: string },
   });
 }

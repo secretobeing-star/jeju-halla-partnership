@@ -4,6 +4,7 @@ export const DEFAULT_TAB_NAME_KEY = "default_tab_name";
 export const DEFAULT_MARKER_IMG_KEY = "default_marker_img";
 export const DEFAULT_BENEFIT_BTN_LABEL_KEY = "default_benefit_btn_label";
 export const EVENT_STAMP_BTN_LABEL_KEY = "event_stamp_btn_label";
+export const STAMP_BUTTON_LABEL_KEY = "stamp_button_label";
 
 export const DEFAULT_MAP_TAB_NAME = "🌿 제휴처";
 export const DEFAULT_BENEFIT_BTN_LABEL = "자세히 보기";
@@ -21,6 +22,7 @@ export type MapAppConfig = {
   default_map_marker_img: string;
   default_benefit_btn_label: string;
   event_stamp_btn_label?: string;
+  stamp_button_label?: string;
 };
 
 export type MapEvent = {
@@ -231,7 +233,10 @@ export function completionRewardsOf(event: Pick<MapEvent, "rewards">) {
   return (event.rewards ?? []).filter((reward) => reward.reward_type === "COMPLETION");
 }
 
-export function configFromRows(rows: Array<{ key?: string; value?: string | null }>): MapAppConfig {
+export function configFromRows(
+  rows: Array<{ key?: string; value?: string | null }>,
+  stampButtonLabel?: string | null
+): MapAppConfig {
   const map = new Map(rows.map((row) => [row.key ?? "", row.value ?? ""]));
   const tab =
     map.get(DEFAULT_TAB_NAME_KEY)?.trim() ||
@@ -241,12 +246,18 @@ export function configFromRows(rows: Array<{ key?: string; value?: string | null
     map.get(DEFAULT_MARKER_IMG_KEY)?.trim() ||
     map.get(DEFAULT_MAP_MARKER_IMG_KEY)?.trim() ||
     "";
+  
+  // site_settings의 stamp_button_label 우선, 그 다음 app_configs의 event_stamp_btn_label 사용
+  const stampLabel = stampButtonLabel?.trim() || 
+                    map.get(EVENT_STAMP_BTN_LABEL_KEY)?.trim() || 
+                    DEFAULT_STAMP_BTN_LABEL;
+  
   return {
     default_map_tab_name: tab,
     default_map_marker_img: marker,
     default_benefit_btn_label:
       map.get(DEFAULT_BENEFIT_BTN_LABEL_KEY)?.trim() || DEFAULT_BENEFIT_BTN_LABEL,
-    event_stamp_btn_label:
-      map.get(EVENT_STAMP_BTN_LABEL_KEY)?.trim() || DEFAULT_STAMP_BTN_LABEL,
+    event_stamp_btn_label: stampLabel,
+    stamp_button_label: stampLabel,
   };
 }

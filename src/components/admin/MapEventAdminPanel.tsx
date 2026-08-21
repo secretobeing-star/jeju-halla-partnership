@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import AdminCollapsibleSection from "@/components/admin/AdminCollapsibleSection";
+import RichTextEditor from "@/components/RichTextEditor";
 import { adminApiFetch } from "@/lib/admin-api";
 import {
   DEFAULT_BENEFIT_BTN_LABEL,
@@ -191,11 +192,12 @@ function ImageField({
 }
 
 export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProps) {
-  const [config, setConfig] = useState<MapAppConfig>({
+  const [config, setConfig] = useState<MapAppConfig & { stamp_button_label?: string }>({
     default_map_tab_name: DEFAULT_MAP_TAB_NAME,
     default_map_marker_img: "",
     default_benefit_btn_label: DEFAULT_BENEFIT_BTN_LABEL,
     event_stamp_btn_label: DEFAULT_STAMP_BTN_LABEL,
+    stamp_button_label: DEFAULT_STAMP_BTN_LABEL,
   });
   const [events, setEvents] = useState<MapEvent[]>([]);
   const [partners, setPartners] = useState<Partner[]>([]);
@@ -480,6 +482,20 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
               className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
             />
           </label>
+          <label className="block text-sm font-medium text-gray-700">
+            도장 찍기 버튼 라벨 (전역 설정)
+            <input
+              value={config.stamp_button_label || ""}
+              onChange={(e) =>
+                setConfig((prev) => ({ ...prev, stamp_button_label: e.target.value }))
+              }
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+              placeholder="도장 찍기"
+            />
+            <span className="mt-1 block text-xs font-normal text-gray-500">
+              이벤트별 설정이 없을 때 사용되는 기본 도장 찍기 버튼 라벨입니다.
+            </span>
+          </label>
         </div>
         <button
           type="button"
@@ -592,12 +608,11 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
           <div className="grid gap-4 sm:grid-cols-2 items-start">
             <label className="text-sm font-medium text-gray-700">
               설명
-              <textarea
-                rows={3}
+              <RichTextEditor
                 value={form.description}
-                onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                onChange={(html) => setForm((prev) => ({ ...prev, description: html }))}
                 placeholder="이벤트 안내 상세 문구를 입력하세요."
+                minHeightClassName="min-h-32"
               />
             </label>
             <ImageField

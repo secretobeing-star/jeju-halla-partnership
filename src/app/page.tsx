@@ -354,6 +354,50 @@ export default function HomePage() {
       window.removeEventListener("focus", syncMemberLogin);
     };
   }, []);
+
+  // Service Worker 등록 및 알림 권한 확인
+  useEffect(() => {
+    if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
+      return;
+    }
+
+    // Service Worker 등록
+    const registerServiceWorker = async () => {
+      try {
+        const existingRegistration = await navigator.serviceWorker.getRegistration();
+        if (!existingRegistration) {
+          console.log("Service Worker 등록 시작...");
+          const registration = await navigator.serviceWorker.register("/sw.js");
+          console.log("Service Worker 등록 완료:", registration.scope);
+          await navigator.serviceWorker.ready;
+          console.log("Service Worker 활성화 완료");
+        } else {
+          console.log("기존 Service Worker 발견:", existingRegistration.scope);
+        }
+      } catch (error) {
+        console.error("Service Worker 등록 실패:", error);
+      }
+    };
+
+    // 알림 권한 확인
+    const checkNotificationPermission = () => {
+      if ("Notification" in window) {
+        console.log("현재 알림 권한:", Notification.permission);
+        if (Notification.permission === "default") {
+          console.log("알림 권한 요청 가능 (사용자 동작 필요)");
+        } else if (Notification.permission === "denied") {
+          console.warn("알림 권한이 거부됨");
+        } else {
+          console.log("알림 권한이 허용됨");
+        }
+      } else {
+        console.warn("이 브라우저는 알림을 지원하지 않습니다");
+      }
+    };
+
+    registerServiceWorker();
+    checkNotificationPermission();
+  }, []);
   const visibleNavLinks = useMemo(() => {
     if (memberStudentLoggedIn) {
       return activeNavLinks;
