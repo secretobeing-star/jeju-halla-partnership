@@ -124,6 +124,3 @@ export async function sendWebPushNotification(
 
   return { sent, failed, skipped: false };
 }
-```[cite: 4, 5]
-
-이렇게 코드만 깔끔하게 넣으시면 빌드 에러 없이 정상적으로 배포될 겁니다!
