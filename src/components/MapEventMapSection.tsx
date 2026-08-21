@@ -153,17 +153,11 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return () => window.clearInterval(timer);
   }, []);
 
-  // 🎯 전체 탭일 때는 즐겨찾기 목록만 남기고 노출 (즐겨찾기 ID가 있을 경우)
   const visiblePartners = useMemo(() => {
     const raw = props.partners || [];
     if (raw.length === 0) return [];
-    
-    // 전체 탭인 경우: 전체 제휴처 전달 (즐겨찾기는 부모 패널의 favoriteIds가 필터링 처리)
-    if (isDefaultTab || !activeEvent) {
-      return raw;
-    }
+    if (isDefaultTab || !activeEvent) return raw;
 
-    // 이벤트 탭인 경우: 이벤트에 할당된 제휴처만 필터링
     const allowed = (activeEvent.partner_ids ?? []).map(String);
     if (allowed.length > 0) {
       const filtered = raw.filter((p) => allowed.includes(String(p.id)));
@@ -227,7 +221,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return null;
   }, [isDefaultTab, activeEvent, currentGeo, visiblePartners, stampedPlaceIds]);
 
-  // 반경 내 진입 시 타이머 세팅 (다른 탭 다녀와도 유지되도록 처리)
+  // 반경 내 진입 시 타이머 세팅 (이벤트 탭 전용)
   useEffect(() => {
     if (isDefaultTab || !activeEvent) return;
 
@@ -246,7 +240,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     }
   }, [activeEvent, isDefaultTab, nearestUnstampedPartnerInside, getEventCooldownKey]);
 
-  // 탭 전환 시 상태 유지 (기존 타이머를 지우지 않고 각 이벤트마다 독립 보존)
+  // 탭 전환 핸들러
   const handleTabChange = (nextTabId: string) => {
     if (activeTabId === nextTabId) return;
 
@@ -284,7 +278,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     setShowIntroModal(false);
   }, [activeEvent, isGuest, userId, getIntroConfirmedKey]);
 
-  // 이벤트별 잔여 쿨다운 계산
+  // 🎯 전체 탭일 경우 남은 시간 계산을 무조건 0으로 반환하여 배지 및 타이머 완전 차단
   const currentPlaceCooldownRemainMs = useMemo(() => {
     if (isDefaultTab || !activeEvent || !nearestUnstampedPartnerInside) return 0;
 
@@ -310,7 +304,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
   const isCooldownOver = hasTimerKey && currentPlaceCooldownRemainMs === 0;
   const isZeroCooldownEvent = Number(activeEvent?.cooldown_minutes || 0) <= 0;
-  // 🎯 다른 탭 다녀와도 반경 내에 있고 시간이 끝났다면 도장 가능 상태 유지
   const isReadyToStamp = !isDefaultTab && Boolean(nearestUnstampedPartnerInside) && (isCooldownOver || isZeroCooldownEvent);
 
   const loadPublic = useCallback(async () => {
@@ -530,6 +523,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const completionPreview = activeEvent ? completionRewardsOf(activeEvent)[0] : null;
   const completionBadgeSrc = activeEvent?.completion_badge_img?.trim() || completionPreview?.reward_img || null;
 
+  // 🎯 전체 탭(!isDefaultTab)이 아닐 때만 도장찍기 기능을 완전히 활성화
   const isStampFeatureActive = !isDefaultTab && Boolean(activeEvent) && isEventLive(activeEvent!) && !isCompleted;
 
   const timerTemplate = config.cooldown_timer_template || DEFAULT_TIMER_TEMPLATE;
@@ -615,7 +609,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
       <div style={{ position: "relative", width: "100%", overflow: "visible" }}>
         
-        {/* 🎯 '전체' 탭(isDefaultTab)에서는 시간이 절대로 뜨지 않으며, 이벤트 탭에서 반경 내에 있을 때만 배지 노출 */}
+        {/* 🎯 '전체' 탭(isDefaultTab)이 아니고, 이벤트 탭에서 반경 내에 있을 때만 플로팅 배지 노출 */}
         {!isDefaultTab && activeEvent && !isCompleted && !rewardModal && !showIntroModal && nearestUnstampedPartnerInside && (
           currentPlaceCooldownRemainMs > 0 ? (
             <div
@@ -669,6 +663,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
           ) : null
         )}
 
+        {/* 🎯 전체 탭일 때는 stampAction을 undefined로 전달하여 도장찍기 버튼을 완전 제거하고 즐겨찾기/상세보기만 활성화 */}
         <PartnerMainMapPanel
           key={activeTabId}
           {...props}
@@ -730,27 +725,120 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         onConfirm={handleConfirmStartEvent}
       />
 
-      {/* 🎯 보상 / 안내 팝업 모달 */}
+      {/* 🎯 팝업 모달 */}
       {rewardModal ? (
-        <div className="map-event-modal" role="dialog" aria-modal="true" style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.5)" }}>
-          <div className="map-event-modal__card" style={{ background: "#fff", borderRadius: "16px", padding: "20px", maxWidth: "340px", width: "90%", textAlign: "center" }}>
-            {rewardModal.banner ? <img src={rewardModal.banner} alt="" className="map-event-modal__banner" style={{ width: "100%", borderRadius: "8px", marginBottom: "12px" }} /> : null}
-            <h3 className="map-event-modal__title" style={{ fontSize: "18px", fontWeight: "700", marginBottom: "8px" }}>{rewardModal.title}</h3>
-            <p className="map-event-modal__body" style={{ whiteSpace: "pre-line", fontSize: "14px", color: "#4b5563", marginBottom: "12px" }}>{rewardModal.body}</p>
-            {rewardModal.rewardImg ? <img src={rewardModal.rewardImg} alt="" className="map-event-modal__reward-img" style={{ width: "80px", height: "80px", margin: "0 auto 12px", objectFit: "contain" }} /> : null}
-            {rewardModal.rewardName ? <p className="map-event-modal__reward" style={{ fontSize: "15px", fontWeight: "600", color: "#059669", marginBottom: "12px" }}>{rewardModal.rewardName}</p> : null}
+        <div
+          className="map-event-modal"
+          role="dialog"
+          aria-modal="true"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 9999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: "rgba(0,0,0,0.5)",
+            backdropFilter: "blur(2px)",
+          }}
+        >
+          <div
+            className="map-event-modal__card"
+            style={{
+              background: "#fff",
+              borderRadius: "16px",
+              padding: "20px",
+              maxWidth: "340px",
+              width: "90%",
+              textAlign: "center",
+              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.2)",
+            }}
+          >
+            {rewardModal.banner ? (
+              <img
+                src={rewardModal.banner}
+                alt=""
+                className="map-event-modal__banner"
+                style={{ width: "100%", borderRadius: "8px", marginBottom: "12px" }}
+              />
+            ) : null}
+            <h3
+              className="map-event-modal__title"
+              style={{ fontSize: "18px", fontWeight: "700", marginBottom: "8px", color: "#111827" }}
+            >
+              {rewardModal.title}
+            </h3>
+            <p
+              className="map-event-modal__body"
+              style={{ whiteSpace: "pre-line", fontSize: "14px", color: "#4b5563", marginBottom: "12px", lineHeight: 1.5 }}
+            >
+              {rewardModal.body}
+            </p>
+            {rewardModal.rewardImg ? (
+              <img
+                src={rewardModal.rewardImg}
+                alt=""
+                className="map-event-modal__reward-img"
+                style={{ width: "80px", height: "80px", margin: "0 auto 12px", objectFit: "contain" }}
+              />
+            ) : null}
+            {rewardModal.rewardName ? (
+              <p
+                className="map-event-modal__reward"
+                style={{ fontSize: "15px", fontWeight: "600", color: "#059669", marginBottom: "12px" }}
+              >
+                {rewardModal.rewardName}
+              </p>
+            ) : null}
 
             {rewardModal.kind === "login_required" ? (
               <div style={{ display: "flex", gap: "8px", marginTop: "12px", width: "100%" }}>
-                <button type="button" className="map-event-modal__btn" style={{ background: "#6b7280", flex: 1, padding: "10px", borderRadius: "8px", color: "#fff", fontWeight: "600" }} onClick={() => setRewardModal(null)}>닫기</button>
-                <button type="button" className="map-event-modal__btn" style={{ background: "#059669", flex: 1.2, padding: "10px", borderRadius: "8px", color: "#fff", fontWeight: "600" }} onClick={() => { setRewardModal(null); window.dispatchEvent(new Event(SITE_STUDENT_NEED_LOGIN_EVENT)); }}>로그인하기</button>
+                <button
+                  type="button"
+                  className="map-event-modal__btn"
+                  style={{ background: "#6b7280", flex: 1, padding: "10px", borderRadius: "8px", color: "#fff", fontWeight: "600" }}
+                  onClick={() => setRewardModal(null)}
+                >
+                  닫기
+                </button>
+                <button
+                  type="button"
+                  className="map-event-modal__btn"
+                  style={{ background: "#059669", flex: 1.2, padding: "10px", borderRadius: "8px", color: "#fff", fontWeight: "600" }}
+                  onClick={() => {
+                    setRewardModal(null);
+                    window.dispatchEvent(new Event(SITE_STUDENT_NEED_LOGIN_EVENT));
+                  }}
+                >
+                  로그인하기
+                </button>
               </div>
             ) : (
               <div style={{ display: "flex", gap: "8px", marginTop: "12px", width: "100%" }}>
                 {rewardModal.showGiftButton ? (
-                  <button type="button" className="map-event-modal__btn" style={{ background: "#059669", flex: 1, padding: "10px", borderRadius: "8px", color: "#fff", fontWeight: "600" }} onClick={() => { setRewardModal(null); window.dispatchEvent(new Event("site-gift-inbox-open")); }}>선물함 열기</button>
+                  <button
+                    type="button"
+                    className="map-event-modal__btn"
+                    style={{ background: "#059669", flex: 1, padding: "10px", borderRadius: "8px", color: "#fff", fontWeight: "600" }}
+                    onClick={() => {
+                      setRewardModal(null);
+                      window.dispatchEvent(new Event("site-gift-inbox-open"));
+                    }}
+                  >
+                    선물함 열기
+                  </button>
                 ) : null}
-                <button type="button" className="map-event-modal__btn" style={{ background: "#6b7280", flex: 1, padding: "10px", borderRadius: "8px", color: "#fff", fontWeight: "600" }} onClick={() => { setRewardModal(null); void handleFullRefresh(); }}>확인</button>
+                <button
+                  type="button"
+                  className="map-event-modal__btn"
+                  style={{ background: "#6b7280", flex: 1, padding: "10px", borderRadius: "8px", color: "#fff", fontWeight: "600" }}
+                  onClick={() => {
+                    setRewardModal(null);
+                    void handleFullRefresh();
+                  }}
+                >
+                  확인
+                </button>
               </div>
             )}
           </div>
