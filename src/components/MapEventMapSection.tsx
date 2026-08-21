@@ -9,7 +9,6 @@ import {
   completionRewardsOf,
   formatCooldownRemain,
   isEventLive,
-  remainingCooldownMs,
   type MapAppConfig,
   type MapEvent,
   type MapEventReward,
@@ -159,7 +158,10 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const [rewardModal, setRewardModal] = useState<RewardModalState | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
 
-  const [localLastStampedAt, setLocalLastStampedAt] = useState<string | null>(null);
+  // 제휴처별 진입/도장 시각 맵
+  const [placeEnteredAtMap, setPlaceEnteredAtMap] = useState<Record<string, string>>({});
+  const [activeNearbyPlaceId, setActiveNearbyPlaceId] = useState<string | null>(null);
+
   const lastKnownGeoRef = useRef<{ latitude: number; longitude: number } | null>(null);
 
   const refreshLocationCache = useCallback(() => {
@@ -197,27 +199,63 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return () => window.clearInterval(timer);
   }, []);
 
-  const cooldownRemainMs = useMemo(() => {
-    if (!activeEvent) return 0;
+  // 마커 데이터 원본 보존
+  const visiblePartners = useMemo(() => {
+    const allowed = activeEvent?.partner_ids ?? [];
+    if (activeEvent && allowed.length > 0) {
+      return props.partners.filter((partner) => allowed.includes(partner.id));
+    }
+    return props.partners;
+  }, [activeEvent, props.partners]);
 
-    const progressLastMs = progress?.last_stamped_at
-      ? new Date(progress.last_stamped_at).getTime()
-      : 0;
+  // 실시간 GPS 감지: 제휴처 A -> B 이동 시 A 타이머 취소 및 B 진입 시각 등록
+  useEffect(() => {
+    if (!lastKnownGeoRef.current || visiblePartners.length === 0) return;
 
-    const localLastMs = localLastStampedAt
-      ? new Date(localLastStampedAt).getTime()
-      : 0;
+    const currentLat = lastKnownGeoRef.current.latitude;
+    const currentLng = lastKnownGeoRef.current.longitude;
+    const radius = activeEvent?.radius_meters || 50;
 
-    const latestLastStampedAtMs = Math.max(progressLastMs, localLastMs);
+    const nearby = visiblePartners.find((partner) => {
+      if (!partner.latitude || !partner.longitude) return false;
+      const dLat = ((partner.latitude - currentLat) * Math.PI) / 180;
+      const dLng = ((partner.longitude - currentLng) * Math.PI) / 180;
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos((currentLat * Math.PI) / 180) *
+          Math.cos((partner.latitude * Math.PI) / 180) *
+          Math.sin(dLng / 2) *
+          Math.sin(dLng / 2);
+      const d = 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return d <= radius;
+    });
 
-    if (!latestLastStampedAtMs) return 0;
+    if (nearby) {
+      if (activeNearbyPlaceId !== nearby.id) {
+        setActiveNearbyPlaceId(nearby.id);
+        setPlaceEnteredAtMap((prev) => ({
+          ...prev,
+          [nearby.id]: prev[nearby.id] || new Date().toISOString(),
+        }));
+      }
+    } else {
+      setActiveNearbyPlaceId(null);
+    }
+  }, [nowMs, activeEvent, visiblePartners, activeNearbyPlaceId]);
 
-    return remainingCooldownMs(
-      new Date(latestLastStampedAtMs).toISOString(),
-      activeEvent.cooldown_minutes ?? 0,
-      nowMs,
-    );
-  }, [activeEvent, progress?.last_stamped_at, localLastStampedAt, nowMs]);
+  // 현재 제휴처의 쿨다운 계산
+  const currentPlaceCooldownRemainMs = useMemo(() => {
+    if (!activeEvent || !activeNearbyPlaceId) return 0;
+
+    const cooldownMinutes = Math.max(0, Number(activeEvent.cooldown_minutes) || 0);
+    if (cooldownMinutes <= 0) return 0;
+
+    const enteredAt = placeEnteredAtMap[activeNearbyPlaceId];
+    if (!enteredAt) return 0;
+
+    const enteredMs = Date.parse(enteredAt);
+    return Math.max(0, enteredMs + cooldownMinutes * 60_000 - nowMs);
+  }, [activeEvent, activeNearbyPlaceId, placeEnteredAtMap, nowMs]);
 
   useEffect(() => {
     if (activeTabId === DEFAULT_TAB_ID) return;
@@ -304,15 +342,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return () => window.removeEventListener("site-stamp-progress-changed", onStampChanged);
   }, [loadProgress]);
 
-  // [롤백 완료] 원래대로 제휴처 목록 원본을 보존하여 전달 (마커와 상단 하트가 그대로 복구됨)
-  const visiblePartners = useMemo(() => {
-    const allowed = activeEvent?.partner_ids ?? [];
-    if (activeEvent && allowed.length > 0) {
-      return props.partners.filter((partner) => allowed.includes(partner.id));
-    }
-    return props.partners;
-  }, [activeEvent, props.partners]);
-
   const stampedPlaceIds = useMemo(
     () => new Set(progress?.stamped_places ?? []),
     [progress],
@@ -364,26 +393,15 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
     if (stampedPlaceIds.has(partner.id)) return;
 
-    const progressLastMs = progress?.last_stamped_at
-      ? new Date(progress.last_stamped_at).getTime()
+    // 해당 제휴처의 쿨다운 검증
+    const cooldownMinutes = Math.max(0, Number(activeEvent.cooldown_minutes) || 0);
+    const enteredAt = placeEnteredAtMap[partner.id];
+    const currentPlaceCooldown = (cooldownMinutes > 0 && enteredAt)
+      ? Math.max(0, Date.parse(enteredAt) + cooldownMinutes * 60_000 - Date.now())
       : 0;
 
-    const localLastMs = localLastStampedAt
-      ? new Date(localLastStampedAt).getTime()
-      : 0;
-
-    const latestLastStampedAtMs = Math.max(progressLastMs, localLastMs);
-
-    const currentRealtimeCooldown = latestLastStampedAtMs
-      ? remainingCooldownMs(
-          new Date(latestLastStampedAtMs).toISOString(),
-          activeEvent.cooldown_minutes ?? 0,
-          Date.now(),
-        )
-      : 0;
-
-    if (currentRealtimeCooldown > 0) {
-      const remainText = formatCooldownRemain(currentRealtimeCooldown);
+    if (currentPlaceCooldown > 0) {
+      const remainText = formatCooldownRemain(currentPlaceCooldown);
       const customTitle =
         activeEvent.cooldown_popup_title?.trim() ||
         activeEvent.cooldown_title?.trim() ||
@@ -525,21 +543,14 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         throw new Error(payload.error || "도장을 찍지 못했습니다.");
       }
 
-      const stampedNow = new Date().toISOString();
-      setLocalLastStampedAt(stampedNow);
-
       if (payload.progress) {
-        setProgress({
-          ...payload.progress,
-          last_stamped_at: payload.progress.last_stamped_at || stampedNow,
-        });
+        setProgress(payload.progress);
       } else {
         setProgress((prev) =>
           prev
             ? {
                 ...prev,
                 current_stamps: prev.current_stamps + 1,
-                last_stamped_at: stampedNow,
                 stamped_places: [...(prev.stamped_places || []), partner.id],
               }
             : {
@@ -547,7 +558,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
                 user_id: sessionUserId,
                 current_stamps: 1,
                 max_stamps: activeEvent.max_stamps ?? 0,
-                last_stamped_at: stampedNow,
                 stamped_places: [partner.id],
                 is_completed: false,
               },
@@ -658,6 +668,8 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     config.event_stamp_btn_label ||
     DEFAULT_STAMP_BTN_LABEL;
 
+  const activeNearbyPartner = visiblePartners.find((p) => p.id === activeNearbyPlaceId);
+
   return (
     <div className="map-event-shell" style={{ position: "relative" }}>
       <div className="map-event-tabs" role="tablist" aria-label="지도 이벤트 탭">
@@ -688,11 +700,12 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         <div className="map-event-stamp-bar" style={stampBarCssVars(activeEvent)}>
           <div className="map-event-stamp-bar__copy">
             <p className="map-event-stamp-bar__title">{activeEvent.title}</p>
-            {(!isCompleted && (!isEventLive(activeEvent) || cooldownRemainMs > 0)) ? (
+            {/* 0/1 숫자 카운터 및 완주 문구 제거 */}
+            {(!isCompleted && (!isEventLive(activeEvent) || currentPlaceCooldownRemainMs > 0)) ? (
               <p className="map-event-stamp-bar__meta">
                 {!isEventLive(activeEvent) ? "기간 종료" : ""}
-                {!isCompleted && cooldownRemainMs > 0
-                  ? `${formatCooldownRemain(cooldownRemainMs)} 후 도장 가능`
+                {!isCompleted && currentPlaceCooldownRemainMs > 0
+                  ? `${formatCooldownRemain(currentPlaceCooldownRemainMs)} 후 도장 가능`
                   : ""}
               </p>
             ) : null}
@@ -738,9 +751,9 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
       {message ? <p className="map-event-message">{message}</p> : null}
 
-      {/* 지도 패널 및 상단 중앙 실시간 타이머 플로팅 뱃지 */}
+      {/* 지도 패널 및 상단 중앙 실시간 제휴처 타이머 플로팅 뱃지 */}
       <div style={{ position: "relative", width: "100%", overflow: "visible" }}>
-        {!isDefaultTab && activeEvent && !isCompleted && cooldownRemainMs > 0 && (
+        {!isDefaultTab && activeEvent && !isCompleted && currentPlaceCooldownRemainMs > 0 && (
           <div
             style={{
               position: "absolute",
@@ -765,11 +778,12 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
             }}
           >
             <span>⏰</span>
-            <span>다음 도장까지 {formatCooldownRemain(cooldownRemainMs)}</span>
+            <span>
+              {activeNearbyPartner?.name ? `[${activeNearbyPartner.name}] ` : ""}다음 도장까지 {formatCooldownRemain(currentPlaceCooldownRemainMs)}
+            </span>
           </div>
         )}
 
-        {/* 일반 지도와 동일하게 100% 원본 프롭스 전달 (마커 상단 하트 복구) */}
         <PartnerMainMapPanel
           {...props}
           partners={visiblePartners}
@@ -781,8 +795,8 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
                   label:
                     busy
                       ? "확인 중..."
-                      : cooldownRemainMs > 0
-                        ? `${formatCooldownRemain(cooldownRemainMs)} 후 가능`
+                      : currentPlaceCooldownRemainMs > 0
+                        ? `${formatCooldownRemain(currentPlaceCooldownRemainMs)} 후 가능`
                         : currentStampBtnLabel,
                   onStamp: (partner) => {
                     void handleStamp(partner);
