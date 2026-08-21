@@ -49,7 +49,6 @@ type PartnerSource = {
   latitude: number | null;
   longitude: number | null;
   image_url?: string | null;
-  pinImageUrl?: string | null;
   category?: string | null;
   address?: string | null;
   benefit?: string | null;
@@ -305,24 +304,14 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return () => window.removeEventListener("site-stamp-progress-changed", onStampChanged);
   }, [loadProgress]);
 
-  // 원본 마커 이미지 데이터 손상 없이 일반 지도와 100% 동일하게 마커/하트가 렌더링되도록 보장
+  // [롤백 완료] 원래대로 제휴처 목록 원본을 보존하여 전달 (마커와 상단 하트가 그대로 복구됨)
   const visiblePartners = useMemo(() => {
-    const customPin =
-      activeEvent?.marker_icon_img?.trim() ||
-      config.default_map_marker_img?.trim() ||
-      null;
-
     const allowed = activeEvent?.partner_ids ?? [];
-    const targetPartners =
-      activeEvent && allowed.length > 0
-        ? props.partners.filter((partner) => allowed.includes(partner.id))
-        : props.partners;
-
-    return targetPartners.map((partner) => ({
-      ...partner,
-      pinImageUrl: customPin || partner.image_url || partner.pinImageUrl || null,
-    }));
-  }, [activeEvent, config.default_map_marker_img, props.partners]);
+    if (activeEvent && allowed.length > 0) {
+      return props.partners.filter((partner) => allowed.includes(partner.id));
+    }
+    return props.partners;
+  }, [activeEvent, props.partners]);
 
   const stampedPlaceIds = useMemo(
     () => new Set(progress?.stamped_places ?? []),
@@ -749,7 +738,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
       {message ? <p className="map-event-message">{message}</p> : null}
 
-      {/* 지도 패널 및 실시간 타이머 플로팅 오버레이 */}
+      {/* 지도 패널 및 상단 중앙 실시간 타이머 플로팅 뱃지 */}
       <div style={{ position: "relative", width: "100%", overflow: "visible" }}>
         {!isDefaultTab && activeEvent && !isCompleted && cooldownRemainMs > 0 && (
           <div
@@ -780,13 +769,10 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
           </div>
         )}
 
+        {/* 일반 지도와 동일하게 100% 원본 프롭스 전달 (마커 상단 하트 복구) */}
         <PartnerMainMapPanel
           {...props}
           partners={visiblePartners}
-          markerSettings={props.markerSettings}
-          favoritesEnabled={props.favoritesEnabled}
-          favoritePartnerIds={props.favoritePartnerIds}
-          onFavoriteToggle={props.onFavoriteToggle}
           stampAction={
             isStampFeatureActive
               ? {
