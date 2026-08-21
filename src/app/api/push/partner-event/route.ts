@@ -36,9 +36,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // 1. 해당 유저의 Web Push 구독 정보 조회
+  // 1. 대상 사용자의 푸시 구독 정보 조회
   let query = admin.from("push_subscriptions").select("endpoint, p256dh, auth");
-
   if (userId) {
     query = query.eq("user_id", userId);
   }

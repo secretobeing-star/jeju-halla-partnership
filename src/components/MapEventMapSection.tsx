@@ -200,7 +200,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return () => navigator.geolocation.clearWatch(watchId);
   }, []);
 
-  // 🎯 현재 미방문 제휴처 중 반경 내에 있는 곳 판별
   const nearestUnstampedPartnerInside = useMemo(() => {
     if (isDefaultTab || !activeEvent || !currentGeo) return null;
 
@@ -221,13 +220,12 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return null;
   }, [isDefaultTab, activeEvent, currentGeo, visiblePartners, stampedPlaceIds]);
 
-  // 🎯 1. 즐겨찾기 해제 및 반경 밖 이탈 시 즉시 타이머 롤백 / 반경 내 진입 시에만 타이머 시작
+  // 타이머 롤백 및 진입 처리
   useEffect(() => {
     if (isDefaultTab || !activeEvent) return;
 
     const storageKey = getEventCooldownKey(activeEvent.id);
 
-    // 반경 내에 미방문 제휴처가 없을 때(거리가 멀거나 목록에서 제외된 경우): 타이머 롤백
     if (!nearestUnstampedPartnerInside) {
       if (localStorage.getItem(storageKey)) {
         localStorage.removeItem(storageKey);
@@ -239,7 +237,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     const cooldownMinutes = Math.max(0, Number(activeEvent?.cooldown_minutes) || 0);
     if (cooldownMinutes <= 0) return;
 
-    // 반경 내에 도착했을 때만 타이머 시작
     const existingEndTime = localStorage.getItem(storageKey);
     if (!existingEndTime) {
       const targetEndTime = Date.now() + cooldownMinutes * 60_000;
@@ -312,6 +309,53 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   }, [activeEvent, isDefaultTab, getEventCooldownKey]);
 
   const isTimerFinished = hasTimerStarted && currentPlaceCooldownRemainMs === 0;
+
+  // 🔔 서버 푸시 발송 트리거 함수
+  const triggerPartnerPush = useCallback(
+    async (partnerId: string, partnerName: string, type: "arrival" | "ready_stamp") => {
+      if (!userId) return;
+
+      const pushKey = `push_sent_${userId}_${partnerId}_${type}`;
+      if (sessionStorage.getItem(pushKey)) return;
+
+      try {
+        await fetch("/api/push/partner-event", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId,
+            partnerId,
+            partnerName,
+            type,
+          }),
+        });
+        sessionStorage.setItem(pushKey, "true");
+      } catch {}
+    },
+    [userId]
+  );
+
+  // 1. 반경 진입 시 푸시 발송
+  useEffect(() => {
+    if (nearestUnstampedPartnerInside && props.favoritePartnerIds?.has(String(nearestUnstampedPartnerInside.partner.id))) {
+      void triggerPartnerPush(
+        String(nearestUnstampedPartnerInside.partner.id),
+        nearestUnstampedPartnerInside.partner.name,
+        "arrival"
+      );
+    }
+  }, [nearestUnstampedPartnerInside, props.favoritePartnerIds, triggerPartnerPush]);
+
+  // 2. 타이머 완료 시 푸시 발송
+  useEffect(() => {
+    if (isTimerFinished && nearestUnstampedPartnerInside && props.favoritePartnerIds?.has(String(nearestUnstampedPartnerInside.partner.id))) {
+      void triggerPartnerPush(
+        String(nearestUnstampedPartnerInside.partner.id),
+        nearestUnstampedPartnerInside.partner.name,
+        "ready_stamp"
+      );
+    }
+  }, [isTimerFinished, nearestUnstampedPartnerInside, props.favoritePartnerIds, triggerPartnerPush]);
 
   const loadPublic = useCallback(async () => {
     try {
@@ -600,8 +644,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       {message ? <p className="map-event-message">{message}</p> : null}
 
       <div style={{ position: "relative", width: "100%", overflow: "visible" }}>
-        
-        {/* 상단 알림 배지 (폭죽 이모지 제거 및 간결한 안내 멘트) */}
         {!isDefaultTab && activeEvent && !isCompleted && !rewardModal && !showIntroModal && (
           currentPlaceCooldownRemainMs > 0 ? (
             <div
