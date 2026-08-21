@@ -4,10 +4,10 @@ import { createSupabaseAdmin } from "@/lib/supabase-admin";
 import { sendWebPushNotification } from "@/lib/web-push-server";
 
 type PartnerEventPushBody = {
-  userId?: string;
+  userId?: string; // clientKey 또는 userId
   partnerId: string;
   partnerName: string;
-  type: "arrival" | "ready_stamp"; // arrival: 도착 안내 / ready_stamp: 도장 찍기 가능
+  type: "arrival" | "ready_stamp";
 };
 
 export async function POST(request: NextRequest) {
@@ -36,10 +36,10 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // 1. 대상 사용자의 푸시 구독 정보 조회
+  // client_key 컬럼 기준으로 구독 정보 조회
   let query = admin.from("push_subscriptions").select("endpoint, p256dh, auth");
   if (userId) {
-    query = query.eq("user_id", userId);
+    query = query.eq("client_key", userId);
   }
 
   const { data: subscriptions, error: subError } = await query;
@@ -52,7 +52,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: "푸시 구독 정보를 찾을 수 없습니다." }, { status: 200 });
   }
 
-  // 2. 사이트 기본 에셋 및 비주얼 로드
   const { data: siteSettings } = await admin
     .from("site_settings")
     .select("main_domain, site_favicon_url, site_push_icon_url, site_pwa_icon_url")
@@ -67,18 +66,12 @@ export async function POST(request: NextRequest) {
     sitePwaIconUrl: siteSettings?.site_pwa_icon_url,
   });
 
-  // 3. 상황별 푸시 문구 세팅 ('처' 제외)
-  const title =
-    type === "ready_stamp"
-      ? `도장 찍기 가능!`
-      : `${partnerName} 도착!`;
-
+  const title = type === "ready_stamp" ? "도장 찍기 가능!" : `${partnerName} 도착!`;
   const pushBody =
     type === "ready_stamp"
       ? `${partnerName}에서 지금 바로 이벤트 도장을 찍어보세요!`
       : `관심 등록한 ${partnerName} 근처에 도착했습니다. 스탬프를 확인해 보세요!`;
 
-  // 4. Web Push 발송
   const result = await sendWebPushNotification(subscriptions, {
     title,
     body: pushBody,

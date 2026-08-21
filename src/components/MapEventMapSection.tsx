@@ -134,13 +134,17 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const userId = student?.studentId?.trim() || "";
   const isGuest = !userId;
 
+  const isDefaultTab = activeTabId === DEFAULT_TAB_ID;
+
   const liveEvents = useMemo(
     () => events.filter((event) => isEventLive(event, nowMs)),
     [events, nowMs],
   );
 
-  const activeEvent = liveEvents.find((event) => event.id === activeTabId) ?? null;
-  const isDefaultTab = activeTabId === DEFAULT_TAB_ID;
+  const activeEvent = useMemo(
+    () => (isDefaultTab ? null : liveEvents.find((event) => event.id === activeTabId) ?? null),
+    [isDefaultTab, liveEvents, activeTabId],
+  );
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -152,17 +156,13 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const visiblePartners = useMemo(() => {
     const raw = props.partners || [];
     if (raw.length === 0) return [];
-
-    if (isDefaultTab || !activeEvent) {
-      return raw;
-    }
+    if (isDefaultTab || !activeEvent) return raw;
 
     const allowed = (activeEvent.partner_ids ?? []).map(String);
     if (allowed.length > 0) {
       const filtered = raw.filter((p) => allowed.includes(String(p.id)));
       return filtered.length > 0 ? filtered : raw;
     }
-
     return raw;
   }, [activeEvent, isDefaultTab, props.partners]);
 
@@ -194,12 +194,13 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         }
       },
       () => {},
-      { enableHighAccuracy: true, maximumAge: 5000, timeout: 5000 },
+      { enableHighAccuracy: true, maximumAge: 3000, timeout: 5000 },
     );
 
     return () => navigator.geolocation.clearWatch(watchId);
   }, []);
 
+  // 반경 내 제휴처 체크 (이벤트 탭에서만 활성화)
   const nearestUnstampedPartnerInside = useMemo(() => {
     if (isDefaultTab || !activeEvent || !currentGeo) return null;
 
@@ -220,7 +221,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return null;
   }, [isDefaultTab, activeEvent, currentGeo, visiblePartners, stampedPlaceIds]);
 
-  // 타이머 롤백 및 진입 처리
+  // 타이머 롤백 및 시작 (이벤트 탭 전용)
   useEffect(() => {
     if (isDefaultTab || !activeEvent) return;
 
@@ -298,64 +299,69 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return Math.max(0, targetEndTime - nowMs);
   }, [activeEvent, isDefaultTab, getEventCooldownKey, nowMs]);
 
-  const hasTimerStarted = useMemo(() => {
+  const hasTimerKey = useMemo(() => {
     if (isDefaultTab || !activeEvent) return false;
     const storageKey = getEventCooldownKey(activeEvent.id);
-    try {
-      return Boolean(localStorage.getItem(storageKey));
-    } catch {
-      return false;
-    }
+    return Boolean(localStorage.getItem(storageKey));
   }, [activeEvent, isDefaultTab, getEventCooldownKey]);
 
-  const isTimerFinished = hasTimerStarted && currentPlaceCooldownRemainMs === 0;
+  const isCooldownOver = hasTimerKey && currentPlaceCooldownRemainMs === 0;
+  const isZeroCooldownEvent = Number(activeEvent?.cooldown_minutes || 0) <= 0;
+  const isReadyToStamp = !isDefaultTab && Boolean(nearestUnstampedPartnerInside) && (isCooldownOver || isZeroCooldownEvent);
 
-  // 🔔 서버 푸시 발송 트리거 함수
   const triggerPartnerPush = useCallback(
     async (partnerId: string, partnerName: string, type: "arrival" | "ready_stamp") => {
+      const title = type === "ready_stamp" ? "도장 찍기 가능!" : `${partnerName} 도착!`;
+      const body =
+        type === "ready_stamp"
+          ? `${partnerName}에서 지금 바로 이벤트 도장을 찍어보세요!`
+          : `${partnerName} 근처에 도착했습니다. 스탬프를 확인해 보세요!`;
+
+      if (typeof window !== "undefined" && "Notification" in window) {
+        if (Notification.permission === "granted") {
+          try {
+            new Notification(title, { body, icon: "/icons/icon-192x192.png" });
+          } catch {}
+        } else if (Notification.permission !== "denied") {
+          Notification.requestPermission();
+        }
+      }
+
       if (!userId) return;
-
-      const pushKey = `push_sent_${userId}_${partnerId}_${type}`;
-      if (sessionStorage.getItem(pushKey)) return;
-
       try {
         await fetch("/api/push/partner-event", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            userId,
-            partnerId,
-            partnerName,
-            type,
-          }),
+          body: JSON.stringify({ userId, partnerId, partnerName, type }),
         });
-        sessionStorage.setItem(pushKey, "true");
       } catch {}
     },
     [userId]
   );
 
-  // 1. 반경 진입 시 푸시 발송
   useEffect(() => {
-    if (nearestUnstampedPartnerInside && props.favoritePartnerIds?.has(String(nearestUnstampedPartnerInside.partner.id))) {
-      void triggerPartnerPush(
-        String(nearestUnstampedPartnerInside.partner.id),
-        nearestUnstampedPartnerInside.partner.name,
-        "arrival"
-      );
+    if (isDefaultTab) return;
+    if (nearestUnstampedPartnerInside) {
+      const partnerId = String(nearestUnstampedPartnerInside.partner.id);
+      const pushKey = `push_sent_${userId || "guest"}_${partnerId}_arrival`;
+      if (!sessionStorage.getItem(pushKey)) {
+        sessionStorage.setItem(pushKey, "true");
+        void triggerPartnerPush(partnerId, nearestUnstampedPartnerInside.partner.name, "arrival");
+      }
     }
-  }, [nearestUnstampedPartnerInside, props.favoritePartnerIds, triggerPartnerPush]);
+  }, [isDefaultTab, nearestUnstampedPartnerInside, userId, triggerPartnerPush]);
 
-  // 2. 타이머 완료 시 푸시 발송
   useEffect(() => {
-    if (isTimerFinished && nearestUnstampedPartnerInside && props.favoritePartnerIds?.has(String(nearestUnstampedPartnerInside.partner.id))) {
-      void triggerPartnerPush(
-        String(nearestUnstampedPartnerInside.partner.id),
-        nearestUnstampedPartnerInside.partner.name,
-        "ready_stamp"
-      );
+    if (isDefaultTab) return;
+    if (isReadyToStamp && nearestUnstampedPartnerInside) {
+      const partnerId = String(nearestUnstampedPartnerInside.partner.id);
+      const pushKey = `push_sent_${userId || "guest"}_${partnerId}_ready`;
+      if (!sessionStorage.getItem(pushKey)) {
+        sessionStorage.setItem(pushKey, "true");
+        void triggerPartnerPush(partnerId, nearestUnstampedPartnerInside.partner.name, "ready_stamp");
+      }
     }
-  }, [isTimerFinished, nearestUnstampedPartnerInside, props.favoritePartnerIds, triggerPartnerPush]);
+  }, [isDefaultTab, isReadyToStamp, nearestUnstampedPartnerInside, userId, triggerPartnerPush]);
 
   const loadPublic = useCallback(async () => {
     try {
@@ -644,6 +650,8 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       {message ? <p className="map-event-message">{message}</p> : null}
 
       <div style={{ position: "relative", width: "100%", overflow: "visible" }}>
+        
+        {/* 🎯 '전체' 탭(isDefaultTab)이 아니고 이벤트 탭일 때만 상단 배지 노출 */}
         {!isDefaultTab && activeEvent && !isCompleted && !rewardModal && !showIntroModal && (
           currentPlaceCooldownRemainMs > 0 ? (
             <div
@@ -670,7 +678,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
               <span>⏰</span>
               <span>{timerBadgeText}</span>
             </div>
-          ) : isTimerFinished && nearestUnstampedPartnerInside ? (
+          ) : isReadyToStamp ? (
             <div
               style={{
                 position: "absolute",
