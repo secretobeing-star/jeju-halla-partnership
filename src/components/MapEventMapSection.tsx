@@ -153,11 +153,17 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return () => window.clearInterval(timer);
   }, []);
 
+  // 🎯 전체 탭일 때는 즐겨찾기 목록만 남기고 노출 (즐겨찾기 ID가 있을 경우)
   const visiblePartners = useMemo(() => {
     const raw = props.partners || [];
     if (raw.length === 0) return [];
-    if (isDefaultTab || !activeEvent) return raw;
+    
+    // 전체 탭인 경우: 전체 제휴처 전달 (즐겨찾기는 부모 패널의 favoriteIds가 필터링 처리)
+    if (isDefaultTab || !activeEvent) {
+      return raw;
+    }
 
+    // 이벤트 탭인 경우: 이벤트에 할당된 제휴처만 필터링
     const allowed = (activeEvent.partner_ids ?? []).map(String);
     if (allowed.length > 0) {
       const filtered = raw.filter((p) => allowed.includes(String(p.id)));
@@ -200,7 +206,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return () => navigator.geolocation.clearWatch(watchId);
   }, []);
 
-  // 반경 내 제휴처 체크 (이벤트 탭에서만 활성화)
+  // 반경 내 미방문 제휴처 감지 (이벤트 탭에서만 활성화)
   const nearestUnstampedPartnerInside = useMemo(() => {
     if (isDefaultTab || !activeEvent || !currentGeo) return null;
 
@@ -221,41 +227,31 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return null;
   }, [isDefaultTab, activeEvent, currentGeo, visiblePartners, stampedPlaceIds]);
 
-  // 반경 이탈 시 타이머 캐시 즉시 제거 및 진입 시 생성
+  // 반경 내 진입 시 타이머 세팅 (다른 탭 다녀와도 유지되도록 처리)
   useEffect(() => {
     if (isDefaultTab || !activeEvent) return;
 
     const storageKey = getEventCooldownKey(activeEvent.id);
 
-    if (!nearestUnstampedPartnerInside) {
-      if (localStorage.getItem(storageKey)) {
-        localStorage.removeItem(storageKey);
+    if (nearestUnstampedPartnerInside) {
+      const cooldownMinutes = Math.max(0, Number(activeEvent?.cooldown_minutes) || 0);
+      if (cooldownMinutes <= 0) return;
+
+      const existingEndTime = localStorage.getItem(storageKey);
+      if (!existingEndTime) {
+        const targetEndTime = Date.now() + cooldownMinutes * 60_000;
+        localStorage.setItem(storageKey, String(targetEndTime));
         setNowMs(Date.now());
       }
-      return;
-    }
-
-    const cooldownMinutes = Math.max(0, Number(activeEvent?.cooldown_minutes) || 0);
-    if (cooldownMinutes <= 0) return;
-
-    const existingEndTime = localStorage.getItem(storageKey);
-    if (!existingEndTime) {
-      const targetEndTime = Date.now() + cooldownMinutes * 60_000;
-      localStorage.setItem(storageKey, String(targetEndTime));
-      setNowMs(Date.now());
     }
   }, [activeEvent, isDefaultTab, nearestUnstampedPartnerInside, getEventCooldownKey]);
 
-  // 탭 전환 시 기존 이벤트 타이머 캐시 완전히 정리
+  // 탭 전환 시 상태 유지 (기존 타이머를 지우지 않고 각 이벤트마다 독립 보존)
   const handleTabChange = (nextTabId: string) => {
     if (activeTabId === nextTabId) return;
 
     if (props.onPartnerSelect) {
       props.onPartnerSelect("");
-    }
-
-    if (activeEvent) {
-      localStorage.removeItem(getEventCooldownKey(activeEvent.id));
     }
 
     setShowIntroModal(false);
@@ -288,6 +284,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     setShowIntroModal(false);
   }, [activeEvent, isGuest, userId, getIntroConfirmedKey]);
 
+  // 이벤트별 잔여 쿨다운 계산
   const currentPlaceCooldownRemainMs = useMemo(() => {
     if (isDefaultTab || !activeEvent || !nearestUnstampedPartnerInside) return 0;
 
@@ -313,61 +310,8 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
   const isCooldownOver = hasTimerKey && currentPlaceCooldownRemainMs === 0;
   const isZeroCooldownEvent = Number(activeEvent?.cooldown_minutes || 0) <= 0;
+  // 🎯 다른 탭 다녀와도 반경 내에 있고 시간이 끝났다면 도장 가능 상태 유지
   const isReadyToStamp = !isDefaultTab && Boolean(nearestUnstampedPartnerInside) && (isCooldownOver || isZeroCooldownEvent);
-
-  const triggerPartnerPush = useCallback(
-    async (partnerId: string, partnerName: string, type: "arrival" | "ready_stamp") => {
-      const title = type === "ready_stamp" ? "도장 찍기 가능!" : `${partnerName} 도착!`;
-      const body =
-        type === "ready_stamp"
-          ? `${partnerName}에서 지금 바로 이벤트 도장을 찍어보세요!`
-          : `${partnerName} 근처에 도착했습니다. 스탬프를 확인해 보세요!`;
-
-      if (typeof window !== "undefined" && "Notification" in window) {
-        if (Notification.permission === "granted") {
-          try {
-            new Notification(title, { body, icon: "/icons/icon-192x192.png" });
-          } catch {}
-        } else if (Notification.permission !== "denied") {
-          Notification.requestPermission();
-        }
-      }
-
-      if (!userId) return;
-      try {
-        await fetch("/api/push/partner-event", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId, partnerId, partnerName, type }),
-        });
-      } catch {}
-    },
-    [userId]
-  );
-
-  useEffect(() => {
-    if (isDefaultTab) return;
-    if (nearestUnstampedPartnerInside) {
-      const partnerId = String(nearestUnstampedPartnerInside.partner.id);
-      const pushKey = `push_sent_${userId || "guest"}_${partnerId}_arrival`;
-      if (!sessionStorage.getItem(pushKey)) {
-        sessionStorage.setItem(pushKey, "true");
-        void triggerPartnerPush(partnerId, nearestUnstampedPartnerInside.partner.name, "arrival");
-      }
-    }
-  }, [isDefaultTab, nearestUnstampedPartnerInside, userId, triggerPartnerPush]);
-
-  useEffect(() => {
-    if (isDefaultTab) return;
-    if (isReadyToStamp && nearestUnstampedPartnerInside) {
-      const partnerId = String(nearestUnstampedPartnerInside.partner.id);
-      const pushKey = `push_sent_${userId || "guest"}_${partnerId}_ready`;
-      if (!sessionStorage.getItem(pushKey)) {
-        sessionStorage.setItem(pushKey, "true");
-        void triggerPartnerPush(partnerId, nearestUnstampedPartnerInside.partner.name, "ready_stamp");
-      }
-    }
-  }, [isDefaultTab, isReadyToStamp, nearestUnstampedPartnerInside, userId, triggerPartnerPush]);
 
   const loadPublic = useCallback(async () => {
     try {
@@ -671,7 +615,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
       <div style={{ position: "relative", width: "100%", overflow: "visible" }}>
         
-        {/* 상단 알림 배지: 반경 내에 실제로 들어온 제휴처가 있을 때(nearestUnstampedPartnerInside)만 렌더링 */}
+        {/* 🎯 '전체' 탭(isDefaultTab)에서는 시간이 절대로 뜨지 않으며, 이벤트 탭에서 반경 내에 있을 때만 배지 노출 */}
         {!isDefaultTab && activeEvent && !isCompleted && !rewardModal && !showIntroModal && nearestUnstampedPartnerInside && (
           currentPlaceCooldownRemainMs > 0 ? (
             <div
@@ -786,26 +730,27 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         onConfirm={handleConfirmStartEvent}
       />
 
+      {/* 🎯 보상 / 안내 팝업 모달 */}
       {rewardModal ? (
-        <div className="map-event-modal" role="dialog" aria-modal="true">
-          <div className="map-event-modal__card">
-            {rewardModal.banner ? <img src={rewardModal.banner} alt="" className="map-event-modal__banner" /> : null}
-            <h3 className="map-event-modal__title">{rewardModal.title}</h3>
-            <p className="map-event-modal__body" style={{ whiteSpace: "pre-line" }}>{rewardModal.body}</p>
-            {rewardModal.rewardImg ? <img src={rewardModal.rewardImg} alt="" className="map-event-modal__reward-img" /> : null}
-            {rewardModal.rewardName ? <p className="map-event-modal__reward">{rewardModal.rewardName}</p> : null}
+        <div className="map-event-modal" role="dialog" aria-modal="true" style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.5)" }}>
+          <div className="map-event-modal__card" style={{ background: "#fff", borderRadius: "16px", padding: "20px", maxWidth: "340px", width: "90%", textAlign: "center" }}>
+            {rewardModal.banner ? <img src={rewardModal.banner} alt="" className="map-event-modal__banner" style={{ width: "100%", borderRadius: "8px", marginBottom: "12px" }} /> : null}
+            <h3 className="map-event-modal__title" style={{ fontSize: "18px", fontWeight: "700", marginBottom: "8px" }}>{rewardModal.title}</h3>
+            <p className="map-event-modal__body" style={{ whiteSpace: "pre-line", fontSize: "14px", color: "#4b5563", marginBottom: "12px" }}>{rewardModal.body}</p>
+            {rewardModal.rewardImg ? <img src={rewardModal.rewardImg} alt="" className="map-event-modal__reward-img" style={{ width: "80px", height: "80px", margin: "0 auto 12px", objectFit: "contain" }} /> : null}
+            {rewardModal.rewardName ? <p className="map-event-modal__reward" style={{ fontSize: "15px", fontWeight: "600", color: "#059669", marginBottom: "12px" }}>{rewardModal.rewardName}</p> : null}
 
             {rewardModal.kind === "login_required" ? (
               <div style={{ display: "flex", gap: "8px", marginTop: "12px", width: "100%" }}>
-                <button type="button" className="map-event-modal__btn" style={{ background: "#6b7280", flex: 1 }} onClick={() => setRewardModal(null)}>닫기</button>
-                <button type="button" className="map-event-modal__btn" style={{ background: "#059669", flex: 1.2 }} onClick={() => { setRewardModal(null); window.dispatchEvent(new Event(SITE_STUDENT_NEED_LOGIN_EVENT)); }}>로그인하기</button>
+                <button type="button" className="map-event-modal__btn" style={{ background: "#6b7280", flex: 1, padding: "10px", borderRadius: "8px", color: "#fff", fontWeight: "600" }} onClick={() => setRewardModal(null)}>닫기</button>
+                <button type="button" className="map-event-modal__btn" style={{ background: "#059669", flex: 1.2, padding: "10px", borderRadius: "8px", color: "#fff", fontWeight: "600" }} onClick={() => { setRewardModal(null); window.dispatchEvent(new Event(SITE_STUDENT_NEED_LOGIN_EVENT)); }}>로그인하기</button>
               </div>
             ) : (
               <div style={{ display: "flex", gap: "8px", marginTop: "12px", width: "100%" }}>
                 {rewardModal.showGiftButton ? (
-                  <button type="button" className="map-event-modal__btn" onClick={() => { setRewardModal(null); window.dispatchEvent(new Event("site-gift-inbox-open")); }}>선물함 열기</button>
+                  <button type="button" className="map-event-modal__btn" style={{ background: "#059669", flex: 1, padding: "10px", borderRadius: "8px", color: "#fff", fontWeight: "600" }} onClick={() => { setRewardModal(null); window.dispatchEvent(new Event("site-gift-inbox-open")); }}>선물함 열기</button>
                 ) : null}
-                <button type="button" className="map-event-modal__btn" style={{ background: "#6b7280" }} onClick={() => { setRewardModal(null); void handleFullRefresh(); }}>확인</button>
+                <button type="button" className="map-event-modal__btn" style={{ background: "#6b7280", flex: 1, padding: "10px", borderRadius: "8px", color: "#fff", fontWeight: "600" }} onClick={() => { setRewardModal(null); void handleFullRefresh(); }}>확인</button>
               </div>
             )}
           </div>
