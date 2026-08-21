@@ -423,7 +423,7 @@ export default function NaverMapPartnersView({
     const pinSignature = validPartners
       .map((partner) => `${partner.id}:${partner.pinImageUrl ?? ""}`)
       .join("|");
-    const nextSignature = `${getMapPartnerMarkersSignature(validPartners)}:${Boolean(stampAction?.enabled)}:${detailButtonLabel ?? ""}:${favKey}:${pinSignature}`;
+    const nextSignature = `${getMapPartnerMarkersSignature(validPartners)}:${Boolean(stampAction?.enabled)}:${detailButtonLabel ?? ""}:${favKey}:${pinSignature}:${effectiveMarkerSettings?.topIconImg ?? ""}`;
 
     if (mapMarkersSignatureRef.current === nextSignature && markersRef.current.length > 0) {
       return;
@@ -477,7 +477,7 @@ export default function NaverMapPartnersView({
         favoritesEnabledRef.current && favoritePartnerIdsRef.current?.has(partner.id)
       );
 
-      // 즐겨찾기가 활성화된 상태에서 좋아요가 안 된 매장은 비활성화 처리
+      // 💡 즐겨찾기(좋아요)가 안 된 매장은 도장 버튼 비활성화 및 "좋아요 필요" 라벨 고정
       const isStampDisabledByFav = Boolean(favoritesEnabledRef.current && !isFav);
       const isAlreadyStamped = Boolean(activeStampAction?.stampedPlaceIds?.has(partner.id));
 
@@ -540,11 +540,21 @@ export default function NaverMapPartnersView({
 
       const isFav = favoritesEnabled && Boolean(favoritePartnerIds?.has(partner.id));
 
+      // 💡 [핵심 수정] 즐겨찾기(좋아요)를 누른 매장만 상단 마커(핀/이벤트 아이콘) 노출, 안 누른 곳은 null
+      const favoriteTopIconImg =
+        partner.pinImageUrl?.trim() ||
+        effectiveMarkerSettings.topIconImg?.trim() ||
+        null;
+
+      const markerCustomSettings = isFav
+        ? { ...effectiveMarkerSettings, topIconImg: favoriteTopIconImg }
+        : { ...effectiveMarkerSettings, topIconImg: null };
+
       const markerElement = createPartnerMapMarkerElement(
         partner,
         false,
         isFav,
-        effectiveMarkerSettings,
+        markerCustomSettings,
       );
       markerElementsRef.current.set(partner.id, markerElement);
 
