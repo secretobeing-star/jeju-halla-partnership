@@ -27,6 +27,35 @@ const DEFAULT_COOLDOWN_TITLE = "잠시 후 도장을 찍을 수 있어요";
 const DEFAULT_COOLDOWN_MSG = "시간이 조금 더 지난 후({remain})에 도장을 찍을 수 있어요!";
 const DEFAULT_TIMER_TEMPLATE = "다음 도장까지 {remain}";
 
+/** PWA 알림 지원 */
+function triggerCooldownDoneNotification(title: string, body: string) {
+  if (typeof window === "undefined" || !("Notification" in window)) return;
+
+  if (Notification.permission === "granted") {
+    try {
+      const options = {
+        body,
+        icon: "/icons/icon-192x192.png",
+        badge: "/icons/icon-192x192.png",
+        vibrate: [200, 100, 200],
+      } as unknown as NotificationOptions;
+
+      new Notification(title, options);
+    } catch {
+      try {
+        navigator.serviceWorker?.ready.then((registration) => {
+          registration.showNotification(title, {
+            body,
+            icon: "/icons/icon-192x192.png",
+            badge: "/icons/icon-192x192.png",
+            vibrate: [200, 100, 200],
+          } as unknown as NotificationOptions);
+        });
+      } catch {}
+    }
+  }
+}
+
 function stampBarCssVars(
   event: Pick<MapEvent, "stamp_bar_bg_color" | "stamp_bar_bg_img">,
 ): CSSProperties {
@@ -193,7 +222,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const activeEvent = liveEvents.find((event) => event.id === activeTabId) ?? null;
   const isDefaultTab = activeTabId === DEFAULT_TAB_ID;
 
-  // 1초마다 실시간 시각 갱신
+  // 1초마다 시각 갱신
   useEffect(() => {
     const timer = window.setInterval(() => {
       setNowMs(Date.now());
@@ -214,12 +243,11 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return raw;
   }, [activeEvent, isDefaultTab, props.partners]);
 
-  // [핵심] 이벤트 ID 기반의 절대적 타이머 종료 시각 관리 (절대 리셋 방지)
   const getEventCooldownKey = useCallback((eventId: string) => {
     return `site_event_timer_end_${eventId}`;
   }, []);
 
-  // 탭 진입 시 기존 종료 시각이 있는지 확인하고, 없을 때만 최초 1회 생성
+  // 탭 진입 시 기존 종료 시각이 없으면 최초 1회 생성
   useEffect(() => {
     if (isDefaultTab || !activeEvent) return;
 
@@ -235,7 +263,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     }
   }, [activeTabId, activeEvent, isDefaultTab, getEventCooldownKey]);
 
-  // 현재 남은 쿨다운 시간 계산 (종료 시각 - 현재 시각)
+  // 남은 쿨다운 계산
   const currentPlaceCooldownRemainMs = useMemo(() => {
     if (isDefaultTab || !activeEvent) return 0;
 
@@ -392,7 +420,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
     if (stampedPlaceIds.has(partner.id)) return;
 
-    // 클라이언트단 쿨다운 체크
+    // 클라이언트 쿨다운 검증
     if (currentPlaceCooldownRemainMs > 0) {
       const remainText = formatCooldownRemain(currentPlaceCooldownRemainMs);
       const customTitle =
@@ -483,10 +511,16 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
       if (!response.ok) {
         if (payload.cooldownError) {
-          const remainText = payload.cooldownMs
-            ? formatCooldownRemain(payload.cooldownMs)
-            : formatCooldownRemain(currentPlaceCooldownRemainMs || 60_000);
+          const remainMs = payload.cooldownMs ?? 60_000;
 
+          // 서버의 실제 남은 시간으로 로컬스토리지 목표 시각을 강제 동기화/보정
+          if (activeEvent && payload.cooldownMs) {
+            const correctEndTime = Date.now() + payload.cooldownMs;
+            localStorage.setItem(getEventCooldownKey(activeEvent.id), String(correctEndTime));
+            setNowMs(Date.now());
+          }
+
+          const remainText = formatCooldownRemain(remainMs);
           const customTitle =
             activeEvent.cooldown_popup_title?.trim() ||
             activeEvent.cooldown_title?.trim() ||
@@ -537,6 +571,15 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
           return;
         }
         throw new Error(payload.error || "도장을 찍지 못했습니다.");
+      }
+
+      // 도장 성공: 다음 쿨다운 즉시 시작 등록
+      if (activeEvent) {
+        const cooldownMinutes = Math.max(0, Number(activeEvent.cooldown_minutes) || 0);
+        if (cooldownMinutes > 0) {
+          const nextEndTime = Date.now() + cooldownMinutes * 60_000;
+          localStorage.setItem(getEventCooldownKey(activeEvent.id), String(nextEndTime));
+        }
       }
 
       if (payload.progress) {
