@@ -31,6 +31,10 @@ type EventFormState = {
   lose_popup_message: string;
   completion_popup_message: string;
   stamp_btn_label: string;
+  // 💡 시작 안내 팝업 필드 추가
+  guide_image_url: string | null;
+  guide_description: string;
+  guide_btn_label: string;
 };
 
 type TabFormState = {
@@ -56,6 +60,9 @@ const EMPTY_EVENT: EventFormState = {
   lose_popup_message: "",
   completion_popup_message: "",
   stamp_btn_label: "도장 찍기",
+  guide_image_url: null,
+  guide_description: "",
+  guide_btn_label: "참여하기",
 };
 
 const EMPTY_TAB: TabFormState = {
@@ -86,6 +93,7 @@ export default function EventAdminPanel({
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [thumbnailUploading, setThumbnailUploading] = useState(false);
+  const [guideImageUploading, setGuideImageUploading] = useState(false);
   const [iconUploading, setIconUploading] = useState(false);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
@@ -164,6 +172,9 @@ export default function EventAdminPanel({
     lose_popup_message?: string | null;
     completion_popup_message?: string | null;
     stamp_btn_label?: string | null;
+    guide_image_url?: string | null;
+    guide_description?: string | null;
+    guide_btn_label?: string | null;
   }) {
     setEditingEventId(event.id);
     setSelectedEventId(event.id);
@@ -181,6 +192,9 @@ export default function EventAdminPanel({
       lose_popup_message: event.lose_popup_message ?? "",
       completion_popup_message: event.completion_popup_message ?? "",
       stamp_btn_label: event.stamp_btn_label ?? "도장 찍기",
+      guide_image_url: event.guide_image_url ?? null,
+      guide_description: event.guide_description ?? "",
+      guide_btn_label: event.guide_btn_label ?? "참여하기",
     });
     resetTabForm();
     onMessage("");
@@ -198,6 +212,21 @@ export default function EventAdminPanel({
       onMessage(`썸네일 업로드 실패: ${getStorageErrorMessage(error)}`);
     } finally {
       setThumbnailUploading(false);
+    }
+  }
+
+  async function handleGuideImageUpload(file: File) {
+    setGuideImageUploading(true);
+    onMessage("");
+
+    try {
+      const url = await uploadPartnershipImage(file, "events");
+      setEventForm((prev) => ({ ...prev, guide_image_url: url }));
+      onMessage("안내 팝업 이미지가 업로드되었습니다.");
+    } catch (error) {
+      onMessage(`안내 팝업 이미지 업로드 실패: ${getStorageErrorMessage(error)}`);
+    } finally {
+      setGuideImageUploading(false);
     }
   }
 
@@ -255,6 +284,9 @@ export default function EventAdminPanel({
       lose_popup_message: eventForm.lose_popup_message.trim() || null,
       completion_popup_message: eventForm.completion_popup_message.trim() || null,
       stamp_btn_label: eventForm.stamp_btn_label.trim() || null,
+      guide_image_url: eventForm.guide_image_url?.trim() || null,
+      guide_description: eventForm.guide_description.trim() || null,
+      guide_btn_label: eventForm.guide_btn_label.trim() || "참여하기",
       updated_at: new Date().toISOString(),
     };
 
@@ -614,7 +646,73 @@ export default function EventAdminPanel({
             />
           </label>
 
-          {/* 팝업 문구 커스텀 필드 */}
+          {/* 💡 [신규 추가] 이벤트 시작 안내 팝업 설정 박스 */}
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 space-y-3">
+            <p className="text-sm font-bold text-emerald-900 flex items-center gap-1.5">
+              <span>📢</span> 이벤트 시작 안내 팝업 설정 (선택)
+            </p>
+            <p className="text-xs text-gray-500">
+              사용자가 이벤트 탭에 진입했을 때 처음 표시되는 안내 팝업창을 구성합니다.
+            </p>
+
+            <div>
+              <p className="text-xs font-semibold text-gray-700">안내 팝업 대표 이미지</p>
+              <input
+                type="file"
+                accept="image/*"
+                disabled={guideImageUploading}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void handleGuideImageUpload(file);
+                  e.target.value = "";
+                }}
+                className="mt-1 block w-full text-xs text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-white file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-emerald-700"
+              />
+              {guideImageUploading ? <p className="mt-1 text-xs text-gray-500">업로드 중...</p> : null}
+              {eventForm.guide_image_url?.trim() ? (
+                <div className="mt-2 flex items-center gap-3">
+                  <img
+                    src={eventForm.guide_image_url.trim()}
+                    alt="안내 이미지 미리보기"
+                    className="h-16 w-24 rounded-lg object-cover ring-1 ring-gray-200"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setEventForm((prev) => ({ ...prev, guide_image_url: null }))}
+                    className="text-xs text-red-600 hover:underline"
+                  >
+                    이미지 제거
+                  </button>
+                </div>
+              ) : null}
+            </div>
+
+            <label className="block text-xs font-semibold text-gray-700">
+              안내 상세 문구
+              <textarea
+                value={eventForm.guide_description}
+                onChange={(e) =>
+                  setEventForm((prev) => ({ ...prev, guide_description: e.target.value }))
+                }
+                rows={3}
+                placeholder="제휴처를 방문하여 도장을 찍고 풍성한 보상을 받아보세요!"
+                className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs outline-none focus:border-emerald-500"
+              />
+            </label>
+
+            <label className="block text-xs font-semibold text-gray-700">
+              시작 버튼 문구
+              <input
+                value={eventForm.guide_btn_label}
+                onChange={(e) =>
+                  setEventForm((prev) => ({ ...prev, guide_btn_label: e.target.value }))
+                }
+                placeholder="참여하기"
+                className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs outline-none focus:border-emerald-500"
+              />
+            </label>
+          </div>
+
           <label className="block text-sm font-medium text-gray-700">
             도장 버튼 라벨 (선택)
             <input
@@ -630,7 +728,6 @@ export default function EventAdminPanel({
             </span>
           </label>
 
-          {/* 거리 초과 안내 문구 커스텀 필드 */}
           <label className="block text-sm font-medium text-gray-700">
             거리 초과 안내 문구 (선택)
             <input
@@ -646,7 +743,6 @@ export default function EventAdminPanel({
             </span>
           </label>
 
-          {/* 팝업 문구 커스텀 필드 */}
           <label className="block text-sm font-medium text-gray-700">
             당첨 팝업 문구 (선택)
             <input
