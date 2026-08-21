@@ -63,8 +63,8 @@ export default function NaverMapPartnersView({
   onMapReady,
 }: NaverMapPartnersViewProps) {
   const mapElementRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<naver.maps.Map | null>(null);
-  const markersRef = useRef<naver.maps.Marker[]>([]);
+  const mapInstanceRef = useRef<any>(null);
+  const markersRef = useRef<any[]>([]);
   const clustererRef = useRef<any>(null);
   const miniCardOverlayRef = useRef<OverlayLike | null>(null);
   const miniCardElementRef = useRef<HTMLElement | null>(null);
@@ -109,8 +109,9 @@ export default function NaverMapPartnersView({
 
   const openMiniCard = useCallback(
     (partner: PartnerPoint) => {
+      const naverMaps = (window as any).naver?.maps;
       const map = mapInstanceRef.current;
-      if (!map || !window.naver?.maps) return;
+      if (!map || !naverMaps) return;
 
       const lat = Number(partner.latitude);
       const lng = Number(partner.longitude);
@@ -175,8 +176,8 @@ export default function NaverMapPartnersView({
 
       miniCardElementRef.current = cardElement;
 
-      const position = new window.naver.maps.LatLng(lat, lng);
-      const overlay = new window.naver.maps.OverlayView();
+      const position = new naverMaps.LatLng(lat, lng);
+      const overlay = new naverMaps.OverlayView();
 
       overlay.onAdd = function () {
         const panes = this.getPanes();
@@ -200,8 +201,8 @@ export default function NaverMapPartnersView({
       overlay.setMap(map);
       miniCardOverlayRef.current = overlay;
 
-      if (typeof (map as any).panTo === "function") {
-        (map as any).panTo(position);
+      if (typeof map.panTo === "function") {
+        map.panTo(position);
       } else {
         map.setCenter(position);
       }
@@ -210,26 +211,27 @@ export default function NaverMapPartnersView({
   );
 
   useEffect(() => {
-    if (!mapElementRef.current || mapInstanceRef.current || !window.naver?.maps)
+    const naverMaps = (window as any).naver?.maps;
+    if (!mapElementRef.current || mapInstanceRef.current || !naverMaps)
       return;
 
-    const initialCenter = new window.naver.maps.LatLng(33.3846, 126.5535);
-    const mapOptions: any = {
+    const initialCenter = new naverMaps.LatLng(33.3846, 126.5535);
+    const rightBottomPos = naverMaps.Position?.RIGHT_BOTTOM ?? 11;
+
+    const map = new naverMaps.Map(mapElementRef.current, {
       center: initialCenter,
       zoom: 10,
       minZoom: 8,
       maxZoom: 19,
       zoomControl: true,
       zoomControlOptions: {
-        position: window.naver.maps.Position.RIGHT_BOTTOM,
+        position: rightBottomPos,
       },
-    };
-
-    const map = new window.naver.maps.Map(mapElementRef.current, mapOptions);
+    });
 
     mapInstanceRef.current = map;
 
-    window.naver.maps.Event.addListener(map, "click", () => {
+    naverMaps.Event.addListener(map, "click", () => {
       closeMiniCard(true);
     });
 
@@ -237,8 +239,9 @@ export default function NaverMapPartnersView({
   }, [closeMiniCard, onMapReady]);
 
   useEffect(() => {
+    const naverMaps = (window as any).naver?.maps;
     const map = mapInstanceRef.current;
-    if (!map || !window.naver?.maps) return;
+    if (!map || !naverMaps) return;
 
     markersRef.current.forEach((m) => m.setMap(null));
     markersRef.current = [];
@@ -252,7 +255,7 @@ export default function NaverMapPartnersView({
       .map((partner) => {
         const lat = Number(partner.latitude);
         const lng = Number(partner.longitude);
-        const position = new window.naver.maps.LatLng(lat, lng);
+        const position = new naverMaps.LatLng(lat, lng);
 
         const isFav = Boolean(
           favoritesEnabledRef.current &&
@@ -271,16 +274,16 @@ export default function NaverMapPartnersView({
           markerSettingsRef.current
         );
 
-        const marker = new window.naver.maps.Marker({
+        const marker = new naverMaps.Marker({
           position,
           map,
           icon: {
             content: markerEl,
-            anchor: new window.naver.maps.Point(20, 20),
+            anchor: new naverMaps.Point(20, 20),
           },
         });
 
-        window.naver.maps.Event.addListener(marker, "click", () => {
+        naverMaps.Event.addListener(marker, "click", () => {
           openMiniCard(partner);
         });
 
