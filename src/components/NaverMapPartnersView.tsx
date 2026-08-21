@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   DEFAULT_BENEFIT_BTN_LABEL,
-  DEFAULT_MAP_MARKER_IMG,
   DEFAULT_STAMP_BTN_LABEL,
   type MapStampActionOptions,
 } from "@/lib/map-events";
@@ -192,12 +191,11 @@ export default function NaverMapPartnersView({
     [closeMiniCard, effectiveStampLabel]
   );
 
-  // 지도 인스턴스 초기화
   useEffect(() => {
     if (!mapElementRef.current || mapInstanceRef.current || !window.naver?.maps)
       return;
 
-    const initialCenter = new window.naver.maps.LatLng(33.3846, 126.5535); // 제주 중심 좌표
+    const initialCenter = new window.naver.maps.LatLng(33.3846, 126.5535);
     const map = new window.naver.maps.Map(mapElementRef.current, {
       center: initialCenter,
       zoom: 10,
@@ -218,7 +216,6 @@ export default function NaverMapPartnersView({
     onMapReady?.();
   }, [closeMiniCard, onMapReady]);
 
-  // 마커 및 클러스터러 렌더링
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map || !window.naver?.maps) return;
@@ -294,7 +291,6 @@ export default function NaverMapPartnersView({
     }
   }, [partners, openMiniCard]);
 
-  // 선택된 매장 ID 변경 시 말풍선 열기
   useEffect(() => {
     if (!selectedPartnerId) return;
     const target = partners.find((p) => String(p.id) === String(selectedPartnerId));
