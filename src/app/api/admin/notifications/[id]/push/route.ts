@@ -12,9 +12,38 @@ function getAccessToken(request: NextRequest) {
   return authHeader?.startsWith("Bearer ") ? authHeader.slice("Bearer ".length) : null;
 }
 
+async function cleanExpiredSubscriptions(expiredEndpoints: string[]) {
+  if (expiredEndpoints.length === 0) return;
+
+  const admin = createSupabaseAdmin();
+  if (!admin) {
+    console.error("만료된 구독 정리 실패: Supabase admin 설정 없음");
+    return;
+  }
+
+  try {
+    console.log("만료된 구독 정보 정리 시작:", expiredEndpoints.length, "개");
+    
+    const { error } = await admin
+      .from("push_subscriptions")
+      .delete()
+      .in("endpoint", expiredEndpoints);
+
+    if (error) {
+      console.error("만료된 구독 정보 정리 실패:", error.message);
+    } else {
+      console.log("만료된 구독 정보 정리 완료:", expiredEndpoints.length, "개 삭제됨");
+    }
+  } catch (error) {
+    console.error("만료된 구독 정보 정리 중 오류:", error);
+  }
+}
+
 export async function POST(request: NextRequest, { params }: RouteParams) {
   const { id } = await params;
   const user = await getRequestUser(getAccessToken(request));
+
+  console.log("관리자 푸시 알림 발송 요청:", { id, user: user?.email });
 
   if (!user?.email) {
     return NextResponse.json({ error: "관리자 로그인이 필요합니다." }, { status: 401 });
@@ -42,20 +71,27 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     .maybeSingle();
 
   if (fetchError) {
+    console.error("알림 조회 실패:", fetchError.message);
     return NextResponse.json({ error: fetchError.message }, { status: 500 });
   }
 
   if (!notification) {
+    console.error("알림을 찾을 수 없음:", id);
     return NextResponse.json({ error: "알림을 찾을 수 없습니다." }, { status: 404 });
   }
+
+  console.log("알림 조회 완료:", notification.title);
 
   const { data: subscriptions, error: subError } = await admin
     .from("push_subscriptions")
     .select("endpoint, p256dh, auth");
 
   if (subError) {
+    console.error("구독 정보 조회 실패:", subError.message);
     return NextResponse.json({ error: subError.message }, { status: 500 });
   }
+
+  console.log("구독 정보 조회 완료:", subscriptions?.length || 0, "개");
 
   const { data: siteSettings } = await admin
     .from("site_settings")
@@ -73,6 +109,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     notificationImageUrl: notification.image_url,
   });
 
+  console.log("푸시 발송 시작:", {
+    title: notification.title,
+    body: notification.body,
+    subscriptionCount: subscriptions?.length || 0,
+  });
+
   const result = await sendWebPushNotification(subscriptions ?? [], {
     title: notification.title,
     body: notification.body,
@@ -82,12 +124,27 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     image: visuals.image,
   });
 
+  console.log("푸시 발송 결과:", result);
+
+  // 만료된 구독 정보 정리
+  if (result.expiredEndpoints && result.expiredEndpoints.length > 0) {
+    await cleanExpiredSubscriptions(result.expiredEndpoints);
+  }
+
   if (!result.skipped && result.sent > 0) {
     await admin
       .from("site_notifications")
       .update({ push_sent_at: new Date().toISOString() })
       .eq("id", id);
+    console.log("알림 발송 시간 업데이트 완료");
   }
 
-  return NextResponse.json({ result });
+  const response = {
+    ...result,
+    notificationId: id,
+    notificationTitle: notification.title,
+  };
+
+  console.log("푸시 발송 응답:", response);
+  return NextResponse.json(response);
 }

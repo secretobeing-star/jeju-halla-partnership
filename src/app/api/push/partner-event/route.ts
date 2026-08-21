@@ -10,6 +10,33 @@ type PartnerEventPushBody = {
   type: "arrival" | "ready_stamp";
 };
 
+async function cleanExpiredSubscriptions(expiredEndpoints: string[]) {
+  if (expiredEndpoints.length === 0) return;
+
+  const admin = createSupabaseAdmin();
+  if (!admin) {
+    console.error("만료된 구독 정리 실패: Supabase admin 설정 없음");
+    return;
+  }
+
+  try {
+    console.log("만료된 구독 정보 정리 시작:", expiredEndpoints.length, "개");
+    
+    const { error } = await admin
+      .from("push_subscriptions")
+      .delete()
+      .in("endpoint", expiredEndpoints);
+
+    if (error) {
+      console.error("만료된 구독 정보 정리 실패:", error.message);
+    } else {
+      console.log("만료된 구독 정보 정리 완료:", expiredEndpoints.length, "개 삭제됨");
+    }
+  } catch (error) {
+    console.error("만료된 구독 정보 정리 중 오류:", error);
+  }
+}
+
 export async function POST(request: NextRequest) {
   let body: PartnerEventPushBody;
 
@@ -28,6 +55,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  console.log("파트너 이벤트 푸시 요청:", { userId, partnerId, partnerName, type });
+
   const admin = createSupabaseAdmin();
   if (!admin) {
     return NextResponse.json(
@@ -45,12 +74,16 @@ export async function POST(request: NextRequest) {
   const { data: subscriptions, error: subError } = await query;
 
   if (subError) {
+    console.error("구독 정보 조회 실패:", subError.message);
     return NextResponse.json({ error: subError.message }, { status: 500 });
   }
 
   if (!subscriptions || subscriptions.length === 0) {
+    console.log("푸시 구독 정보를 찾을 수 없음:", userId);
     return NextResponse.json({ message: "푸시 구독 정보를 찾을 수 없습니다." }, { status: 200 });
   }
+
+  console.log("구독 정보 조회 완료:", subscriptions.length, "개");
 
   const { data: siteSettings } = await admin
     .from("site_settings")
@@ -80,5 +113,22 @@ export async function POST(request: NextRequest) {
     badge: visuals.badge,
   });
 
-  return NextResponse.json({ success: true, result });
+  // 만료된 구독 정보 정리
+  if (result.expiredEndpoints && result.expiredEndpoints.length > 0) {
+    await cleanExpiredSubscriptions(result.expiredEndpoints);
+  }
+
+  const response = {
+    success: true,
+    result: {
+      sent: result.sent,
+      failed: result.failed,
+      skipped: result.skipped,
+      message: result.message,
+      errors: result.errors,
+    },
+  };
+
+  console.log("푸시 발송 응답:", response);
+  return NextResponse.json(response);
 }

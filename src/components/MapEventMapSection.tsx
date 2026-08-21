@@ -542,11 +542,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
   const isStampFeatureActive = !isDefaultTab && Boolean(activeEvent) && isEventLive(activeEvent!) && !isCompleted;
 
-  const timerTemplate = config.cooldown_timer_template || DEFAULT_TIMER_TEMPLATE;
-  const timerBadgeText = timerTemplate.includes("{remain}")
-    ? timerTemplate.replace(/\{remain\}/g, formatCooldownRemain(cooldownRemainMs))
-    : `${timerTemplate} ${formatCooldownRemain(cooldownRemainMs)}`;
-
   return (
     <div className="map-event-shell" style={{ position: "relative" }}>
       <div className="map-event-tabs" role="tablist">
@@ -702,58 +697,31 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
             >
               <span>⏸️</span>
               <span>주변 제휴처를 찾을 수 없어 타이머가 일시정지되었습니다.</span>
+          ) : nearestUnstampedPartnerInside && isReadyToStamp ? (
+            <div
+              style={{
+                position: "absolute",
+                top: "16px",
+                left: "50%",
+                transform: "translateX(-50%)",
+                zIndex: 20,
+                backgroundColor: "#059669",
+                color: "#ffffff",
+                padding: "8px 18px",
+                borderRadius: "9999px",
+                fontSize: "13px",
+                fontWeight: "700",
+                boxShadow: "0 6px 16px rgba(5, 150, 105, 0.4)",
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                pointerEvents: "none",
+                border: "1px solid rgba(255, 255, 255, 0.2)",
+              }}
+            >
+              <span>지금 바로 도장을 찍어보세요!</span>
             </div>
-          ) : nearestUnstampedPartnerInside ? (
-            cooldownRemainMs > 0 ? (
-              <div
-                style={{
-                  position: "absolute",
-                  top: "16px",
-                  left: "50%",
-                  transform: "translateX(-50%)",
-                  zIndex: 20,
-                  backgroundColor: "rgba(17, 24, 39, 0.92)",
-                  color: "#ffffff",
-                  padding: "8px 18px",
-                  borderRadius: "9999px",
-                  fontSize: "13px",
-                  fontWeight: "700",
-                  boxShadow: "0 6px 16px rgba(0, 0, 0, 0.3)",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  pointerEvents: "none",
-                  border: "1px solid rgba(255, 255, 255, 0.15)",
-                }}
-              >
-                <span>⏰</span>
-                <span>{timerBadgeText}</span>
-              </div>
-            ) : isReadyToStamp ? (
-              <div
-                style={{
-                  position: "absolute",
-                  top: "16px",
-                  left: "50%",
-                  transform: "translateX(-50%)",
-                  zIndex: 20,
-                  backgroundColor: "#059669",
-                  color: "#ffffff",
-                  padding: "8px 18px",
-                  borderRadius: "9999px",
-                  fontSize: "13px",
-                  fontWeight: "700",
-                  boxShadow: "0 6px 16px rgba(5, 150, 105, 0.4)",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  pointerEvents: "none",
-                  border: "1px solid rgba(255, 255, 255, 0.2)",
-                }}
-              >
-                <span>지금 바로 도장을 찍어보세요!</span>
-              </div>
-            ) : null
+          ) : null
           ) : (
             <div
               style={{
