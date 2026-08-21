@@ -28,31 +28,31 @@ const DEFAULT_COOLDOWN_MSG = "시간이 조금 더 지난 후({remain})에 도�
 const DEFAULT_TIMER_TEMPLATE = "다음 도장까지 {remain}";
 const LOCAL_STORAGE_COOLDOWN_KEY = "site_place_cooldown_map_v2";
 
-function sendCooldownEndNotification(storeName?: string) {
+/** PWA 알림 지원 (타입 에러 방어) */
+function triggerCooldownDoneNotification(title: string, body: string) {
   if (typeof window === "undefined" || !("Notification" in window)) return;
 
   if (Notification.permission === "granted") {
-    const title = "도장 찍기 준비 완료!";
-    const body = storeName
-      ? `[${storeName}] 쿨다운 시간이 끝났습니다. 지금 바로 도장을 찍어보세요!`
-      : "쿨다운 시간이 끝났습니다. 지금 바로 도장을 찍고 보상을 받아보세요!";
-
     try {
-      new Notification(title, {
+      const options = {
         body,
         icon: "/icons/icon-192x192.png",
         badge: "/icons/icon-192x192.png",
-        vibrate: [200, 100, 200] as unknown as number[],
-      });
+        vibrate: [200, 100, 200],
+      } as unknown as NotificationOptions;
+
+      new Notification(title, options);
     } catch {
-      // ServiceWorker 기반 대체 알림
-      navigator.serviceWorker?.ready.then((reg) => {
-        reg.showNotification(title, {
-          body,
-          icon: "/icons/icon-192x192.png",
-          badge: "/icons/icon-192x192.png",
+      try {
+        navigator.serviceWorker?.ready.then((registration) => {
+          registration.showNotification(title, {
+            body,
+            icon: "/icons/icon-192x192.png",
+            badge: "/icons/icon-192x192.png",
+            vibrate: [200, 100, 200],
+          } as unknown as NotificationOptions);
         });
-      });
+      } catch {}
     }
   }
 }
@@ -193,10 +193,11 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const [rewardModal, setRewardModal] = useState<RewardModalState | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
 
+  // [PWA 앱 종료 후 재실행 대응]
   const [placeEnteredAtMap, setPlaceEnteredAtMap] = useState<Record<string, string>>({});
   const [storageLoaded, setStorageLoaded] = useState(false);
-  const notifiedPlacesRef = useRef<Set<string>>(new Set());
 
+  // 마운트 시 localStorage에서 복원
   useEffect(() => {
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_COOLDOWN_KEY);
@@ -205,11 +206,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       }
     } catch {}
     setStorageLoaded(true);
-
-    // 알림 권한 사전 요청
-    if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "default") {
-      void Notification.requestPermission();
-    }
   }, []);
 
   const [activeNearbyPlaceId, setActiveNearbyPlaceId] = useState<string | null>(null);
@@ -263,6 +259,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return raw;
   }, [activeEvent, isDefaultTab, props.partners]);
 
+  // 탭 진입 시: 이미 저장된 기록이 없을 때만 새로 생성
   useEffect(() => {
     if (!storageLoaded || isDefaultTab || !activeEvent || visiblePartners.length === 0) return;
 
@@ -290,6 +287,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     }
   }, [storageLoaded, activeTabId, activeEvent, isDefaultTab, visiblePartners, activeNearbyPlaceId]);
 
+  // 실시간 GPS 반경 감지: 다른 제휴처로 이동 시 해당 제휴처 타이머 시작 (기존 기록 보존)
   useEffect(() => {
     if (!lastKnownGeoRef.current || visiblePartners.length === 0) return;
 
@@ -334,6 +332,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     }
   }, [nowMs, activeEvent, visiblePartners, activeNearbyPlaceId]);
 
+  // 남은 쿨다운 시간 계산
   const currentPlaceCooldownRemainMs = useMemo(() => {
     if (!activeEvent) return 0;
 
@@ -349,27 +348,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     const enteredMs = Date.parse(enteredAt);
     return Math.max(0, enteredMs + cooldownMinutes * 60_000 - nowMs);
   }, [activeEvent, activeNearbyPlaceId, visiblePartners, placeEnteredAtMap, nowMs]);
-
-  // [푸시 알림 트리거]: 쿨다운이 끝나는 순간 1회 발송
-  useEffect(() => {
-    if (isDefaultTab || !activeEvent) return;
-
-    const cooldownMinutes = Math.max(0, Number(activeEvent.cooldown_minutes) || 0);
-    if (cooldownMinutes <= 0) return;
-
-    const targetPlace = visiblePartners.find((p) => p.id === (activeNearbyPlaceId || visiblePartners[0]?.id));
-    if (!targetPlace) return;
-
-    const enteredAt = placeEnteredAtMap[targetPlace.id];
-    if (!enteredAt) return;
-
-    const remain = Date.parse(enteredAt) + cooldownMinutes * 60_000 - nowMs;
-
-    if (remain <= 0 && !notifiedPlacesRef.current.has(targetPlace.id)) {
-      notifiedPlacesRef.current.add(targetPlace.id);
-      sendCooldownEndNotification(targetPlace.name);
-    }
-  }, [currentPlaceCooldownRemainMs, isDefaultTab, activeEvent, visiblePartners, activeNearbyPlaceId, placeEnteredAtMap, nowMs]);
 
   useEffect(() => {
     if (activeTabId === DEFAULT_TAB_ID) return;
@@ -507,6 +485,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
     if (stampedPlaceIds.has(partner.id)) return;
 
+    // 클라이언트단 쿨다운 체크
     const cooldownMinutes = Math.max(0, Number(activeEvent.cooldown_minutes) || 0);
     const enteredAt = placeEnteredAtMap[partner.id] || placeEnteredAtMap[visiblePartners[0]?.id];
     const currentPlaceCooldown = (cooldownMinutes > 0 && enteredAt)
