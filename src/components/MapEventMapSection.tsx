@@ -41,7 +41,6 @@ function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: num
   return R * c;
 }
 
-// 🎯 미터를 보기 쉽게 m 또는 km로 자동 변환하는 함수
 function formatDistance(meters: number): string {
   if (meters >= 1000) {
     return `${(meters / 1000).toFixed(1)}km`;
@@ -137,7 +136,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const [showIntroModal, setShowIntroModal] = useState(false);
   const [currentGeo, setCurrentGeo] = useState<{ latitude: number; longitude: number } | null>(null);
   
-  // 🎯 쿨타임 만료 타임스탬프 및 남은 잔여 시간(밀리초) 상태
   const [cooldownTargetTime, setCooldownTargetTime] = useState<number>(0);
   const [cooldownRemainMs, setCooldownRemainMs] = useState<number>(0);
 
@@ -171,7 +169,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return raw;
   }, [activeEvent, isDefaultTab, props.partners]);
 
-  // 🎯 문자열 ID 매칭 안정화
   const stampedPlaceIds = useMemo(
     () => new Set((progress?.stamped_places ?? []).map(String)),
     [progress],
@@ -206,7 +203,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return () => navigator.geolocation.clearWatch(watchId);
   }, []);
 
-  // 🎯 찜한 제휴 중에서만 가장 가까운 제휴 및 거리 계산
   const nearestTargetPartner = useMemo(() => {
     if (isDefaultTab || !activeEvent || !currentGeo || !hasFavorites) return null;
 
@@ -238,7 +234,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return null;
   }, [nearestTargetPartner]);
 
-  // 🎯 [수정됨] 초기 만료 타임스탬프 로드 (만료된 경우 무한 재설정 방지 및 0초 유지)
+  // 🎯 [방어 조치] 찜 변경이나 다른 상호작용과 무관하게, 저장된 쿨타임 만료 시각을 독립적으로 불러옴
   useEffect(() => {
     if (isDefaultTab || !activeEvent || isGuest) {
       setCooldownTargetTime(0);
@@ -266,7 +262,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     }
   }, [activeEvent, isDefaultTab, isGuest, getEventCooldownKey]);
 
-  // 🎯 [수정됨] 타이머 카운트다운 (0초 도달 시 멈춰서 도장 대기 상태 유지)
+  // 🎯 [방어 조치] 찜 상태나 위치 변동에 영향받지 않고 오직 시간 흐름에 따라 안전하게 타이머 구동
   useEffect(() => {
     if (isDefaultTab || !activeEvent || isGuest || cooldownTargetTime <= 0) {
       return;
@@ -510,7 +506,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         throw new Error(payload.error || "도장을 찍지 못했습니다.");
       }
 
-      // 도장 완료 시: 쿨타임 분 설정이 있으면 다음 도장까지의 쿨타임 시작, 없으면 0초 대기
+      // 도장 완료 시: 설정된 쿨타임 부여, 없으면 초기화
       const cooldownMinutes = Math.max(0, Number(activeEvent?.cooldown_minutes) || 0);
       if (cooldownMinutes > 0) {
         const nextTarget = Date.now() + cooldownMinutes * 60_000;

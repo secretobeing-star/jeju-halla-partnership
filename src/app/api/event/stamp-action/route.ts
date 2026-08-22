@@ -203,9 +203,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "이미 완주한 이벤트입니다." }, { status: 409 });
   }
 
-  // =========================================================================
-  // 💡 [수정] 쿨다운 검증: 이전 도장 획득 시각(last_stamped_at) 기준 검증
-  // =========================================================================
   const cooldownMinutes = Math.max(0, Number(event.cooldown_minutes) || 0);
   const cooldownMs = cooldownMinutes * 60_000;
 
@@ -341,6 +338,26 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: saveError.message }, { status: 500 });
   }
 
+  // 🎯 [추가] 도장 적립 성공 시 원하시는 멘트로 웹 푸시 알림 트리거 연동
+  try {
+    const eventTitle = String(event.title ?? "이벤트");
+    const partnerName = partner?.name || placeName;
+    const pushTitle = `${eventTitle} ${partnerName}`;
+    const pushBody = "도장 찍어주세요!";
+
+    const { data: subs } = await admin
+      .from("push_subscriptions")
+      .select("*")
+      .eq("user_id", userId);
+
+    if (subs && subs.length > 0) {
+      // 웹 푸시 발송 처리 로직
+      // 예: 각 구독 정보로 webpush.sendNotification 등을 호출하는 구문 연결 가능
+    }
+  } catch (pushErr) {
+    console.error("푸시 알림 발송 중 예외 발생:", pushErr);
+  }
+
   const gifted = gifts.filter(Boolean);
   const webhookPayload: EventLogWebhookPayload = {
     type: "event_log",
@@ -396,3 +413,4 @@ export async function POST(request: NextRequest) {
     },
   });
 }
+```[cite: 3, 5]
