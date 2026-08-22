@@ -229,7 +229,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return null;
   }, [nearestTargetPartner]);
 
-  // 🎯 제휴처별 개별 쿨타임 키 및 초기화 체크 키 생성 함수
   const getPartnerCooldownKey = useCallback(
     (eventId: string, placeId: string) => `site_event_remain_seconds_${userId || "guest"}_${eventId}_${placeId}`,
     [userId],
@@ -242,7 +241,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
   const currentActivePartnerId = nearestUnstampedPartnerInside?.partner.id || "";
 
-  // 🎯 [수정됨] 탭 전환이나 제휴 재선택 시 쿨타임이 초기화되지 않도록 안전하게 유지
   useEffect(() => {
     if (isDefaultTab || !activeEvent || isGuest || !currentActivePartnerId) {
       setCooldownTargetTime(0);
@@ -257,7 +255,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     const now = Date.now();
     const cooldownMinutes = Math.max(0, Number(activeEvent?.cooldown_minutes) || 0);
 
-    // 1. 이미 진행 중인 타이머가 있다면 유지
     if (savedTarget !== null) {
       const targetTime = Number(savedTarget);
       if (targetTime > now) {
@@ -267,7 +264,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       }
     }
 
-    // 2. 최초 진입인 경우에만 쿨타임 부여 (이미 초기화된 적이 있다면 0초 유지)
     if (!isInitialized && cooldownMinutes > 0) {
       const newTargetTime = now + cooldownMinutes * 60_000;
       localStorage.setItem(storageKey, String(newTargetTime));
@@ -281,7 +277,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     setCooldownRemainMs(0);
   }, [activeEvent, activeTabId, isDefaultTab, isGuest, currentActivePartnerId, getPartnerCooldownKey, getPartnerInitializedKey]);
 
-  // 🎯 현재 선택된 제휴처 기준 타이머 구동
   useEffect(() => {
     if (isDefaultTab || !activeEvent || isGuest || !currentActivePartnerId || cooldownTargetTime <= 0) {
       return;
@@ -431,6 +426,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     const sessionUserId = sessionStudent?.studentId?.trim() || "";
     const sessionName = sessionStudent?.name?.trim() || "";
     const sessionDepartment = sessionStudent?.department?.trim() || "";
+    const sessionToken = localStorage.getItem("sessionToken") || ""; // 🌟 세션 토큰 가져오기
 
     if (!sessionUserId || !sessionStudent || !sessionName) {
       openLoginModal();
@@ -477,6 +473,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
           latitude: geo.latitude,
           longitude: geo.longitude,
           timestamp: Date.now(),
+          sessionToken, // 🌟 서버 전송 데이터에 세션 토큰 추가
         }),
       });
 
@@ -525,46 +522,16 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         throw new Error(payload.error || "도장을 찍지 못했습니다.");
       }
 
-      // 도장 완료 시 해당 제휴처의 쿨타임 키 제거
       localStorage.removeItem(getPartnerCooldownKey(activeEvent.id, partner.id));
       setCooldownTargetTime(0);
       setCooldownRemainMs(0);
 
       if (payload.progress) setProgress(payload.progress);
 
-      const popupKind = payload.popup || (payload.completion?.reached ? "completion" : (payload.giftCount ?? 0) > 0 ? "win" : "lose");
+      // 🌟 도장 찍기 성공 시 즉시 새로고침하여 상태 반영
+      window.location.reload();
+      return;
 
-      if (popupKind === "completion") {
-        setRewardModal({
-          kind: "completion",
-          title: config.completion_popup_title || "완주 보상",
-          body: payload.messages?.completion || "완주 보상이 선물함으로 지급되었습니다!",
-          banner: activeEvent.banner_img,
-          rewardName: payload.completion?.reward?.reward_name || null,
-          rewardImg: payload.completion?.reward?.reward_img || null,
-          showGiftButton: (payload.giftCount ?? 0) > 0,
-        });
-      } else if (popupKind === "win") {
-        setRewardModal({
-          kind: "win",
-          title: config.win_popup_title || "당첨",
-          body: payload.messages?.win || "선물함으로 보상이 지급되었습니다!",
-          banner: activeEvent.banner_img,
-          rewardName: payload.step?.reward?.reward_name || null,
-          rewardImg: payload.step?.reward?.reward_img || null,
-          showGiftButton: true,
-        });
-      } else {
-        setRewardModal({
-          kind: "lose",
-          title: "미당첨",
-          body: payload.messages?.lose || "아쉽지만 이번엔 당첨되지 않았습니다.",
-          banner: activeEvent.banner_img,
-          rewardName: null,
-          rewardImg: null,
-          showGiftButton: false,
-        });
-      }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "도장 찍기에 실패했습니다.");
     } finally {
