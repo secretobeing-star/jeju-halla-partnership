@@ -80,7 +80,7 @@ function toSerializable(value: unknown, depth = 0): unknown {
     for (const key of Object.getOwnPropertyNames(value).slice(0, 30)) {
       if (key in out) continue;
       try {
-        out[key] = toSerializable((value as Record<string, unknown>)[key], depth + 1);
+        out[key] = toSerializable((value as unknown as Record<string, unknown>)[key], depth + 1);
       } catch {
         out[key] = "[unreadable]";
       }
