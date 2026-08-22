@@ -15,6 +15,7 @@ type FavoriteStampBody = {
   userId?: string;
   placeId?: string;
   eventId?: string;
+  sessionToken?: string; // 🌟 추가: 클라이언트에서 전달받는 세션 토큰
 };
 
 async function pickReward(
@@ -84,12 +85,29 @@ export async function POST(request: NextRequest) {
   const userId = body.userId?.trim() || "";
   const placeId = body.placeId?.trim() || "";
   const eventId = body.eventId?.trim() || "";
+  const sessionToken = body.sessionToken?.trim() || "";
 
   if (!userId || !placeId || !eventId) {
     return NextResponse.json(
       { error: "userId, placeId, eventId가 필요합니다." },
       { status: 400 },
     );
+  }
+
+  // 🌟 안전장치: 세션 토큰 유효성 검증 (다른 기기 로그인 또는 세션 만료 차단)
+  if (userId) {
+    const { data: sessionData } = await admin
+      .from("site_user_sessions")
+      .select("session_token")
+      .eq("student_id", userId)
+      .maybeSingle();
+
+    if (!sessionData || (sessionToken && sessionData.session_token !== sessionToken)) {
+      return NextResponse.json(
+        { error: "다른 기기에서 로그인되었거나 세션이 만료되었습니다. 다시 로그인해 주세요." },
+        { status: 401 }
+      );
+    }
   }
 
   const { data: eventRow, error: eventError } = await admin
