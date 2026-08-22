@@ -170,4 +170,3 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   console.log("푸시 발송 응답:", response);
   return NextResponse.json(response);
 }
-```[cite: 5]
