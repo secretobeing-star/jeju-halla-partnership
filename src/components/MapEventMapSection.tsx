@@ -174,11 +174,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     [progress],
   );
 
-  const getEventCooldownKey = useCallback(
-    (eventId: string) => `site_event_remain_seconds_${userId || "guest"}_${eventId}`,
-    [userId],
-  );
-
   const getIntroConfirmedKey = useCallback(
     (eventId: string) => `site_intro_confirmed_${userId || "guest"}_${eventId}`,
     [userId],
@@ -234,15 +229,24 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return null;
   }, [nearestTargetPartner]);
 
-  // 🎯 [방어 조치] 찜 변경이나 다른 상호작용과 무관하게, 저장된 쿨타임 만료 시각을 독립적으로 불러옴
+  // 🎯 [핵심] 제휴처별 개별 쿨타임 키 생성 함수 (이벤트 ID + 현재 바라보는 제휴처 ID 조합)
+  const getPartnerCooldownKey = useCallback(
+    (eventId: string, placeId: string) => `site_event_remain_seconds_${userId || "guest"}_${eventId}_${placeId}`,
+    [userId],
+  );
+
+  // 현재 집중하고 있는 제휴처 ID
+  const currentActivePartnerId = nearestUnstampedPartnerInside?.partner.id || "";
+
+  // 🎯 [수정] 제휴처를 바꿀 때마다 해당 제휴처의 개별 쿨타임 타임스탬프를 로드
   useEffect(() => {
-    if (isDefaultTab || !activeEvent || isGuest) {
+    if (isDefaultTab || !activeEvent || isGuest || !currentActivePartnerId) {
       setCooldownTargetTime(0);
       setCooldownRemainMs(0);
       return;
     }
 
-    const storageKey = getEventCooldownKey(activeEvent.id);
+    const storageKey = getPartnerCooldownKey(activeEvent.id, currentActivePartnerId);
     const savedTarget = localStorage.getItem(storageKey);
     const now = Date.now();
 
@@ -260,11 +264,11 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       setCooldownTargetTime(0);
       setCooldownRemainMs(0);
     }
-  }, [activeEvent, isDefaultTab, isGuest, getEventCooldownKey]);
+  }, [activeEvent, isDefaultTab, isGuest, currentActivePartnerId, getPartnerCooldownKey]);
 
-  // 🎯 [방어 조치] 찜 상태나 위치 변동에 영향받지 않고 오직 시간 흐름에 따라 안전하게 타이머 구동
+  // 🎯 타이머 구동 (현재 선택된 제휴처 기준)
   useEffect(() => {
-    if (isDefaultTab || !activeEvent || isGuest || cooldownTargetTime <= 0) {
+    if (isDefaultTab || !activeEvent || isGuest || !currentActivePartnerId || cooldownTargetTime <= 0) {
       return;
     }
 
@@ -274,7 +278,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       if (remain <= 0) {
         setCooldownRemainMs(0);
         setCooldownTargetTime(0);
-        localStorage.removeItem(getEventCooldownKey(activeEvent.id));
+        localStorage.removeItem(getPartnerCooldownKey(activeEvent.id, currentActivePartnerId));
       } else {
         setCooldownRemainMs(remain);
       }
@@ -283,7 +287,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     updateRemain();
     const timer = window.setInterval(updateRemain, 1000);
     return () => window.clearInterval(timer);
-  }, [isDefaultTab, activeEvent, isGuest, cooldownTargetTime, getEventCooldownKey]);
+  }, [isDefaultTab, activeEvent, isGuest, currentActivePartnerId, cooldownTargetTime, getPartnerCooldownKey]);
 
   const isTimerPaused = useMemo(() => {
     if (isDefaultTab || !activeEvent) return false;
@@ -468,7 +472,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
           const remainMs = payload.cooldownMs ?? 60_000;
           if (activeEvent) {
             const targetTime = Date.now() + remainMs;
-            localStorage.setItem(getEventCooldownKey(activeEvent.id), String(targetTime));
+            localStorage.setItem(getPartnerCooldownKey(activeEvent.id, partner.id), String(targetTime));
             setCooldownTargetTime(targetTime);
             setCooldownRemainMs(remainMs);
           }
@@ -506,18 +510,10 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         throw new Error(payload.error || "도장을 찍지 못했습니다.");
       }
 
-      // 도장 완료 시: 설정된 쿨타임 부여, 없으면 초기화
-      const cooldownMinutes = Math.max(0, Number(activeEvent?.cooldown_minutes) || 0);
-      if (cooldownMinutes > 0) {
-        const nextTarget = Date.now() + cooldownMinutes * 60_000;
-        localStorage.setItem(getEventCooldownKey(activeEvent.id), String(nextTarget));
-        setCooldownTargetTime(nextTarget);
-        setCooldownRemainMs(cooldownMinutes * 60_000);
-      } else {
-        localStorage.removeItem(getEventCooldownKey(activeEvent.id));
-        setCooldownTargetTime(0);
-        setCooldownRemainMs(0);
-      }
+      // 도장 완료 시 해당 제휴처의 쿨타임 키 제거
+      localStorage.removeItem(getPartnerCooldownKey(activeEvent.id, partner.id));
+      setCooldownTargetTime(0);
+      setCooldownRemainMs(0);
 
       if (payload.progress) setProgress(payload.progress);
 
