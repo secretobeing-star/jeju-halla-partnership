@@ -549,11 +549,22 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         throw new Error(payload.error || "도장을 찍지 못했습니다.");
       }
 
-      localStorage.removeItem(getPartnerCooldownKey(activeEvent.id, partner.id));
-      setCooldownTargetTime(0);
-      setCooldownRemainMs(0);
+      if (payload.progress) {
+        setProgress(payload.progress);
+      }
 
-      if (payload.progress) setProgress(payload.progress);
+      // 🌟 도장 성공 시 타이머 꼬임 방지를 위해 쿨타임 즉시 세팅
+      const activeCooldownMinutes = Number(activeEvent?.cooldown_minutes) || 0;
+      if (activeCooldownMinutes > 0) {
+        const nextTargetTime = Date.now() + activeCooldownMinutes * 60_000;
+        localStorage.setItem(getPartnerCooldownKey(activeEvent.id, partner.id), String(nextTargetTime));
+        setCooldownTargetTime(nextTargetTime);
+        setCooldownRemainMs(activeCooldownMinutes * 60_000);
+      } else {
+        localStorage.removeItem(getPartnerCooldownKey(activeEvent.id, partner.id));
+        setCooldownTargetTime(0);
+        setCooldownRemainMs(0);
+      }
 
       const popupKind = payload.popup || (payload.completion?.reached ? "completion" : (payload.giftCount ?? 0) > 0 ? "win" : "lose");
 
