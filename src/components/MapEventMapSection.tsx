@@ -229,15 +229,20 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return null;
   }, [nearestTargetPartner]);
 
-  // 🎯 제휴처별 개별 쿨타임 키 생성 함수
+  // 🎯 제휴처별 개별 쿨타임 키 및 초기화 체크 키 생성 함수
   const getPartnerCooldownKey = useCallback(
     (eventId: string, placeId: string) => `site_event_remain_seconds_${userId || "guest"}_${eventId}_${placeId}`,
     [userId],
   );
 
+  const getPartnerInitializedKey = useCallback(
+    (eventId: string, placeId: string) => `site_event_initialized_${userId || "guest"}_${eventId}_${placeId}`,
+    [userId],
+  );
+
   const currentActivePartnerId = nearestUnstampedPartnerInside?.partner.id || "";
 
-  // 🎯 [수정됨] 새로운 이벤트나 제휴 진입 시, 이전 만료 기록이 없거나 이미 끝났다면 무조건 새로운 쿨타임 타이머부터 강제 시작
+  // 🎯 [수정됨] 탭 전환이나 제휴 재선택 시 쿨타임이 초기화되지 않도록 안전하게 유지
   useEffect(() => {
     if (isDefaultTab || !activeEvent || isGuest || !currentActivePartnerId) {
       setCooldownTargetTime(0);
@@ -246,32 +251,35 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     }
 
     const storageKey = getPartnerCooldownKey(activeEvent.id, currentActivePartnerId);
+    const initKey = getPartnerInitializedKey(activeEvent.id, currentActivePartnerId);
     const savedTarget = localStorage.getItem(storageKey);
+    const isInitialized = localStorage.getItem(initKey);
     const now = Date.now();
     const cooldownMinutes = Math.max(0, Number(activeEvent?.cooldown_minutes) || 0);
 
+    // 1. 이미 진행 중인 타이머가 있다면 유지
     if (savedTarget !== null) {
       const targetTime = Number(savedTarget);
       if (targetTime > now) {
-        // 아직 쿨타임이 남았다면 남은 시간 유지
         setCooldownTargetTime(targetTime);
         setCooldownRemainMs(targetTime - now);
         return;
       }
     }
 
-    // 💡 저장된 기록이 없거나(최초 진입), 이전 타이머가 이미 완료되어 만료된 상태였다면
-    // 곧바로 '도장 찍으세요'를 띄우지 않고, 새로운 쿨타임 타이머를 강제로 새로 시작시킴!
-    if (cooldownMinutes > 0) {
+    // 2. 최초 진입인 경우에만 쿨타임 부여 (이미 초기화된 적이 있다면 0초 유지)
+    if (!isInitialized && cooldownMinutes > 0) {
       const newTargetTime = now + cooldownMinutes * 60_000;
       localStorage.setItem(storageKey, String(newTargetTime));
+      localStorage.setItem(initKey, "true");
       setCooldownTargetTime(newTargetTime);
       setCooldownRemainMs(cooldownMinutes * 60_000);
-    } else {
-      setCooldownTargetTime(0);
-      setCooldownRemainMs(0);
+      return;
     }
-  }, [activeEvent, isDefaultTab, isGuest, currentActivePartnerId, getPartnerCooldownKey]);
+
+    setCooldownTargetTime(0);
+    setCooldownRemainMs(0);
+  }, [activeEvent, activeTabId, isDefaultTab, isGuest, currentActivePartnerId, getPartnerCooldownKey, getPartnerInitializedKey]);
 
   // 🎯 현재 선택된 제휴처 기준 타이머 구동
   useEffect(() => {
