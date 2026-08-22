@@ -37,6 +37,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "구독 정보가 올바르지 않습니다." }, { status: 400 });
   }
 
+  // 🌟 upsert 시 client_key 기준으로 저장
   const { error } = await admin.from("push_subscriptions").upsert(
     {
       client_key: clientKey,
