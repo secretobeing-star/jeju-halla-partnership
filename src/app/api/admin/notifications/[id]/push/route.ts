@@ -130,7 +130,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   console.log("푸시 발송 결과:", result);
 
-  // 만료된 구독 정보 정리
   if (result.expiredEndpoints && result.expiredEndpoints.length > 0) {
     await cleanExpiredSubscriptions(result.expiredEndpoints);
   }
@@ -172,5 +171,3 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   return NextResponse.json(response);
 }
 ```[cite: 5]
-
-이 코드를 적용하시면 서버 콘솔과 관리자 페이지 네트워크 응답 양쪽에서 모든 진단 정보와 에러 로그를 한눈에 확인할 수 있습니다!
