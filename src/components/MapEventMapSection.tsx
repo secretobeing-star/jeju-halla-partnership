@@ -18,6 +18,7 @@ import type { MapMarkerCustomSettings } from "@/lib/naver-map-partner-ui";
 import { getCurrentGeolocation } from "@/lib/geolocation";
 import { getSiteMemberSession } from "@/lib/site-member-session";
 import { SITE_STUDENT_NEED_LOGIN_EVENT } from "@/lib/site-student-auth-settings";
+import { supabase } from "@/lib/supabase"; // 🌟 슈퍼베이스 클라이언트 임포트
 
 const DEFAULT_TAB_ID = "__default_partners__";
 const DEFAULT_STAMP_BAR_BG = "#ecfdf5";
@@ -382,6 +383,33 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     void loadProgress();
   }, [loadProgress]);
 
+  // 🌟 슈퍼베이스 Realtime 구독: 다른 기기에서 도장을 찍어 DB가 바뀌면 실시간 동기화
+  useEffect(() => {
+    if (!activeEvent || !userId) return;
+
+    const channel = supabase
+      .channel(`user-progress-${userId}-${activeEvent.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "user_event_progress",
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          if (payload.new && (payload.new as UserEventProgress).event_id === activeEvent.id) {
+            setProgress(payload.new as UserEventProgress);
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [activeEvent, userId]);
+
   const handleFullRefresh = useCallback(async () => {
     setRefreshing(true);
     await Promise.all([loadPublic(), loadProgress()]);
@@ -426,7 +454,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     const sessionUserId = sessionStudent?.studentId?.trim() || "";
     const sessionName = sessionStudent?.name?.trim() || "";
     const sessionDepartment = sessionStudent?.department?.trim() || "";
-    const sessionToken = localStorage.getItem("sessionToken") || ""; // 🌟 세션 토큰 가져오기
+    const sessionToken = localStorage.getItem("sessionToken") || "";
 
     if (!sessionUserId || !sessionStudent || !sessionName) {
       openLoginModal();
@@ -473,7 +501,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
           latitude: geo.latitude,
           longitude: geo.longitude,
           timestamp: Date.now(),
-          sessionToken, // 🌟 서버 전송 데이터에 세션 토큰 추가
+          sessionToken,
         }),
       });
 
@@ -528,7 +556,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
       if (payload.progress) setProgress(payload.progress);
 
-      // 🌟 도장 찍기 성공 시 즉시 새로고침하여 상태 반영
       window.location.reload();
       return;
 
