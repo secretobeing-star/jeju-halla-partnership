@@ -210,7 +210,8 @@ export async function POST(request: NextRequest) {
     const lastStampedMs = Date.parse(String(progressRow.last_stamped_at));
     if (Number.isFinite(lastStampedMs)) {
       const elapsedMs = Date.now() - lastStampedMs;
-      if (elapsedMs < cooldownMs) {
+      // 💡 미세한 네트워크 오차 및 타이밍 차이를 고려하여 2초(2000ms)의 버퍼 적용
+      if (elapsedMs < cooldownMs - 2000) {
         const remainMs = cooldownMs - elapsedMs;
         const remainMin = Math.floor(remainMs / 60_000);
         const remainSec = Math.max(1, Math.ceil((remainMs % 60_000) / 1000));
@@ -338,7 +339,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: saveError.message }, { status: 500 });
   }
 
-  // 🎯 도장 적립 성공 시 웹 푸시 알림 발송 로직 적용
+  // 🎯 도장 적립 성공 시 웹 푸시 알림 발송 로직 적용[cite: 4]
   try {
     const eventTitle = String(event.title ?? "이벤트");
     const partnerName = partner?.name || placeName;
