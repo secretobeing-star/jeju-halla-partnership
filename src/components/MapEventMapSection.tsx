@@ -251,14 +251,15 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     }
   }, [activeEvent, isDefaultTab, isGuest, getEventCooldownKey, nearestUnstampedPartnerInside]);
 
-  // 🎯 [핵심] 제휴처 반경 안에 있을 때만 1초마다 남은 시간 1000ms씩 차감 (벗어나거나 없으면 완벽 정지)
+  // 🎯 [수정됨] 타이머가 리렌더링으로 꼬이지 않도록 cooldownRemainMs 의존성 제거
   useEffect(() => {
-    if (isDefaultTab || !activeEvent || isGuest || !hasFavorites || !nearestUnstampedPartnerInside || cooldownRemainMs <= 0) {
+    if (isDefaultTab || !activeEvent || isGuest || !hasFavorites || !nearestUnstampedPartnerInside) {
       return;
     }
 
     const timer = window.setInterval(() => {
       setCooldownRemainMs((prev) => {
+        if (prev <= 0) return 0;
         const next = Math.max(0, prev - 1000);
         const storageKey = getEventCooldownKey(activeEvent.id);
         localStorage.setItem(storageKey, String(next));
@@ -267,7 +268,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     }, 1000);
 
     return () => window.clearInterval(timer);
-  }, [isDefaultTab, activeEvent, isGuest, hasFavorites, nearestUnstampedPartnerInside, cooldownRemainMs, getEventCooldownKey]);
+  }, [isDefaultTab, activeEvent, isGuest, hasFavorites, nearestUnstampedPartnerInside, getEventCooldownKey]);
 
   const isTimerPaused = useMemo(() => {
     if (isDefaultTab || !activeEvent) return false;
