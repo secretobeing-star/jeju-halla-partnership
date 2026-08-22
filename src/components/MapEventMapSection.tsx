@@ -41,6 +41,14 @@ function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: num
   return R * c;
 }
 
+// 🎯 [추가] 미터를 보기 쉽게 m 또는 km로 자동 변환하는 함수
+function formatDistance(meters: number): string {
+  if (meters >= 1000) {
+    return `${(meters / 1000).toFixed(1)}km`;
+  }
+  return `${Math.round(meters)}m`;
+}
+
 function stampBarCssVars(
   event: Pick<MapEvent, "stamp_bar_bg_color" | "stamp_bar_bg_img">,
 ): CSSProperties {
@@ -129,7 +137,8 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const [showIntroModal, setShowIntroModal] = useState(false);
   const [currentGeo, setCurrentGeo] = useState<{ latitude: number; longitude: number } | null>(null);
   
-  // 🎯 남은 잔여 시간(밀리초) 상태
+  // 🎯 쿨타임 만료 타임스탬프 및 남은 잔여 시간(밀리초) 상태
+  const [cooldownTargetTime, setCooldownTargetTime] = useState<number>(0);
   const [cooldownRemainMs, setCooldownRemainMs] = useState<number>(0);
 
   const student = getSiteMemberSession()?.student;
@@ -162,8 +171,9 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return raw;
   }, [activeEvent, isDefaultTab, props.partners]);
 
+  // 🎯 문자열 ID 매칭 안정화
   const stampedPlaceIds = useMemo(
-    () => new Set(progress?.stamped_places ?? []),
+    () => new Set((progress?.stamped_places ?? []).map(String)),
     [progress],
   );
 
@@ -228,47 +238,60 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return null;
   }, [nearestTargetPartner]);
 
-  // 🎯 초기 남은 쿨타임 로컬스토리지에서 로드
+  // 🎯 초기 만료 타임스탬프 로컬스토리지에서 로드
   useEffect(() => {
     if (isDefaultTab || !activeEvent || isGuest) {
+      setCooldownTargetTime(0);
       setCooldownRemainMs(0);
       return;
     }
 
     const storageKey = getEventCooldownKey(activeEvent.id);
-    const savedRemain = localStorage.getItem(storageKey);
+    const savedTarget = localStorage.getItem(storageKey);
+    const now = Date.now();
 
-    if (savedRemain !== null) {
-      setCooldownRemainMs(Math.max(0, Number(savedRemain)));
+    if (savedTarget !== null) {
+      const targetTime = Number(savedTarget);
+      if (targetTime > now) {
+        setCooldownTargetTime(targetTime);
+        setCooldownRemainMs(targetTime - now);
+      } else {
+        localStorage.removeItem(storageKey);
+        setCooldownTargetTime(0);
+        setCooldownRemainMs(0);
+      }
     } else {
-      // 신규 진입 시 쿨타임 설정
       const cooldownMinutes = Math.max(0, Number(activeEvent?.cooldown_minutes) || 0);
       if (cooldownMinutes > 0 && nearestUnstampedPartnerInside) {
-        const initialMs = cooldownMinutes * 60_000;
-        localStorage.setItem(storageKey, String(initialMs));
-        setCooldownRemainMs(initialMs);
+        const targetTime = now + cooldownMinutes * 60_000;
+        localStorage.setItem(storageKey, String(targetTime));
+        setCooldownTargetTime(targetTime);
+        setCooldownRemainMs(targetTime - now);
       }
     }
   }, [activeEvent, isDefaultTab, isGuest, getEventCooldownKey, nearestUnstampedPartnerInside]);
 
-  // 🎯 [수정됨] 타이머가 리렌더링으로 꼬이지 않도록 cooldownRemainMs 의존성 제거
+  // 🎯 [핵심] 절대 타임스탬프 기준 타이머 (탭을 내렸다가 와도 절대 멈추거나 밀리지 않음)
   useEffect(() => {
-    if (isDefaultTab || !activeEvent || isGuest || !hasFavorites || !nearestUnstampedPartnerInside) {
+    if (isDefaultTab || !activeEvent || isGuest || !hasFavorites || !nearestUnstampedPartnerInside || cooldownTargetTime <= 0) {
       return;
     }
 
-    const timer = window.setInterval(() => {
-      setCooldownRemainMs((prev) => {
-        if (prev <= 0) return 0;
-        const next = Math.max(0, prev - 1000);
-        const storageKey = getEventCooldownKey(activeEvent.id);
-        localStorage.setItem(storageKey, String(next));
-        return next;
-      });
-    }, 1000);
+    const updateRemain = () => {
+      const now = Date.now();
+      const remain = cooldownTargetTime - now;
+      if (remain <= 0) {
+        setCooldownRemainMs(0);
+        localStorage.removeItem(getEventCooldownKey(activeEvent.id));
+      } else {
+        setCooldownRemainMs(remain);
+      }
+    };
 
+    updateRemain();
+    const timer = window.setInterval(updateRemain, 1000);
     return () => window.clearInterval(timer);
-  }, [isDefaultTab, activeEvent, isGuest, hasFavorites, nearestUnstampedPartnerInside, getEventCooldownKey]);
+  }, [isDefaultTab, activeEvent, isGuest, hasFavorites, nearestUnstampedPartnerInside, cooldownTargetTime, getEventCooldownKey]);
 
   const isTimerPaused = useMemo(() => {
     if (isDefaultTab || !activeEvent) return false;
@@ -403,7 +426,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       return;
     }
 
-    if (stampedPlaceIds.has(partner.id)) return;
+    if (stampedPlaceIds.has(String(partner.id))) return;
 
     let geo = currentGeo;
     if (!geo?.latitude || !geo?.longitude) {
@@ -451,9 +474,11 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       if (!response.ok) {
         if (payload.cooldownError) {
           const remainMs = payload.cooldownMs ?? 60_000;
-          if (activeEvent && payload.cooldownMs) {
-            localStorage.setItem(getEventCooldownKey(activeEvent.id), String(payload.cooldownMs));
-            setCooldownRemainMs(payload.cooldownMs);
+          if (activeEvent) {
+            const targetTime = Date.now() + remainMs;
+            localStorage.setItem(getEventCooldownKey(activeEvent.id), String(targetTime));
+            setCooldownTargetTime(targetTime);
+            setCooldownRemainMs(remainMs);
           }
           const remainText = formatCooldownRemain(remainMs);
           setRewardModal({
@@ -491,6 +516,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
       // 도장 완료 시 쿨타임 초기화
       localStorage.removeItem(getEventCooldownKey(activeEvent.id));
+      setCooldownTargetTime(0);
       setCooldownRemainMs(0);
 
       if (payload.progress) setProgress(payload.progress);
@@ -781,7 +807,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
               <span>📍</span>
               <span>
                 {nearestTargetPartner
-                  ? `${nearestTargetPartner.partner.name} (약 ${Math.round(nearestTargetPartner.distance)}m) · 가까운 제휴 찾으러 가볼까요?`
+                  ? `${nearestTargetPartner.partner.name} (약 ${formatDistance(nearestTargetPartner.distance)}) · 가까운 제휴 찾으러 가볼까요?`
                   : "가까운 제휴를 찾을 수 없습니다."}
               </span>
             </div>
