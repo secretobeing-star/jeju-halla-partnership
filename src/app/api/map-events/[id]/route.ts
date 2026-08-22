@@ -27,7 +27,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (typeof body.tab_name === "string") patch.tab_name = body.tab_name.trim();
   if (typeof body.title === "string") patch.title = body.title.trim();
-  if (typeof body.description === "string") patch.description = body.description.trim();
+  if (typeof body.description === "string") patch.description = body.description;
   if (typeof body.is_active === "boolean") patch.is_active = body.is_active;
   if (body.start_at !== undefined) patch.start_at = body.start_at ? String(body.start_at) : null;
   if (body.end_at !== undefined) patch.end_at = body.end_at ? String(body.end_at) : null;
@@ -42,6 +42,15 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   }
   if (typeof body.guide_text === "string") patch.guide_text = body.guide_text.trim() || null;
   if (typeof body.distance_error_message === "string") patch.distance_error_message = body.distance_error_message.trim() || null;
+  if (body.win_popup_message !== undefined) {
+    patch.win_popup_message = String(body.win_popup_message ?? "").trim() || null;
+  }
+  if (body.lose_popup_message !== undefined) {
+    patch.lose_popup_message = String(body.lose_popup_message ?? "").trim() || null;
+  }
+  if (body.completion_popup_message !== undefined) {
+    patch.completion_popup_message = String(body.completion_popup_message ?? "").trim() || null;
+  }
   if (typeof body.win_message === "string") patch.win_message = body.win_message.trim() || null;
   if (typeof body.lose_message === "string") patch.lose_message = body.lose_message.trim() || null;
   if (typeof body.completion_message === "string") {

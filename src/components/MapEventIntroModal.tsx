@@ -9,6 +9,18 @@ type MapEventIntroModalProps = {
   onConfirm: () => void;
 };
 
+function resolveIntroHtml(event: MapEvent) {
+  const description = event.description?.trim() || "";
+  if (description) {
+    return description;
+  }
+  return event.guide_text?.trim() || "";
+}
+
+function isHtmlContent(value: string) {
+  return /<[a-z][\s\S]*>/i.test(value);
+}
+
 export default function MapEventIntroModal({
   event,
   isOpen,
@@ -17,12 +29,10 @@ export default function MapEventIntroModal({
 }: MapEventIntroModalProps) {
   if (!isOpen || !event) return null;
 
-  // HTML 태그가 포함되어 있는지 확인
-  const guideHtml = event.guide_text?.trim() || "";
-  const isHtml = /<[a-z][\s\S]*>/i.test(guideHtml);
-
-  // 배너 또는 인트로 이미지 추출
-  const bannerImg = event.banner_img?.trim() || (event as { intro_img?: string }).intro_img?.trim() || null;
+  const bodyHtml = resolveIntroHtml(event);
+  const isHtml = isHtmlContent(bodyHtml);
+  const bannerImg =
+    event.banner_img?.trim() || (event as { intro_img?: string }).intro_img?.trim() || null;
 
   return (
     <div
@@ -56,9 +66,15 @@ export default function MapEventIntroModal({
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* 상단 이벤트 배너/설명 이미지 */}
         {bannerImg ? (
-          <div style={{ width: "100%", maxHeight: "200px", overflow: "hidden", backgroundColor: "#f3f4f6" }}>
+          <div
+            style={{
+              width: "100%",
+              maxHeight: "200px",
+              overflow: "hidden",
+              backgroundColor: "#f3f4f6",
+            }}
+          >
             <img
               src={bannerImg}
               alt=""
@@ -68,7 +84,6 @@ export default function MapEventIntroModal({
         ) : null}
 
         <div style={{ padding: "20px", overflowY: "auto", flex: 1 }}>
-          {/* 이벤트 타이틀 */}
           <h3
             style={{
               fontSize: "18px",
@@ -82,9 +97,9 @@ export default function MapEventIntroModal({
             {event.title}
           </h3>
 
-          {/* 이벤트 설명 본문 (HTML 파싱 지원) */}
-          {guideHtml ? (
+          {bodyHtml ? (
             <div
+              className="map-event-intro-body"
               style={{
                 backgroundColor: "#f9fafb",
                 borderRadius: "12px",
@@ -97,18 +112,14 @@ export default function MapEventIntroModal({
               }}
             >
               {isHtml ? (
-                <div
-                  dangerouslySetInnerHTML={{ __html: guideHtml }}
-                  style={{ all: "inherit" }}
-                />
+                <div dangerouslySetInnerHTML={{ __html: bodyHtml }} />
               ) : (
-                <p style={{ margin: 0, whiteSpace: "pre-line" }}>{guideHtml}</p>
+                <p style={{ margin: 0, whiteSpace: "pre-line" }}>{bodyHtml}</p>
               )}
             </div>
           ) : null}
         </div>
 
-        {/* 하단 참여하기 버튼 */}
         <div style={{ padding: "0 20px 20px 20px" }}>
           <button
             type="button"

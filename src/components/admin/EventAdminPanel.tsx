@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import AdminCollapsibleSection from "@/components/admin/AdminCollapsibleSection";
+import RichTextEditor from "@/components/RichTextEditor";
 import { formatSiteSettingsSaveError } from "@/lib/site-settings-save-error";
 import {
   fromDatetimeLocalValue,
@@ -26,15 +27,6 @@ type EventFormState = {
   list_type: SiteEventListType;
   is_active: boolean;
   sort_order: number;
-  distance_error_message: string;
-  win_popup_message: string;
-  lose_popup_message: string;
-  completion_popup_message: string;
-  stamp_btn_label: string;
-  // 💡 시작 안내 팝업 필드 추가
-  guide_image_url: string | null;
-  guide_description: string;
-  guide_btn_label: string;
 };
 
 type TabFormState = {
@@ -55,14 +47,6 @@ const EMPTY_EVENT: EventFormState = {
   list_type: "event",
   is_active: true,
   sort_order: 0,
-  distance_error_message: "제휴처와의 거리가 {distance}m 남았습니다. 지정된 반경({radius}m) 내에서 도장을 찍어주세요.",
-  win_popup_message: "",
-  lose_popup_message: "",
-  completion_popup_message: "",
-  stamp_btn_label: "도장 찍기",
-  guide_image_url: null,
-  guide_description: "",
-  guide_btn_label: "참여하기",
 };
 
 const EMPTY_TAB: TabFormState = {
@@ -73,6 +57,14 @@ const EMPTY_TAB: TabFormState = {
   is_active: true,
   sort_order: 0,
 };
+
+function isRichTextEmpty(html: string) {
+  return !html.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
+}
+
+function stripRichText(html: string) {
+  return html.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
+}
 
 type EventAdminPanelProps = {
   settings: SiteSettings;
@@ -93,7 +85,6 @@ export default function EventAdminPanel({
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [thumbnailUploading, setThumbnailUploading] = useState(false);
-  const [guideImageUploading, setGuideImageUploading] = useState(false);
   const [iconUploading, setIconUploading] = useState(false);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
@@ -166,16 +157,7 @@ export default function EventAdminPanel({
     setTabForm(EMPTY_TAB);
   }
 
-  function startEditEvent(event: SiteEvent & { 
-    distance_error_message?: string | null;
-    win_popup_message?: string | null;
-    lose_popup_message?: string | null;
-    completion_popup_message?: string | null;
-    stamp_btn_label?: string | null;
-    guide_image_url?: string | null;
-    guide_description?: string | null;
-    guide_btn_label?: string | null;
-  }) {
+  function startEditEvent(event: SiteEvent) {
     setEditingEventId(event.id);
     setSelectedEventId(event.id);
     setEventForm({
@@ -187,14 +169,6 @@ export default function EventAdminPanel({
       list_type: normalizeSiteEventListType(event.list_type),
       is_active: event.is_active,
       sort_order: event.sort_order ?? 0,
-      distance_error_message: event.distance_error_message ?? "",
-      win_popup_message: event.win_popup_message ?? "",
-      lose_popup_message: event.lose_popup_message ?? "",
-      completion_popup_message: event.completion_popup_message ?? "",
-      stamp_btn_label: event.stamp_btn_label ?? "도장 찍기",
-      guide_image_url: event.guide_image_url ?? null,
-      guide_description: event.guide_description ?? "",
-      guide_btn_label: event.guide_btn_label ?? "참여하기",
     });
     resetTabForm();
     onMessage("");
@@ -212,21 +186,6 @@ export default function EventAdminPanel({
       onMessage(`썸네일 업로드 실패: ${getStorageErrorMessage(error)}`);
     } finally {
       setThumbnailUploading(false);
-    }
-  }
-
-  async function handleGuideImageUpload(file: File) {
-    setGuideImageUploading(true);
-    onMessage("");
-
-    try {
-      const url = await uploadPartnershipImage(file, "events");
-      setEventForm((prev) => ({ ...prev, guide_image_url: url }));
-      onMessage("안내 팝업 이미지가 업로드되었습니다.");
-    } catch (error) {
-      onMessage(`안내 팝업 이미지 업로드 실패: ${getStorageErrorMessage(error)}`);
-    } finally {
-      setGuideImageUploading(false);
     }
   }
 
@@ -272,21 +231,13 @@ export default function EventAdminPanel({
 
     const payload = {
       title,
-      description: eventForm.description.trim() || null,
+      description: isRichTextEmpty(eventForm.description) ? null : eventForm.description,
       thumbnail_url: eventForm.thumbnail_url?.trim() || null,
       starts_at: fromDatetimeLocalValue(eventForm.starts_at),
       ends_at: fromDatetimeLocalValue(eventForm.ends_at),
       list_type: normalizeSiteEventListType(eventForm.list_type),
       is_active: eventForm.is_active,
       sort_order: Number.isFinite(eventForm.sort_order) ? eventForm.sort_order : 0,
-      distance_error_message: eventForm.distance_error_message.trim() || null,
-      win_popup_message: eventForm.win_popup_message.trim() || null,
-      lose_popup_message: eventForm.lose_popup_message.trim() || null,
-      completion_popup_message: eventForm.completion_popup_message.trim() || null,
-      stamp_btn_label: eventForm.stamp_btn_label.trim() || null,
-      guide_image_url: eventForm.guide_image_url?.trim() || null,
-      guide_description: eventForm.guide_description.trim() || null,
-      guide_btn_label: eventForm.guide_btn_label.trim() || "참여하기",
       updated_at: new Date().toISOString(),
     };
 
@@ -622,7 +573,7 @@ export default function EventAdminPanel({
 
       <AdminCollapsibleSection
         title={editingEventId ? "이벤트 수정" : "이벤트 등록"}
-        description="카드 목록용 썸네일·기간·분류 및 거리 초과 안내 문구를 설정합니다."
+        description="카드 목록용 썸네일·기간·분류를 설정합니다."
       >
         <form onSubmit={handleEventSubmit} className="space-y-4">
           <label className="block text-sm font-medium text-gray-700">
@@ -635,158 +586,20 @@ export default function EventAdminPanel({
             />
           </label>
 
-          <label className="block text-sm font-medium text-gray-700">
-            설명 (선택)
-            <textarea
-              value={eventForm.description}
-              onChange={(e) => setEventForm((prev) => ({ ...prev, description: e.target.value }))}
-              rows={2}
-              placeholder=""
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-emerald-500"
-            />
-          </label>
-
-          {/* 💡 [신규 추가] 이벤트 시작 안내 팝업 설정 박스 */}
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 space-y-3">
-            <p className="text-sm font-bold text-emerald-900 flex items-center gap-1.5">
-              <span>📢</span> 이벤트 시작 안내 팝업 설정 (선택)
+          <div>
+            <p className="text-sm font-medium text-gray-700">설명 (선택)</p>
+            <p className="mt-0.5 text-xs text-gray-500">
+              게시판 글처럼 사진·글을 작성할 수 있습니다. 비우면 목록에 설명이 표시되지 않습니다.
             </p>
-            <p className="text-xs text-gray-500">
-              사용자가 이벤트 탭에 진입했을 때 처음 표시되는 안내 팝업창을 구성합니다.
-            </p>
-
-            <div>
-              <p className="text-xs font-semibold text-gray-700">안내 팝업 대표 이미지</p>
-              <input
-                type="file"
-                accept="image/*"
-                disabled={guideImageUploading}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) void handleGuideImageUpload(file);
-                  e.target.value = "";
-                }}
-                className="mt-1 block w-full text-xs text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-white file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-emerald-700"
+            <div className="mt-2">
+              <RichTextEditor
+                value={eventForm.description}
+                onChange={(html) => setEventForm((prev) => ({ ...prev, description: html }))}
+                placeholder="이벤트 안내 내용을 입력하세요."
+                minHeightClassName="min-h-40"
               />
-              {guideImageUploading ? <p className="mt-1 text-xs text-gray-500">업로드 중...</p> : null}
-              {eventForm.guide_image_url?.trim() ? (
-                <div className="mt-2 flex items-center gap-3">
-                  <img
-                    src={eventForm.guide_image_url.trim()}
-                    alt="안내 이미지 미리보기"
-                    className="h-16 w-24 rounded-lg object-cover ring-1 ring-gray-200"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setEventForm((prev) => ({ ...prev, guide_image_url: null }))}
-                    className="text-xs text-red-600 hover:underline"
-                  >
-                    이미지 제거
-                  </button>
-                </div>
-              ) : null}
             </div>
-
-            <label className="block text-xs font-semibold text-gray-700">
-              안내 상세 문구
-              <textarea
-                value={eventForm.guide_description}
-                onChange={(e) =>
-                  setEventForm((prev) => ({ ...prev, guide_description: e.target.value }))
-                }
-                rows={3}
-                placeholder="제휴처를 방문하여 도장을 찍고 풍성한 보상을 받아보세요!"
-                className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs outline-none focus:border-emerald-500"
-              />
-            </label>
-
-            <label className="block text-xs font-semibold text-gray-700">
-              시작 버튼 문구
-              <input
-                value={eventForm.guide_btn_label}
-                onChange={(e) =>
-                  setEventForm((prev) => ({ ...prev, guide_btn_label: e.target.value }))
-                }
-                placeholder="참여하기"
-                className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs outline-none focus:border-emerald-500"
-              />
-            </label>
           </div>
-
-          <label className="block text-sm font-medium text-gray-700">
-            도장 버튼 라벨 (선택)
-            <input
-              value={eventForm.stamp_btn_label}
-              onChange={(e) =>
-                setEventForm((prev) => ({ ...prev, stamp_btn_label: e.target.value }))
-              }
-              placeholder="도장 찍기"
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-emerald-500"
-            />
-            <span className="mt-1 block text-xs font-normal text-gray-500">
-              * 비워두면 기본값 "도장 찍기"가 사용됩니다.
-            </span>
-          </label>
-
-          <label className="block text-sm font-medium text-gray-700">
-            거리 초과 안내 문구 (선택)
-            <input
-              value={eventForm.distance_error_message}
-              onChange={(e) =>
-                setEventForm((prev) => ({ ...prev, distance_error_message: e.target.value }))
-              }
-              placeholder="제휴처와의 거리가 {distance}m 남았습니다. 지정된 반경({radius}m) 내에서 도장을 찍어주세요."
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-emerald-500"
-            />
-            <span className="mt-1 block text-xs font-normal text-gray-500">
-              * <code>{`{distance}`}</code>는 남은 거리(m), <code>{`{radius}`}</code>는 허용 반경(m)으로 자동 치환됩니다. 비워두면 기본 문구가 사용됩니다.
-            </span>
-          </label>
-
-          <label className="block text-sm font-medium text-gray-700">
-            당첨 팝업 문구 (선택)
-            <input
-              value={eventForm.win_popup_message}
-              onChange={(e) =>
-                setEventForm((prev) => ({ ...prev, win_popup_message: e.target.value }))
-              }
-              placeholder="축하합니다! 선물함으로 보상이 지급되었습니다!"
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-emerald-500"
-            />
-            <span className="mt-1 block text-xs font-normal text-gray-500">
-              * 비워두면 기본 문구가 사용됩니다.
-            </span>
-          </label>
-
-          <label className="block text-sm font-medium text-gray-700">
-            미당첨 팝업 문구 (선택)
-            <input
-              value={eventForm.lose_popup_message}
-              onChange={(e) =>
-                setEventForm((prev) => ({ ...prev, lose_popup_message: e.target.value }))
-              }
-              placeholder="아쉽지만 이번엔 당첨되지 않았습니다."
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-emerald-500"
-            />
-            <span className="mt-1 block text-xs font-normal text-gray-500">
-              * 비워두면 기본 문구가 사용됩니다.
-            </span>
-          </label>
-
-          <label className="block text-sm font-medium text-gray-700">
-            완주 팝업 문구 (선택)
-            <input
-              value={eventForm.completion_popup_message}
-              onChange={(e) =>
-                setEventForm((prev) => ({ ...prev, completion_popup_message: e.target.value }))
-              }
-              placeholder="완주 축하합니다! 선물함으로 보상이 지급되었습니다!"
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-emerald-500"
-            />
-            <span className="mt-1 block text-xs font-normal text-gray-500">
-              * 비워두면 기본 문구가 사용됩니다.
-            </span>
-          </label>
 
           <div>
             <p className="text-sm font-medium text-gray-700">목록 카드 썸네일</p>
@@ -921,7 +734,9 @@ export default function EventAdminPanel({
                 >
                   <p className="font-medium text-gray-900">{item.title}</p>
                   {item.description?.trim() ? (
-                    <p className="mt-0.5 text-sm text-gray-500">{item.description.trim()}</p>
+                    <p className="mt-0.5 text-sm text-gray-500 line-clamp-2">
+                      {stripRichText(item.description)}
+                    </p>
                   ) : null}
                   <p className="mt-1 text-xs text-gray-400">
                     순서 {item.sort_order} · {item.is_active ? "표시중" : "숨김"}

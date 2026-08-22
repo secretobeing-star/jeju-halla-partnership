@@ -411,7 +411,10 @@ export default function SiteEventsBoardSection({
                     {showDetail ? selectedEvent?.title || resolvedLabel : resolvedLabel}
                   </h2>
                   {showDetail && selectedEvent?.description?.trim() ? (
-                    <p className="site-event-dialog__desc">{selectedEvent.description.trim()}</p>
+                    <div
+                      className="site-event-dialog__desc site-event-dialog__desc--rich"
+                      dangerouslySetInnerHTML={{ __html: selectedEvent.description.trim() }}
+                    />
                   ) : null}
                   {showDetail ? (
                     <p className="site-event-dialog__range">

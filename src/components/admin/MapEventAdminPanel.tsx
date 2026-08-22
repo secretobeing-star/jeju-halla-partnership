@@ -15,7 +15,8 @@ import {
   type MapEventRewardType,
 } from "@/lib/map-events";
 import { fromDatetimeLocalValue, toDatetimeLocalValue } from "@/lib/site-events";
-import { uploadPartnershipImage, getStorageErrorMessage } from "@/lib/storage";
+import { getAdminAccessToken } from "@/lib/admin-api";
+import { getStorageErrorMessage } from "@/lib/storage";
 import { supabase, type Partner } from "@/lib/supabase";
 import type { PublicCardFrameItem } from "@/data/cardFrames";
 
@@ -132,6 +133,10 @@ function eventToForm(event: MapEvent): EventForm {
   };
 }
 
+function isRichTextEmpty(html: string) {
+  return !html.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
+}
+
 function asHexColor(value: string, fallback = "#ecfdf5") {
   return /^#[0-9a-fA-F]{6}$/.test(value.trim()) ? value.trim() : fallback;
 }
@@ -170,6 +175,9 @@ function ImageField({
             삭제
           </button>
         </div>
+      ) : null}
+      {uploading ? (
+        <p className="mt-1 text-xs text-emerald-600">업로드 중...</p>
       ) : null}
       <input
         type="file"
@@ -223,7 +231,7 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
     [editingId, events],
   );
 
-  const loadAll = useCallback(async () => {
+  const loadAll = useCallback(async (): Promise<MapEvent[]> => {
     setLoading(true);
     try {
       const [configPayload, eventsPayload, framesPayload] = await Promise.all([
@@ -250,8 +258,10 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
         .select("id, name, category, is_active")
         .order("name", { ascending: true });
       setPartners((partnerRows ?? []) as Partner[]);
+      return eventsPayload.events ?? [];
     } catch (error) {
       onMessage(error instanceof Error ? error.message : "지도 이벤트를 불러오지 못했습니다.");
+      return [];
     } finally {
       setLoading(false);
     }
@@ -264,7 +274,25 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
   async function uploadImage(file: File, key: string) {
     setUploadingKey(key);
     try {
-      return await uploadPartnershipImage(file, "map-events");
+      const token = await getAdminAccessToken();
+      if (!token) {
+        throw new Error("관리자 로그인이 필요합니다. 다시 로그인 후 업로드해 주세요.");
+      }
+
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("folder", "map-events");
+
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const payload = (await response.json()) as { url?: string; error?: string };
+      if (!response.ok || !payload.url) {
+        throw new Error(payload.error || "이미지 업로드에 실패했습니다.");
+      }
+      return payload.url;
     } catch (error) {
       onMessage(getStorageErrorMessage(error));
       return null;
@@ -305,7 +333,7 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
       const payload = {
         tab_name: form.tab_name,
         title: form.title,
-        description: form.description,
+        description: isRichTextEmpty(form.description) ? "" : form.description,
         is_active: form.is_active,
         start_at: form.start_at ? fromDatetimeLocalValue(form.start_at) : null,
         end_at: form.end_at ? fromDatetimeLocalValue(form.end_at) : null,
@@ -335,6 +363,7 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
         completion_message: form.completion_message?.trim() || null,
         partner_ids: form.partner_ids,
       };
+      let savedId = editingId;
       if (editingId) {
         await adminApiFetch(`/api/map-events/${editingId}`, {
           method: "PATCH",
@@ -342,14 +371,22 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
         });
         onMessage("이벤트를 수정했습니다.");
       } else {
-        await adminApiFetch("/api/map-events", {
+        const result = (await adminApiFetch("/api/map-events", {
           method: "POST",
           body: JSON.stringify(payload),
-        });
+        })) as { event?: MapEvent };
+        savedId = result.event?.id ?? null;
+        if (savedId) {
+          setEditingId(savedId);
+        }
         onMessage("이벤트를 만들었습니다.");
-        setForm(EMPTY_FORM);
       }
-      await loadAll();
+
+      const refreshedEvents = await loadAll();
+      const savedEvent = savedId ? refreshedEvents.find((item) => item.id === savedId) : null;
+      if (savedEvent) {
+        setForm(eventToForm(savedEvent));
+      }
     } catch (error) {
       onMessage(error instanceof Error ? error.message : "이벤트 저장에 실패했습니다.");
     } finally {

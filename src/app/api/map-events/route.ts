@@ -194,7 +194,7 @@ export async function POST(request: NextRequest) {
   const payload = {
     tab_name: tabName,
     title,
-    description: body.description?.trim() || "",
+    description: typeof body.description === "string" ? body.description : "",
     is_active: Boolean(body.is_active),
     start_at: body.start_at || null,
     end_at: body.end_at || null,

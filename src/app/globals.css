@@ -2248,6 +2248,29 @@ html.dark-mode .site-event-dialog__nav-summary {
   color: #6b7280;
 }
 
+.site-event-dialog__desc--rich img,
+.map-event-intro-body img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+  margin: 0.35rem 0;
+}
+
+.site-event-dialog__desc--rich p,
+.map-event-intro-body p {
+  margin: 0.35rem 0;
+}
+
+.site-event-dialog__desc--rich p:first-child,
+.map-event-intro-body p:first-child {
+  margin-top: 0;
+}
+
+.site-event-dialog__desc--rich p:last-child,
+.map-event-intro-body p:last-child {
+  margin-bottom: 0;
+}
+
 .site-event-dialog__range {
   margin: 0.35rem 0 0;
   font-size: 0.75rem;
