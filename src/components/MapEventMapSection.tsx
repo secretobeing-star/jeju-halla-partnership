@@ -41,7 +41,7 @@ function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: num
   return R * c;
 }
 
-// 🎯 [추가] 미터를 보기 쉽게 m 또는 km로 자동 변환하는 함수
+// 🎯 미터를 보기 쉽게 m 또는 km로 자동 변환하는 함수
 function formatDistance(meters: number): string {
   if (meters >= 1000) {
     return `${(meters / 1000).toFixed(1)}km`;
@@ -238,7 +238,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return null;
   }, [nearestTargetPartner]);
 
-  // 🎯 초기 만료 타임스탬프 로컬스토리지에서 로드
+  // 🎯 [수정됨] 초기 만료 타임스탬프 로드 (만료된 경우 무한 재설정 방지 및 0초 유지)
   useEffect(() => {
     if (isDefaultTab || !activeEvent || isGuest) {
       setCooldownTargetTime(0);
@@ -261,19 +261,14 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         setCooldownRemainMs(0);
       }
     } else {
-      const cooldownMinutes = Math.max(0, Number(activeEvent?.cooldown_minutes) || 0);
-      if (cooldownMinutes > 0 && nearestUnstampedPartnerInside) {
-        const targetTime = now + cooldownMinutes * 60_000;
-        localStorage.setItem(storageKey, String(targetTime));
-        setCooldownTargetTime(targetTime);
-        setCooldownRemainMs(targetTime - now);
-      }
+      setCooldownTargetTime(0);
+      setCooldownRemainMs(0);
     }
-  }, [activeEvent, isDefaultTab, isGuest, getEventCooldownKey, nearestUnstampedPartnerInside]);
+  }, [activeEvent, isDefaultTab, isGuest, getEventCooldownKey]);
 
-  // 🎯 [핵심] 절대 타임스탬프 기준 타이머 (탭을 내렸다가 와도 절대 멈추거나 밀리지 않음)
+  // 🎯 [수정됨] 타이머 카운트다운 (0초 도달 시 멈춰서 도장 대기 상태 유지)
   useEffect(() => {
-    if (isDefaultTab || !activeEvent || isGuest || !hasFavorites || !nearestUnstampedPartnerInside || cooldownTargetTime <= 0) {
+    if (isDefaultTab || !activeEvent || isGuest || cooldownTargetTime <= 0) {
       return;
     }
 
@@ -282,6 +277,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       const remain = cooldownTargetTime - now;
       if (remain <= 0) {
         setCooldownRemainMs(0);
+        setCooldownTargetTime(0);
         localStorage.removeItem(getEventCooldownKey(activeEvent.id));
       } else {
         setCooldownRemainMs(remain);
@@ -291,7 +287,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     updateRemain();
     const timer = window.setInterval(updateRemain, 1000);
     return () => window.clearInterval(timer);
-  }, [isDefaultTab, activeEvent, isGuest, hasFavorites, nearestUnstampedPartnerInside, cooldownTargetTime, getEventCooldownKey]);
+  }, [isDefaultTab, activeEvent, isGuest, cooldownTargetTime, getEventCooldownKey]);
 
   const isTimerPaused = useMemo(() => {
     if (isDefaultTab || !activeEvent) return false;
@@ -514,10 +510,18 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         throw new Error(payload.error || "도장을 찍지 못했습니다.");
       }
 
-      // 도장 완료 시 쿨타임 초기화
-      localStorage.removeItem(getEventCooldownKey(activeEvent.id));
-      setCooldownTargetTime(0);
-      setCooldownRemainMs(0);
+      // 도장 완료 시: 쿨타임 분 설정이 있으면 다음 도장까지의 쿨타임 시작, 없으면 0초 대기
+      const cooldownMinutes = Math.max(0, Number(activeEvent?.cooldown_minutes) || 0);
+      if (cooldownMinutes > 0) {
+        const nextTarget = Date.now() + cooldownMinutes * 60_000;
+        localStorage.setItem(getEventCooldownKey(activeEvent.id), String(nextTarget));
+        setCooldownTargetTime(nextTarget);
+        setCooldownRemainMs(cooldownMinutes * 60_000);
+      } else {
+        localStorage.removeItem(getEventCooldownKey(activeEvent.id));
+        setCooldownTargetTime(0);
+        setCooldownRemainMs(0);
+      }
 
       if (payload.progress) setProgress(payload.progress);
 
