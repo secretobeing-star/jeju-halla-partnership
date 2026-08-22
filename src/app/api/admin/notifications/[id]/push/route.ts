@@ -5,6 +5,10 @@ import { resolvePushSiteOrigin, resolvePushVisuals } from "@/lib/push-asset-url"
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 import { sendWebPushNotification } from "@/lib/web-push-server";
 
+export const runtime = "nodejs";
+
+const ADMIN_NOTIFICATION_PUSH_ROUTE_VERSION = "admin-notification-push-2026-08-22-v1";
+
 type RouteParams = { params: Promise<{ id: string }> };
 
 function getAccessToken(request: NextRequest) {
@@ -141,10 +145,32 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   const response = {
     ...result,
+    result: {
+      sent: result.sent,
+      failed: result.failed,
+      skipped: result.skipped,
+      message: result.message ?? null,
+      expiredEndpoints: result.expiredEndpoints ?? [],
+      errors: result.errors ?? [],
+      diagnosticVersion: result.diagnosticVersion ?? null,
+      endpointHostCounts: result.endpointHostCounts ?? {},
+      errorDetails: result.errorDetails ?? [],
+      errorDetailsTruncated: result.errorDetailsTruncated ?? false,
+    },
     notificationId: id,
     notificationTitle: notification.title,
+    diagnostics: {
+      routeVersion: ADMIN_NOTIFICATION_PUSH_ROUTE_VERSION,
+      routeRuntime: runtime,
+      subscriptionCount: subscriptions?.length ?? 0,
+      siteOrigin,
+      sendDiagnosticVersion: result.diagnosticVersion ?? null,
+    },
   };
 
   console.log("푸시 발송 응답:", response);
   return NextResponse.json(response);
 }
+```[cite: 5]
+
+이 코드를 적용하시면 서버 콘솔과 관리자 페이지 네트워크 응답 양쪽에서 모든 진단 정보와 에러 로그를 한눈에 확인할 수 있습니다!
