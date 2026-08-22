@@ -229,16 +229,15 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return null;
   }, [nearestTargetPartner]);
 
-  // 🎯 [핵심] 제휴처별 개별 쿨타임 키 생성 함수 (이벤트 ID + 현재 바라보는 제휴처 ID 조합)
+  // 🎯 제휴처별 개별 쿨타임 키 생성 함수
   const getPartnerCooldownKey = useCallback(
     (eventId: string, placeId: string) => `site_event_remain_seconds_${userId || "guest"}_${eventId}_${placeId}`,
     [userId],
   );
 
-  // 현재 집중하고 있는 제휴처 ID
   const currentActivePartnerId = nearestUnstampedPartnerInside?.partner.id || "";
 
-  // 🎯 [수정] 제휴처를 바꿀 때마다 해당 제휴처의 개별 쿨타임 타임스탬프를 로드
+  // 🎯 [수정됨] 새로운 이벤트나 제휴 진입 시, 이전 만료 기록이 없거나 이미 끝났다면 무조건 새로운 쿨타임 타이머부터 강제 시작
   useEffect(() => {
     if (isDefaultTab || !activeEvent || isGuest || !currentActivePartnerId) {
       setCooldownTargetTime(0);
@@ -249,24 +248,32 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     const storageKey = getPartnerCooldownKey(activeEvent.id, currentActivePartnerId);
     const savedTarget = localStorage.getItem(storageKey);
     const now = Date.now();
+    const cooldownMinutes = Math.max(0, Number(activeEvent?.cooldown_minutes) || 0);
 
     if (savedTarget !== null) {
       const targetTime = Number(savedTarget);
       if (targetTime > now) {
+        // 아직 쿨타임이 남았다면 남은 시간 유지
         setCooldownTargetTime(targetTime);
         setCooldownRemainMs(targetTime - now);
-      } else {
-        localStorage.removeItem(storageKey);
-        setCooldownTargetTime(0);
-        setCooldownRemainMs(0);
+        return;
       }
+    }
+
+    // 💡 저장된 기록이 없거나(최초 진입), 이전 타이머가 이미 완료되어 만료된 상태였다면
+    // 곧바로 '도장 찍으세요'를 띄우지 않고, 새로운 쿨타임 타이머를 강제로 새로 시작시킴!
+    if (cooldownMinutes > 0) {
+      const newTargetTime = now + cooldownMinutes * 60_000;
+      localStorage.setItem(storageKey, String(newTargetTime));
+      setCooldownTargetTime(newTargetTime);
+      setCooldownRemainMs(cooldownMinutes * 60_000);
     } else {
       setCooldownTargetTime(0);
       setCooldownRemainMs(0);
     }
   }, [activeEvent, isDefaultTab, isGuest, currentActivePartnerId, getPartnerCooldownKey]);
 
-  // 🎯 타이머 구동 (현재 선택된 제휴처 기준)
+  // 🎯 현재 선택된 제휴처 기준 타이머 구동
   useEffect(() => {
     if (isDefaultTab || !activeEvent || isGuest || !currentActivePartnerId || cooldownTargetTime <= 0) {
       return;
