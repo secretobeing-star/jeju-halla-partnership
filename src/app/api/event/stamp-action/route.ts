@@ -338,7 +338,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: saveError.message }, { status: 500 });
   }
 
-  // 🎯 도장 적립 성공 시 웹 푸시 알림 트리거 연동 ([이벤트명] [제휴 이름] 도장 찍어주세요!)
+  // 🎯 도장 적립 성공 시 웹 푸시 알림 발송 로직 적용
   try {
     const eventTitle = String(event.title ?? "이벤트");
     const partnerName = partner?.name || placeName;
@@ -351,7 +351,33 @@ export async function POST(request: NextRequest) {
       .eq("user_id", userId);
 
     if (subs && subs.length > 0) {
-      // 웹 푸시 발송 처리 로직
+      const webpush = require("web-push");
+      
+      webpush.setVapidDetails(
+        process.env.VAPID_SUBJECT || "mailto:admin@example.com",
+        process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "",
+        process.env.VAPID_PRIVATE_KEY || ""
+      );
+
+      const payload = JSON.stringify({
+        title: pushTitle,
+        body: pushBody,
+        icon: event.banner_img || "/icon.png",
+      });
+
+      for (const sub of subs) {
+        const pushSub = {
+          endpoint: sub.endpoint,
+          keys: {
+            p256dh: sub.p256dh,
+            auth: sub.auth,
+          },
+        };
+        
+        await webpush.sendNotification(pushSub, payload).catch((err: unknown) => {
+          console.error("푸시 전송 실패 (만료된 구독 등):", err);
+        });
+      }
     }
   } catch (pushErr) {
     console.error("푸시 알림 발송 중 예외 발생:", pushErr);
