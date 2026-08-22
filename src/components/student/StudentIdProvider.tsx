@@ -209,7 +209,6 @@ export default function StudentIdProvider({
         hiddenFormFields={authDisplay.hiddenFormFields}
         customFields={authDisplay.customFields}
         onSubmitted={async (next) => {
-          // 🌟 1. 백엔드 로그인 API 호출을 통해 서버에 세션을 등록하고 토큰을 발급받습니다.
           try {
             const res = await fetch("/api/auth/login", {
               method: "POST",
@@ -222,15 +221,13 @@ export default function StudentIdProvider({
             const data = await res.json();
 
             if (res.ok && data.ok) {
-              // 🌟 2. AppProviders의 1초 주기 검증이 작동하도록 로컬스토리지에 저장합니다.
               localStorage.setItem("studentId", data.session.studentId);
               localStorage.setItem("sessionToken", data.session.sessionToken);
             }
           } catch (err) {
-            console.error("실시간 세션 등록 통신 오류:", err);
+            console.error("로그인 토큰 저장 오류:", err);
           }
 
-          // 기존 학생증 세션 저장 및 화면 전환 로직 유지
           patchSiteMemberStudentProfile(next);
           setStudent(next);
           setStep("card");
