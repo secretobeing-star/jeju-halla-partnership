@@ -15,6 +15,9 @@ function useSessionCheck(intervalMs = 1000) {
       const studentId = localStorage.getItem("studentId");
       const sessionToken = localStorage.getItem("sessionToken");
 
+      // 콘솔 로그 추가: 실제 값이 잘 불러와지는지 확인
+      console.log("세션 검증 시도 중...", { studentId, sessionToken });
+
       if (!studentId || !sessionToken) return;
 
       try {
@@ -25,14 +28,18 @@ function useSessionCheck(intervalMs = 1000) {
         });
 
         const data = await res.json();
+        
+        // 콘솔 로그 추가: 서버 응답 결과 확인
+        console.log("서버 검증 결과:", data);
 
         if (!data.valid) {
+          console.warn("로그아웃 조건 충족: 강제 로그아웃 수행");
           alert(data.message || "다른 기기에서 로그인하여 로그아웃되었습니다.");
           localStorage.clear();
           router.push("/login");
         }
       } catch (err) {
-        console.error("세션 검증 중 오류 발생:", err);
+        console.error("세션 검증 통신 오류:", err);
       }
     }
 
