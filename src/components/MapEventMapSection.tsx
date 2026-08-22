@@ -18,7 +18,7 @@ import type { MapMarkerCustomSettings } from "@/lib/naver-map-partner-ui";
 import { getCurrentGeolocation } from "@/lib/geolocation";
 import { getSiteMemberSession } from "@/lib/site-member-session";
 import { SITE_STUDENT_NEED_LOGIN_EVENT } from "@/lib/site-student-auth-settings";
-import { supabase } from "@/lib/supabase"; // 🌟 슈퍼베이스 클라이언트 임포트
+import { supabase } from "@/lib/supabase";
 
 const DEFAULT_TAB_ID = "__default_partners__";
 const DEFAULT_STAMP_BAR_BG = "#ecfdf5";
@@ -383,7 +383,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     void loadProgress();
   }, [loadProgress]);
 
-  // 🌟 슈퍼베이스 Realtime 구독: 다른 기기에서 도장을 찍어 DB가 바뀌면 실시간 동기화
   useEffect(() => {
     if (!activeEvent || !userId) return;
 
@@ -556,9 +555,39 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
       if (payload.progress) setProgress(payload.progress);
 
-      window.location.reload();
-      return;
+      const popupKind = payload.popup || (payload.completion?.reached ? "completion" : (payload.giftCount ?? 0) > 0 ? "win" : "lose");
 
+      if (popupKind === "completion") {
+        setRewardModal({
+          kind: "completion",
+          title: config.completion_popup_title || "완주 보상",
+          body: payload.messages?.completion || "완주 보상이 선물함으로 지급되었습니다!",
+          banner: activeEvent.banner_img,
+          rewardName: payload.completion?.reward?.reward_name || null,
+          rewardImg: payload.completion?.reward?.reward_img || null,
+          showGiftButton: (payload.giftCount ?? 0) > 0,
+        });
+      } else if (popupKind === "win") {
+        setRewardModal({
+          kind: "win",
+          title: config.win_popup_title || "당첨",
+          body: payload.messages?.win || "선물함으로 보상이 지급되었습니다!",
+          banner: activeEvent.banner_img,
+          rewardName: payload.step?.reward?.reward_name || null,
+          rewardImg: payload.step?.reward?.reward_img || null,
+          showGiftButton: true,
+        });
+      } else {
+        setRewardModal({
+          kind: "lose",
+          title: "미당첨",
+          body: payload.messages?.lose || "아쉽지만 이번엔 당첨되지 않았습니다.",
+          banner: activeEvent.banner_img,
+          rewardName: null,
+          rewardImg: null,
+          showGiftButton: false,
+        });
+      }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "도장 찍기에 실패했습니다.");
     } finally {
