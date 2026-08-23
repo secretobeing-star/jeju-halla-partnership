@@ -49,11 +49,14 @@ function formatDistance(meters: number): string {
   return `${Math.round(meters)}m`;
 }
 
+// 🌟 배경 이미지가 비율에 맞게 꽉 차고 반응하도록 보완된 스타일 생성 함수
 function stampBarCssVars(
   event: Pick<MapEvent, "stamp_bar_bg_color" | "stamp_bar_bg_img">,
 ): CSSProperties {
+  const bgColor = event.stamp_bar_bg_color?.trim() || DEFAULT_STAMP_BAR_BG;
   const style: CSSProperties & Record<string, string> = {
-    "--stamp-bar-bg-color": event.stamp_bar_bg_color?.trim() || DEFAULT_STAMP_BAR_BG,
+    "--stamp-bar-bg-color": bgColor,
+    backgroundColor: bgColor,
   };
   const bgImg = event.stamp_bar_bg_img?.trim();
   if (bgImg) {
@@ -61,6 +64,7 @@ function stampBarCssVars(
     style.backgroundImage = `url(${JSON.stringify(bgImg)})`;
     style.backgroundSize = "cover";
     style.backgroundPosition = "center";
+    style.backgroundRepeat = "no-repeat";
   }
   return style;
 }
@@ -673,7 +677,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         ))}
       </div>
 
-      {/* 🌟 1. 일반 웹 브라우저에서 '이벤트 탭'을 눌렀을 때만 PWA 안내 및 차단 */}
       {!isDefaultTab && isPwaMode === false ? (
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "50vh", padding: "24px", textAlign: "center", background: "#f9fafb", borderRadius: "16px", margin: "16px" }}>
           <div style={{ fontSize: "52px", marginBottom: "16px" }}>📱</div>
@@ -691,7 +694,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
           </div>
         </div>
       ) : !isDefaultTab && isDuplicateAccess ? (
-        // 🌟 2. 이벤트 탭에서 동시 접속 감지된 경우
         <div style={{ position: "fixed", inset: 0, zIndex: 99999, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
           <div style={{ background: "#fff", borderRadius: "16px", padding: "24px", maxWidth: "340px", width: "100%", textAlign: "center" }}>
             <div style={{ fontSize: "42px", marginBottom: "12px" }}>⚠️</div>
@@ -711,16 +713,33 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         </div>
       ) : (
         <>
-          {/* 기본 제휴 지도는 브라우저에서도 정상 노출, 이벤트 탭일 때만 이벤트 바 노출 */}
           {!isDefaultTab && activeEvent ? (
             <>
-              <div className="map-event-stamp-bar" style={stampBarCssVars(activeEvent)}>
-                <div className="map-event-stamp-bar__copy">
-                  <p className="map-event-stamp-bar__title">{activeEvent.title}</p>
-                  {!isEventLive(activeEvent) ? <p className="map-event-stamp-bar__meta">기간 종료</p> : null}
-                  {activeEvent.guide_text ? <p className="map-event-stamp-bar__guide">{activeEvent.guide_text}</p> : null}
+              {/* 🌟 반응형 스타일이 적용된 스탬프 바 컨테이너 */}
+              <div 
+                className="map-event-stamp-bar" 
+                style={{
+                  ...stampBarCssVars(activeEvent),
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "12px 16px",
+                  borderRadius: "12px",
+                  margin: "8px 0",
+                  gap: "12px",
+                  width: "100%",
+                  boxSizing: "border-box",
+                  overflow: "hidden",
+                }}
+              >
+                <div className="map-event-stamp-bar__copy" style={{ flex: 1, minWidth: 0 }}>
+                  <p className="map-event-stamp-bar__title" style={{ fontSize: "15px", fontWeight: "700", margin: "0 0 4px 0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {activeEvent.title}
+                  </p>
+                  {!isEventLive(activeEvent) ? <p className="map-event-stamp-bar__meta" style={{ margin: 0, fontSize: "12px" }}>기간 종료</p> : null}
+                  {activeEvent.guide_text ? <p className="map-event-stamp-bar__guide" style={{ margin: 0, fontSize: "12px", opacity: 0.85, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{activeEvent.guide_text}</p> : null}
                 </div>
-                <div className="map-event-stamps" aria-hidden="true">
+                <div className="map-event-stamps" aria-hidden="true" style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
                   {Array.from({ length: maxStamps }, (_, index) => {
                     const filled = index < current;
                     const src = filled ? activeEvent.stamp_active_img : activeEvent.stamp_inactive_img;
@@ -1064,7 +1083,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
                       type="button"
                       className="map-event-modal__btn"
                       style={{ background: "#6b7280", flex: 1, padding: "10px", borderRadius: "8px", color: "#fff", fontWeight: "600" }}
-                      onClick={() => setRewardModal(null)}
                     >
                       닫기
                     </button>
