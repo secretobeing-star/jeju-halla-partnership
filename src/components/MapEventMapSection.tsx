@@ -193,16 +193,11 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     [isDefaultTab, liveEvents, activeTabId],
   );
 
-  // 🌟 핵심 수정: 기본 제휴 탭일 때는 모든 제휴처의 커스텀 핀 이미지(불꽃 등)를 강제로 제거하여 기본 마커로 출력
+  // 🌟 원본 파트너 데이터 유지 (pinImageUrl 강제 초기화 제거)[cite: 6]
   const visiblePartners = useMemo(() => {
     const raw = props.partners || [];
     if (raw.length === 0) return [];
-    
-    if (isDefaultTab) {
-      return raw.map((p) => ({ ...p, pinImageUrl: null }));
-    }
-
-    if (!activeEvent) return raw;
+    if (isDefaultTab || !activeEvent) return raw;
 
     const allowed = (activeEvent.partner_ids ?? []).map(String);
     if (allowed.length > 0) {
@@ -960,10 +955,11 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
               )
             )}
 
+            {/* 🌟 핵심 수정: 기본 제휴 탭일 때는 markerSettings를 아예 전달하지 않고(undefined), 이벤트 탭일 때만 props.markerSettings 전달 */}
             <PartnerMainMapPanel
               key={activeTabId}
               {...props}
-              markerSettings={isDefaultTab ? null : props.markerSettings}
+              markerSettings={isDefaultTab ? undefined : props.markerSettings}
               partners={visiblePartners}
               stampAction={
                 isStampFeatureActive
