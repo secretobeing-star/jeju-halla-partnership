@@ -103,7 +103,6 @@ type RewardModalState = {
 };
 
 export default function MapEventMapSection(props: MapEventMapSectionProps) {
-  // 🌟 PWA 전용 진입 여부 및 동시 접속 차단 상태 (초기값 null로 SSR 에러 방지)
   const [isPwaMode, setIsPwaMode] = useState<boolean | null>(null);
   const [isDuplicateAccess, setIsDuplicateAccess] = useState(false);
 
@@ -148,7 +147,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const userId = student?.studentId?.trim() || "";
   const isGuest = !userId;
 
-  // 🌟 1. PWA 모드 검증 및 기기별 세션/동시 접속 체크
   useEffect(() => {
     const checkEnvironment = () => {
       const standalone =
@@ -178,55 +176,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     window.addEventListener("storage", handleStorage);
     return () => window.removeEventListener("storage", handleStorage);
   }, [userId]);
-
-  // 🌟 2. 클라이언트 환경 판별 중일 때 안전한 빈 껍데기 반환 (SSR 500 에러 방지)
-  if (isPwaMode === null) {
-    return <div style={{ minHeight: "50vh" }} />;
-  }
-
-  // 🌟 3. 일반 모바일 브라우저(크롬, 사파리, 삼브 등)로 접속한 경우 차단 화면 렌더링
-  if (!isPwaMode) {
-    return (
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "60vh", padding: "24px", textAlign: "center", background: "#f9fafb", borderRadius: "16px", margin: "16px" }}>
-        <div style={{ fontSize: "52px", marginBottom: "16px" }}>📱</div>
-        <h2 style={{ fontSize: "20px", fontWeight: "700", color: "#111827", marginBottom: "10px" }}>
-          PWA 전용 이벤트 안내
-        </h2>
-        <p style={{ fontSize: "14px", color: "#4b5563", lineHeight: "1.6", wordBreak: "keep-all", marginBottom: "20px" }}>
-          공정하고 원활한 이벤트 참여를 위해 일반 웹 브라우저(크롬, 사파리, 삼성 인터넷 등) 접근이 제한되어 있습니다.<br />
-          반드시 <b>홈 화면에 추가된 전용 PWA 앱</b>을 실행해서 참여해 주세요!
-        </p>
-        <div style={{ background: "#e5e7eb", padding: "12px 16px", borderRadius: "8px", fontSize: "13px", color: "#374151", textAlign: "left" }}>
-          💡 <b>홈 화면 추가 방법:</b><br />
-          • 크롬/삼성: 우측 상단 메뉴 ➔ '앱 설치' 또는 '홈 화면에 추가'<br />
-          • 사파리(아이폰): 하단 공유 버튼 ➔ '홈 화면에 추가'
-        </div>
-      </div>
-    );
-  }
-
-  // 🌟 4. 다른 기기/창에서 동시 접속이 감지된 경우 차단 팝업
-  if (isDuplicateAccess) {
-    return (
-      <div style={{ position: "fixed", inset: 0, zIndex: 99999, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
-        <div style={{ background: "#fff", borderRadius: "16px", padding: "24px", maxWidth: "340px", width: "100%", textAlign: "center" }}>
-          <div style={{ fontSize: "42px", marginBottom: "12px" }}>⚠️</div>
-          <h3 style={{ fontSize: "18px", fontWeight: "700", color: "#111827", marginBottom: "8px" }}>동시 접속 감지</h3>
-          <p style={{ fontSize: "14px", color: "#4b5563", lineHeight: "1.5", marginBottom: "20px" }}>
-            다른 기기 또는 다른 창에서 이미 해당 계정으로 이벤트에 접속 중입니다.<br />
-            동일 계정으로 중복 접속은 이용하실 수 없습니다.
-          </p>
-          <button
-            type="button"
-            onClick={() => window.location.reload()}
-            style={{ width: "100%", background: "#059669", color: "#fff", padding: "12px", borderRadius: "8px", fontWeight: "600", border: "none", cursor: "pointer" }}
-          >
-            이 기기에서 다시 접속하기
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   const isDefaultTab = !activeTabId || activeTabId === DEFAULT_TAB_ID;
   const hasFavorites = Boolean(props.favoritePartnerIds && props.favoritePartnerIds.size > 0);
@@ -724,405 +673,446 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         ))}
       </div>
 
-      {!isDefaultTab && activeEvent ? (
-        <>
-          <div className="map-event-stamp-bar" style={stampBarCssVars(activeEvent)}>
-            <div className="map-event-stamp-bar__copy">
-              <p className="map-event-stamp-bar__title">{activeEvent.title}</p>
-              {!isEventLive(activeEvent) ? <p className="map-event-stamp-bar__meta">기간 종료</p> : null}
-              {activeEvent.guide_text ? <p className="map-event-stamp-bar__guide">{activeEvent.guide_text}</p> : null}
-            </div>
-            <div className="map-event-stamps" aria-hidden="true">
-              {Array.from({ length: maxStamps }, (_, index) => {
-                const filled = index < current;
-                const src = filled ? activeEvent.stamp_active_img : activeEvent.stamp_inactive_img;
-                return src ? (
-                  <img key={index} src={src} alt="" className={`map-event-stamp ${filled ? "map-event-stamp--on" : "map-event-stamp--off"}`} />
-                ) : (
-                  <span key={index} className={`map-event-stamp map-event-stamp--fallback ${filled ? "map-event-stamp--on" : ""}`} />
-                );
-              })}
-              {completionBadgeSrc || completionPreview ? (
-                <span className="map-event-completion-reward">
-                  {completionBadgeSrc ? <img src={completionBadgeSrc} alt="" /> : <span className="map-event-completion-reward__fallback" />}
-                </span>
-              ) : null}
-            </div>
-          </div>
-
-          <div style={{ display: "flex", justifyContent: "flex-end", padding: "4px 8px 8px 8px" }}>
-            <button
-              type="button"
-              onClick={() => void handleFullRefresh()}
-              disabled={refreshing}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "4px",
-                padding: "4px 10px",
-                fontSize: "12px",
-                fontWeight: "600",
-                color: "#4b5563",
-                backgroundColor: "#f3f4f6",
-                border: "1px solid #e5e7eb",
-                borderRadius: "6px",
-                cursor: refreshing ? "not-allowed" : "pointer",
-              }}
-            >
-              <span>🔄</span>
-              <span>{refreshing ? "갱신 중..." : "새로고침"}</span>
-            </button>
-          </div>
-        </>
-      ) : null}
-
-      {message ? <p className="map-event-message">{message}</p> : null}
-
-      <div style={{ position: "relative", width: "100%", overflow: "visible" }}>
-        
-        {!isDefaultTab && activeEvent && !isCompleted && !rewardModal && !showIntroModal && (
-          isGuest ? (
-            <div
-              onClick={openLoginModal}
-              style={{
-                position: "absolute",
-                top: "16px",
-                left: "50%",
-                transform: "translateX(-50%)",
-                zIndex: 20,
-                backgroundColor: "#059669",
-                color: "#ffffff",
-                padding: "8px 18px",
-                borderRadius: "9999px",
-                fontSize: "13px",
-                fontWeight: "700",
-                boxShadow: "0 6px 16px rgba(5, 150, 105, 0.4)",
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-                cursor: "pointer",
-                border: "1px solid rgba(255, 255, 255, 0.2)",
-              }}
-            >
-              <span>🔒 로그인 후 도장을 찍을 수 있어요!</span>
-            </div>
-          ) : !hasFavorites ? (
-            <div
-              style={{
-                position: "absolute",
-                top: "16px",
-                left: "50%",
-                transform: "translateX(-50%)",
-                zIndex: 20,
-                backgroundColor: "rgba(31, 41, 55, 0.95)",
-                color: "#f9fafb",
-                padding: "8px 18px",
-                borderRadius: "9999px",
-                fontSize: "12px",
-                fontWeight: "600",
-                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.25)",
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-                pointerEvents: "none",
-                border: "1px solid rgba(255, 255, 255, 0.1)",
-                whiteSpace: "nowrap",
-              }}
-            >
-              <span>❤️</span>
-              <span>찜한 제휴가 없습니다. 제휴의 ❤️를 먼저 눌러주세요!</span>
-            </div>
-          ) : isTimerPaused ? (
-            <div
-              style={{
-                position: "absolute",
-                top: "16px",
-                left: "50%",
-                transform: "translateX(-50%)",
-                zIndex: 20,
-                backgroundColor: "rgba(31, 41, 55, 0.95)",
-                color: "#f9fafb",
-                padding: "8px 18px",
-                borderRadius: "9999px",
-                fontSize: "12px",
-                fontWeight: "600",
-                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.25)",
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-                pointerEvents: "none",
-                border: "1px solid rgba(255, 255, 255, 0.1)",
-                whiteSpace: "nowrap",
-              }}
-            >
-              <span>⏸️</span>
-              <span>주변 제휴처를 찾을 수 없어 타이머가 일시정지되었습니다.</span>
-            </div>
-          ) : nearestUnstampedPartnerInside ? (
-            cooldownRemainMs > 0 ? (
-              <div
-                style={{
-                  position: "absolute",
-                  top: "16px",
-                  left: "50%",
-                  transform: "translateX(-50%)",
-                  zIndex: 20,
-                  backgroundColor: "rgba(17, 24, 39, 0.92)",
-                  color: "#ffffff",
-                  padding: "8px 18px",
-                  borderRadius: "9999px",
-                  fontSize: "13px",
-                  fontWeight: "700",
-                  boxShadow: "0 6px 16px rgba(0, 0, 0, 0.3)",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  pointerEvents: "none",
-                  border: "1px solid rgba(255, 255, 255, 0.15)",
-                }}
-              >
-                <span>⏰</span>
-                <span>{timerBadgeText}</span>
-              </div>
-            ) : isReadyToStamp ? (
-              <div
-                style={{
-                  position: "absolute",
-                  top: "16px",
-                  left: "50%",
-                  transform: "translateX(-50%)",
-                  zIndex: 20,
-                  backgroundColor: "#059669",
-                  color: "#ffffff",
-                  padding: "8px 18px",
-                  borderRadius: "9999px",
-                  fontSize: "13px",
-                  fontWeight: "700",
-                  boxShadow: "0 6px 16px rgba(5, 150, 105, 0.4)",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  pointerEvents: "none",
-                  border: "1px solid rgba(255, 255, 255, 0.2)",
-                }}
-              >
-                <span>지금 바로 도장을 찍어보세요!</span>
-              </div>
-            ) : null
-          ) : (
-            <div
-              style={{
-                position: "absolute",
-                top: "16px",
-                left: "50%",
-                transform: "translateX(-50%)",
-                zIndex: 20,
-                backgroundColor: "rgba(31, 41, 55, 0.95)",
-                color: "#f9fafb",
-                padding: "8px 18px",
-                borderRadius: "9999px",
-                fontSize: "12px",
-                fontWeight: "600",
-                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.25)",
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-                pointerEvents: "none",
-                border: "1px solid rgba(255, 255, 255, 0.1)",
-                whiteSpace: "nowrap",
-              }}
-            >
-              <span>📍</span>
-              <span>
-                {nearestTargetPartner
-                  ? `${nearestTargetPartner.partner.name} (약 ${formatDistance(nearestTargetPartner.distance)}) · 가까운 제휴 찾으러 가볼까요?`
-                  : "가까운 제휴를 찾을 수 없습니다."}
-              </span>
-            </div>
-          )
-        )}
-
-        <PartnerMainMapPanel
-          key={activeTabId}
-          {...props}
-          partners={visiblePartners}
-          stampAction={
-            isStampFeatureActive
-              ? {
-                  enabled: true,
-                  stampedPlaceIds,
-                  isPartnerDisabled: (partner: PartnerSource) => {
-                    if (busy) return true;
-                    if (isGuest) return false;
-                    if (stampedPlaceIds.has(String(partner.id))) return true;
-                    if (cooldownRemainMs > 0) return true;
-
-                    const radius = Number(activeEvent?.radius_meters) || 30;
-                    const pLat = Number(partner.latitude);
-                    const pLon = Number(partner.longitude);
-
-                    if (currentGeo && pLat && pLon && !isNaN(pLat) && !isNaN(pLon)) {
-                      const dist = getDistanceInMeters(currentGeo.latitude, currentGeo.longitude, pLat, pLon);
-                      return dist > radius;
-                    }
-                    return true;
-                  },
-                  getPartnerLabel: (partner: PartnerSource) => {
-                    if (busy) return "확인 중...";
-                    if (isGuest) return "로그인 후 도장 가능";
-                    if (stampedPlaceIds.has(String(partner.id))) return "도장 찍기 완료";
-                    if (cooldownRemainMs > 0) {
-                      return `${formatCooldownRemain(cooldownRemainMs)} 후 가능`;
-                    }
-
-                    const radius = Number(activeEvent?.radius_meters) || 30;
-                    const pLat = Number(partner.latitude);
-                    const pLon = Number(partner.longitude);
-
-                    if (currentGeo && pLat && pLon && !isNaN(pLat) && !isNaN(pLon)) {
-                      const dist = getDistanceInMeters(currentGeo.latitude, currentGeo.longitude, pLat, pLon);
-                      if (dist > radius) {
-                        return "제휴 방문 시 도장 가능";
-                      }
-                    }
-                    return config.event_stamp_btn_label || DEFAULT_STAMP_BTN_LABEL;
-                  },
-                  label: isGuest ? "로그인 후 도장 가능" : (config.event_stamp_btn_label || DEFAULT_STAMP_BTN_LABEL),
-                  onStamp: (partner) => {
-                    void handleStamp(partner);
-                  },
-                }
-              : undefined
-          }
-          detailButtonLabel={config.default_benefit_btn_label || DEFAULT_BENEFIT_BTN_LABEL}
-        />
-      </div>
-
-      <MapEventIntroModal
-        event={activeEvent}
-        isOpen={showIntroModal}
-        onClose={() => setShowIntroModal(false)}
-        onConfirm={handleConfirmStartEvent}
-      />
-
-      {rewardModal ? (
-        <div
-          className="map-event-modal"
-          role="dialog"
-          aria-modal="true"
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 9999,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: "rgba(0,0,0,0.5)",
-            backdropFilter: "blur(2px)",
-          }}
-        >
-          <div
-            className="map-event-modal__card"
-            style={{
-              background: "#fff",
-              borderRadius: "16px",
-              padding: "20px",
-              maxWidth: "340px",
-              width: "90%",
-              textAlign: "center",
-              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.2)",
-            }}
-          >
-            {rewardModal.banner ? (
-              <img
-                src={rewardModal.banner}
-                alt=""
-                className="map-event-modal__banner"
-                style={{ width: "100%", borderRadius: "8px", marginBottom: "12px" }}
-              />
-            ) : null}
-            <h3
-              className="map-event-modal__title"
-              style={{ fontSize: "18px", fontWeight: "700", marginBottom: "8px", color: "#111827" }}
-            >
-              {rewardModal.title}
-            </h3>
-            <p
-              className="map-event-modal__body"
-              style={{ whiteSpace: "pre-line", fontSize: "14px", color: "#4b5563", marginBottom: "12px", lineHeight: 1.5 }}
-            >
-              {rewardModal.body}
-            </p>
-            {rewardModal.rewardImg ? (
-              <img
-                src={rewardModal.rewardImg}
-                alt=""
-                className="map-event-modal__reward-img"
-                style={{ width: "80px", height: "80px", margin: "0 auto 12px", objectFit: "contain" }}
-              />
-            ) : null}
-            {rewardModal.rewardName ? (
-              <p
-                className="map-event-modal__reward"
-                style={{ fontSize: "15px", fontWeight: "600", color: "#059669", marginBottom: "12px" }}
-              >
-                {rewardModal.rewardName}
-              </p>
-            ) : null}
-
-            {rewardModal.kind === "login_required" ? (
-              <div style={{ display: "flex", gap: "8px", marginTop: "12px", width: "100%" }}>
-                <button
-                  type="button"
-                  className="map-event-modal__btn"
-                  style={{ background: "#6b7280", flex: 1, padding: "10px", borderRadius: "8px", color: "#fff", fontWeight: "600" }}
-                  onClick={() => setRewardModal(null)}
-                >
-                  닫기
-                </button>
-                <button
-                  type="button"
-                  className="map-event-modal__btn"
-                  style={{ background: "#059669", flex: 1.2, padding: "10px", borderRadius: "8px", color: "#fff", fontWeight: "600" }}
-                  onClick={() => {
-                    setRewardModal(null);
-                    window.dispatchEvent(new Event(SITE_STUDENT_NEED_LOGIN_EVENT));
-                  }}
-                >
-                  로그인하기
-                </button>
-              </div>
-            ) : (
-              <div style={{ display: "flex", gap: "8px", marginTop: "12px", width: "100%" }}>
-                {rewardModal.showGiftButton ? (
-                  <button
-                    type="button"
-                    className="map-event-modal__btn"
-                    style={{ background: "#059669", flex: 1, padding: "10px", borderRadius: "8px", color: "#fff", fontWeight: "600" }}
-                    onClick={() => {
-                      setRewardModal(null);
-                      window.dispatchEvent(new Event("site-gift-inbox-open"));
-                    }}
-                  >
-                    선물함 열기
-                  </button>
-                ) : null}
-                <button
-                  type="button"
-                  className="map-event-modal__btn"
-                  style={{ background: "#6b7280", flex: 1, padding: "10px", borderRadius: "8px", color: "#fff", fontWeight: "600" }}
-                  onClick={() => {
-                    setRewardModal(null);
-                    void handleFullRefresh();
-                  }}
-                >
-                  확인
-                </button>
-              </div>
-            )}
+      {/* 🌟 1. 일반 웹 브라우저에서 '이벤트 탭'을 눌렀을 때만 PWA 안내 및 차단 */}
+      {!isDefaultTab && isPwaMode === false ? (
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "50vh", padding: "24px", textAlign: "center", background: "#f9fafb", borderRadius: "16px", margin: "16px" }}>
+          <div style={{ fontSize: "52px", marginBottom: "16px" }}>📱</div>
+          <h2 style={{ fontSize: "20px", fontWeight: "700", color: "#111827", marginBottom: "10px" }}>
+            PWA 전용 이벤트 안내
+          </h2>
+          <p style={{ fontSize: "14px", color: "#4b5563", lineHeight: "1.6", wordBreak: "keep-all", marginBottom: "20px" }}>
+            공정하고 원활한 이벤트 참여를 위해 이벤트 참여 기능은 일반 웹 브라우저(크롬, 사파리, 삼성 인터넷 등)에서 제한됩니다.<br />
+            반드시 <b>홈 화면에 추가된 전용 PWA 앱</b>을 실행해서 참여해 주세요!
+          </p>
+          <div style={{ background: "#e5e7eb", padding: "12px 16px", borderRadius: "8px", fontSize: "13px", color: "#374151", textAlign: "left" }}>
+            💡 <b>홈 화면 추가 방법:</b><br />
+            • 크롬/삼성: 우측 상단 메뉴 ➔ '앱 설치' 또는 '홈 화면에 추가'<br />
+            • 사파리(아이폰): 하단 공유 버튼 ➔ '홈 화면에 추가'
           </div>
         </div>
-      ) : null}
+      ) : !isDefaultTab && isDuplicateAccess ? (
+        // 🌟 2. 이벤트 탭에서 동시 접속 감지된 경우
+        <div style={{ position: "fixed", inset: 0, zIndex: 99999, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
+          <div style={{ background: "#fff", borderRadius: "16px", padding: "24px", maxWidth: "340px", width: "100%", textAlign: "center" }}>
+            <div style={{ fontSize: "42px", marginBottom: "12px" }}>⚠️</div>
+            <h3 style={{ fontSize: "18px", fontWeight: "700", color: "#111827", marginBottom: "8px" }}>동시 접속 감지</h3>
+            <p style={{ fontSize: "14px", color: "#4b5563", lineHeight: "1.5", marginBottom: "20px" }}>
+              다른 기기 또는 다른 창에서 이미 해당 계정으로 이벤트에 접속 중입니다.<br />
+              동일 계정으로 중복 접속은 이용하실 수 없습니다.
+            </p>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              style={{ width: "100%", background: "#059669", color: "#fff", padding: "12px", borderRadius: "8px", fontWeight: "600", border: "none", cursor: "pointer" }}
+            >
+              이 기기에서 다시 접속하기
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* 기본 제휴 지도는 브라우저에서도 정상 노출, 이벤트 탭일 때만 이벤트 바 노출 */}
+          {!isDefaultTab && activeEvent ? (
+            <>
+              <div className="map-event-stamp-bar" style={stampBarCssVars(activeEvent)}>
+                <div className="map-event-stamp-bar__copy">
+                  <p className="map-event-stamp-bar__title">{activeEvent.title}</p>
+                  {!isEventLive(activeEvent) ? <p className="map-event-stamp-bar__meta">기간 종료</p> : null}
+                  {activeEvent.guide_text ? <p className="map-event-stamp-bar__guide">{activeEvent.guide_text}</p> : null}
+                </div>
+                <div className="map-event-stamps" aria-hidden="true">
+                  {Array.from({ length: maxStamps }, (_, index) => {
+                    const filled = index < current;
+                    const src = filled ? activeEvent.stamp_active_img : activeEvent.stamp_inactive_img;
+                    return src ? (
+                      <img key={index} src={src} alt="" className={`map-event-stamp ${filled ? "map-event-stamp--on" : "map-event-stamp--off"}`} />
+                    ) : (
+                      <span key={index} className={`map-event-stamp map-event-stamp--fallback ${filled ? "map-event-stamp--on" : ""}`} />
+                    );
+                  })}
+                  {completionBadgeSrc || completionPreview ? (
+                    <span className="map-event-completion-reward">
+                      {completionBadgeSrc ? <img src={completionBadgeSrc} alt="" /> : <span className="map-event-completion-reward__fallback" />}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "flex-end", padding: "4px 8px 8px 8px" }}>
+                <button
+                  type="button"
+                  onClick={() => void handleFullRefresh()}
+                  disabled={refreshing}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    padding: "4px 10px",
+                    fontSize: "12px",
+                    fontWeight: "600",
+                    color: "#4b5563",
+                    backgroundColor: "#f3f4f6",
+                    border: "1px solid #e5e7eb",
+                    borderRadius: "6px",
+                    cursor: refreshing ? "not-allowed" : "pointer",
+                  }}
+                >
+                  <span>🔄</span>
+                  <span>{refreshing ? "갱신 중..." : "새로고침"}</span>
+                </button>
+              </div>
+            </>
+          ) : null}
+
+          {message ? <p className="map-event-message">{message}</p> : null}
+
+          <div style={{ position: "relative", width: "100%", overflow: "visible" }}>
+            
+            {!isDefaultTab && activeEvent && !isCompleted && !rewardModal && !showIntroModal && (
+              isGuest ? (
+                <div
+                  onClick={openLoginModal}
+                  style={{
+                    position: "absolute",
+                    top: "16px",
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                    zIndex: 20,
+                    backgroundColor: "#059669",
+                    color: "#ffffff",
+                    padding: "8px 18px",
+                    borderRadius: "9999px",
+                    fontSize: "13px",
+                    fontWeight: "700",
+                    boxShadow: "0 6px 16px rgba(5, 150, 105, 0.4)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    cursor: "pointer",
+                    border: "1px solid rgba(255, 255, 255, 0.2)",
+                  }}
+                >
+                  <span>🔒 로그인 후 도장을 찍을 수 있어요!</span>
+                </div>
+              ) : !hasFavorites ? (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "16px",
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                    zIndex: 20,
+                    backgroundColor: "rgba(31, 41, 55, 0.95)",
+                    color: "#f9fafb",
+                    padding: "8px 18px",
+                    borderRadius: "9999px",
+                    fontSize: "12px",
+                    fontWeight: "600",
+                    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.25)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    pointerEvents: "none",
+                    border: "1px solid rgba(255, 255, 255, 0.1)",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  <span>❤️</span>
+                  <span>찜한 제휴가 없습니다. 제휴의 ❤️를 먼저 눌러주세요!</span>
+                </div>
+              ) : isTimerPaused ? (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "16px",
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                    zIndex: 20,
+                    backgroundColor: "rgba(31, 41, 55, 0.95)",
+                    color: "#f9fafb",
+                    padding: "8px 18px",
+                    borderRadius: "9999px",
+                    fontSize: "12px",
+                    fontWeight: "600",
+                    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.25)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    pointerEvents: "none",
+                    border: "1px solid rgba(255, 255, 255, 0.1)",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  <span>⏸️</span>
+                  <span>주변 제휴처를 찾을 수 없어 타이머가 일시정지되었습니다.</span>
+                </div>
+              ) : nearestUnstampedPartnerInside ? (
+                cooldownRemainMs > 0 ? (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "16px",
+                      left: "50%",
+                      transform: "translateX(-50%)",
+                      zIndex: 20,
+                      backgroundColor: "rgba(17, 24, 39, 0.92)",
+                      color: "#ffffff",
+                      padding: "8px 18px",
+                      borderRadius: "9999px",
+                      fontSize: "13px",
+                      fontWeight: "700",
+                      boxShadow: "0 6px 16px rgba(0, 0, 0, 0.3)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      pointerEvents: "none",
+                      border: "1px solid rgba(255, 255, 255, 0.15)",
+                    }}
+                  >
+                    <span>⏰</span>
+                    <span>{timerBadgeText}</span>
+                  </div>
+                ) : isReadyToStamp ? (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "16px",
+                      left: "50%",
+                      transform: "translateX(-50%)",
+                      zIndex: 20,
+                      backgroundColor: "#059669",
+                      color: "#ffffff",
+                      padding: "8px 18px",
+                      borderRadius: "9999px",
+                      fontSize: "13px",
+                      fontWeight: "700",
+                      boxShadow: "0 6px 16px rgba(5, 150, 105, 0.4)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      pointerEvents: "none",
+                      border: "1px solid rgba(255, 255, 255, 0.2)",
+                    }}
+                  >
+                    <span>지금 바로 도장을 찍어보세요!</span>
+                  </div>
+                ) : null
+              ) : (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "16px",
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                    zIndex: 20,
+                    backgroundColor: "rgba(31, 41, 55, 0.95)",
+                    color: "#f9fafb",
+                    padding: "8px 18px",
+                    borderRadius: "9999px",
+                    fontSize: "12px",
+                    fontWeight: "600",
+                    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.25)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    pointerEvents: "none",
+                    border: "1px solid rgba(255, 255, 255, 0.1)",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  <span>📍</span>
+                  <span>
+                    {nearestTargetPartner
+                      ? `${nearestTargetPartner.partner.name} (약 ${formatDistance(nearestTargetPartner.distance)}) · 가까운 제휴 찾으러 가볼까요?`
+                      : "가까운 제휴를 찾을 수 없습니다."}
+                  </span>
+                </div>
+              )
+            )}
+
+            <PartnerMainMapPanel
+              key={activeTabId}
+              {...props}
+              partners={visiblePartners}
+              stampAction={
+                isStampFeatureActive
+                  ? {
+                      enabled: true,
+                      stampedPlaceIds,
+                      isPartnerDisabled: (partner: PartnerSource) => {
+                        if (busy) return true;
+                        if (isGuest) return false;
+                        if (stampedPlaceIds.has(String(partner.id))) return true;
+                        if (cooldownRemainMs > 0) return true;
+
+                        const radius = Number(activeEvent?.radius_meters) || 30;
+                        const pLat = Number(partner.latitude);
+                        const pLon = Number(partner.longitude);
+
+                        if (currentGeo && pLat && pLon && !isNaN(pLat) && !isNaN(pLon)) {
+                          const dist = getDistanceInMeters(currentGeo.latitude, currentGeo.longitude, pLat, pLon);
+                          return dist > radius;
+                        }
+                        return true;
+                      },
+                      getPartnerLabel: (partner: PartnerSource) => {
+                        if (busy) return "확인 중...";
+                        if (isGuest) return "로그인 후 도장 가능";
+                        if (stampedPlaceIds.has(String(partner.id))) return "도장 찍기 완료";
+                        if (cooldownRemainMs > 0) {
+                          return `${formatCooldownRemain(cooldownRemainMs)} 후 가능`;
+                        }
+
+                        const radius = Number(activeEvent?.radius_meters) || 30;
+                        const pLat = Number(partner.latitude);
+                        const pLon = Number(partner.longitude);
+
+                        if (currentGeo && pLat && pLon && !isNaN(pLat) && !isNaN(pLon)) {
+                          const dist = getDistanceInMeters(currentGeo.latitude, currentGeo.longitude, pLat, pLon);
+                          if (dist > radius) {
+                            return "제휴 방문 시 도장 가능";
+                          }
+                        }
+                        return config.event_stamp_btn_label || DEFAULT_STAMP_BTN_LABEL;
+                      },
+                      label: isGuest ? "로그인 후 도장 가능" : (config.event_stamp_btn_label || DEFAULT_STAMP_BTN_LABEL),
+                      onStamp: (partner) => {
+                        void handleStamp(partner);
+                      },
+                    }
+                  : undefined
+              }
+              detailButtonLabel={config.default_benefit_btn_label || DEFAULT_BENEFIT_BTN_LABEL}
+            />
+          </div>
+
+          <MapEventIntroModal
+            event={activeEvent}
+            isOpen={showIntroModal}
+            onClose={() => setShowIntroModal(false)}
+            onConfirm={handleConfirmStartEvent}
+          />
+
+          {rewardModal ? (
+            <div
+              className="map-event-modal"
+              role="dialog"
+              aria-modal="true"
+              style={{
+                position: "fixed",
+                inset: 0,
+                zIndex: 9999,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: "rgba(0,0,0,0.5)",
+                backdropFilter: "blur(2px)",
+              }}
+            >
+              <div
+                className="map-event-modal__card"
+                style={{
+                  background: "#fff",
+                  borderRadius: "16px",
+                  padding: "20px",
+                  maxWidth: "340px",
+                  width: "90%",
+                  textAlign: "center",
+                  boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.2)",
+                }}
+              >
+                {rewardModal.banner ? (
+                  <img
+                    src={rewardModal.banner}
+                    alt=""
+                    className="map-event-modal__banner"
+                    style={{ width: "100%", borderRadius: "8px", marginBottom: "12px" }}
+                  />
+                ) : null}
+                <h3
+                  className="map-event-modal__title"
+                  style={{ fontSize: "18px", fontWeight: "700", marginBottom: "8px", color: "#111827" }}
+                >
+                  {rewardModal.title}
+                </h3>
+                <p
+                  className="map-event-modal__body"
+                  style={{ whiteSpace: "pre-line", fontSize: "14px", color: "#4b5563", marginBottom: "12px", lineHeight: 1.5 }}
+                >
+                  {rewardModal.body}
+                </p>
+                {rewardModal.rewardImg ? (
+                  <img
+                    src={rewardModal.rewardImg}
+                    alt=""
+                    className="map-event-modal__reward-img"
+                    style={{ width: "80px", height: "80px", margin: "0 auto 12px", objectFit: "contain" }}
+                  />
+                ) : null}
+                {rewardModal.rewardName ? (
+                  <p
+                    className="map-event-modal__reward"
+                    style={{ fontSize: "15px", fontWeight: "600", color: "#059669", marginBottom: "12px" }}
+                  >
+                    {rewardModal.rewardName}
+                  </p>
+                ) : null}
+
+                {rewardModal.kind === "login_required" ? (
+                  <div style={{ display: "flex", gap: "8px", marginTop: "12px", width: "100%" }}>
+                    <button
+                      type="button"
+                      className="map-event-modal__btn"
+                      style={{ background: "#6b7280", flex: 1, padding: "10px", borderRadius: "8px", color: "#fff", fontWeight: "600" }}
+                      onClick={() => setRewardModal(null)}
+                    >
+                      닫기
+                    </button>
+                    <button
+                      type="button"
+                      className="map-event-modal__btn"
+                      style={{ background: "#059669", flex: 1.2, padding: "10px", borderRadius: "8px", color: "#fff", fontWeight: "600" }}
+                      onClick={() => {
+                        setRewardModal(null);
+                        window.dispatchEvent(new Event(SITE_STUDENT_NEED_LOGIN_EVENT));
+                      }}
+                    >
+                      로그인하기
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", gap: "8px", marginTop: "12px", width: "100%" }}>
+                    {rewardModal.showGiftButton ? (
+                      <button
+                        type="button"
+                        className="map-event-modal__btn"
+                        style={{ background: "#059669", flex: 1, padding: "10px", borderRadius: "8px", color: "#fff", fontWeight: "600" }}
+                        onClick={() => {
+                          setRewardModal(null);
+                          window.dispatchEvent(new Event("site-gift-inbox-open"));
+                        }}
+                      >
+                        선물함 열기
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      className="map-event-modal__btn"
+                      style={{ background: "#6b7280", flex: 1, padding: "10px", borderRadius: "8px", color: "#fff", fontWeight: "600" }}
+                      onClick={() => {
+                        setRewardModal(null);
+                        void handleFullRefresh();
+                      }}
+                    >
+                      확인
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : null}
+        </>
+      )}
     </div>
   );
 }
