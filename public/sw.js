@@ -1,4 +1,29 @@
-// 푸시 알림 수신
+const CACHE_NAME = 'halla-pass-v3';
+
+// 1. 서비스 워커 설치 시 즉시 대기 상태 해제
+self.addEventListener("install", (event) => {
+  console.log("서비스 워커 설치 중 (v3)");
+  self.skipWaiting();
+});
+
+// 2. 서비스 워커 활성화 시 구버전 캐시 자동 삭제
+self.addEventListener("activate", (event) => {
+  console.log("서비스 워커 활성화 및 구버전 캐시 청소 (v3)");
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cacheName) => {
+          if (cacheName !== CACHE_NAME) {
+            console.log("기존 구버전 캐시 삭제:", cacheName);
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    }).then(() => self.clients.claim())
+  );
+});
+
+// 3. 푸시 알림 수신 및 처리
 self.addEventListener("push", (event) => {
   console.log("푸시 알림 수신");
   let payload = {
@@ -12,13 +37,11 @@ self.addEventListener("push", (event) => {
 
   try {
     if (event.data) {
-      // JSON 파싱을 시도하고, 실패하면 그냥 텍스트로 처리
       try {
         const jsonData = event.data.json();
         console.log("푸시 페이로드 (JSON):", jsonData);
         payload = { ...payload, ...jsonData };
       } catch (jsonError) {
-        // JSON 파싱 실패 시 텍스트로 처리
         console.warn("JSON 파싱 실패, 텍스트로 처리:", jsonError);
         const textData = event.data.text();
         if (textData) {

@@ -230,56 +230,44 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return null;
   }, [nearestTargetPartner]);
 
-  const getPartnerCooldownKey = useCallback(
-    (eventId: string, placeId: string) => `site_event_remain_seconds_${userId || "guest"}_${eventId}_${placeId}`,
-    [userId],
-  );
-
-  const getPartnerInitializedKey = useCallback(
-    (eventId: string, placeId: string) => `site_event_initialized_${userId || "guest"}_${eventId}_${placeId}`,
-    [userId],
-  );
-
-  const currentActivePartnerId = nearestUnstampedPartnerInside?.partner.id || "";
-
   useEffect(() => {
-    if (isDefaultTab || !activeEvent || isGuest || !currentActivePartnerId) {
+    if (isDefaultTab || !activeEvent || isGuest || !userId) {
       setCooldownTargetTime(0);
       setCooldownRemainMs(0);
       return;
     }
 
-    const storageKey = getPartnerCooldownKey(activeEvent.id, currentActivePartnerId);
-    const initKey = getPartnerInitializedKey(activeEvent.id, currentActivePartnerId);
-    const savedTarget = localStorage.getItem(storageKey);
-    const isInitialized = localStorage.getItem(initKey);
-    const now = Date.now();
-    const cooldownMinutes = Math.max(0, Number(activeEvent?.cooldown_minutes) || 0);
-
-    if (savedTarget !== null) {
-      const targetTime = Number(savedTarget);
-      if (targetTime > now) {
-        setCooldownTargetTime(targetTime);
-        setCooldownRemainMs(targetTime - now);
-        return;
+    const fetchTimerState = async () => {
+      try {
+        const res = await fetch(`/api/event/timer?userId=${encodeURIComponent(userId)}&eventId=${encodeURIComponent(activeEvent.id)}`, {
+          cache: "no-store",
+        });
+        const data = await res.json();
+        if (data.cooldown_end_time) {
+          const targetTime = new Date(data.cooldown_end_time).getTime();
+          const now = Date.now();
+          if (targetTime > now) {
+            setCooldownTargetTime(targetTime);
+            setCooldownRemainMs(targetTime - now);
+          } else {
+            setCooldownTargetTime(0);
+            setCooldownRemainMs(0);
+          }
+        } else {
+          setCooldownTargetTime(0);
+          setCooldownRemainMs(0);
+        }
+      } catch {
+        setCooldownTargetTime(0);
+        setCooldownRemainMs(0);
       }
-    }
+    };
 
-    if (!isInitialized && cooldownMinutes > 0) {
-      const newTargetTime = now + cooldownMinutes * 60_000;
-      localStorage.setItem(storageKey, String(newTargetTime));
-      localStorage.setItem(initKey, "true");
-      setCooldownTargetTime(newTargetTime);
-      setCooldownRemainMs(cooldownMinutes * 60_000);
-      return;
-    }
-
-    setCooldownTargetTime(0);
-    setCooldownRemainMs(0);
-  }, [activeEvent, activeTabId, isDefaultTab, isGuest, currentActivePartnerId, getPartnerCooldownKey, getPartnerInitializedKey]);
+    void fetchTimerState();
+  }, [activeEvent, activeTabId, isDefaultTab, isGuest, userId]);
 
   useEffect(() => {
-    if (isDefaultTab || !activeEvent || isGuest || !currentActivePartnerId || cooldownTargetTime <= 0) {
+    if (isDefaultTab || !activeEvent || isGuest || cooldownTargetTime <= 0) {
       return;
     }
 
@@ -289,7 +277,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       if (remain <= 0) {
         setCooldownRemainMs(0);
         setCooldownTargetTime(0);
-        localStorage.removeItem(getPartnerCooldownKey(activeEvent.id, currentActivePartnerId));
       } else {
         setCooldownRemainMs(remain);
       }
@@ -298,7 +285,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     updateRemain();
     const timer = window.setInterval(updateRemain, 1000);
     return () => window.clearInterval(timer);
-  }, [isDefaultTab, activeEvent, isGuest, currentActivePartnerId, cooldownTargetTime, getPartnerCooldownKey]);
+  }, [isDefaultTab, activeEvent, isGuest, cooldownTargetTime]);
 
   const isTimerPaused = useMemo(() => {
     if (isDefaultTab || !activeEvent) return false;
@@ -510,9 +497,18 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         if (payload.cooldownError) {
           const remainMs = payload.cooldownMs ?? 60_000;
           if (activeEvent) {
-            const targetTime = Date.now() + remainMs;
-            localStorage.setItem(getPartnerCooldownKey(activeEvent.id, partner.id), String(targetTime));
-            setCooldownTargetTime(targetTime);
+            const nextTargetTime = Date.now() + remainMs;
+            await fetch("/api/event/timer", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                userId,
+                eventId: activeEvent.id,
+                cooldownEndTime: new Date(nextTargetTime).toISOString(),
+                introConfirmed: true,
+              }),
+            });
+            setCooldownTargetTime(nextTargetTime);
             setCooldownRemainMs(remainMs);
           }
           const remainText = formatCooldownRemain(remainMs);
@@ -553,15 +549,25 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         setProgress(payload.progress);
       }
 
-      // 🌟 도장 성공 시 타이머 꼬임 방지를 위해 쿨타임 즉시 세팅
       const activeCooldownMinutes = Number(activeEvent?.cooldown_minutes) || 0;
       if (activeCooldownMinutes > 0) {
         const nextTargetTime = Date.now() + activeCooldownMinutes * 60_000;
-        localStorage.setItem(getPartnerCooldownKey(activeEvent.id, partner.id), String(nextTargetTime));
+        await fetch("/api/event/timer", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId,
+            eventId: activeEvent.id,
+            cooldownEndTime: new Date(nextTargetTime).toISOString(),
+            introConfirmed: true,
+          }),
+        });
         setCooldownTargetTime(nextTargetTime);
         setCooldownRemainMs(activeCooldownMinutes * 60_000);
       } else {
-        localStorage.removeItem(getPartnerCooldownKey(activeEvent.id, partner.id));
+        await fetch(`/api/event/timer?userId=${encodeURIComponent(userId)}&eventId=${encodeURIComponent(activeEvent.id)}`, {
+          method: "DELETE",
+        });
         setCooldownTargetTime(0);
         setCooldownRemainMs(0);
       }
@@ -704,7 +710,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
               style={{
                 position: "absolute",
                 top: "16px",
-                left: "50%",
+                left: "44%", // 🌟 우측 접기 버튼과 안 겹치도록 왼쪽으로 약간 조정
                 transform: "translateX(-50%)",
                 zIndex: 20,
                 backgroundColor: "#059669",
@@ -728,7 +734,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
               style={{
                 position: "absolute",
                 top: "16px",
-                left: "50%",
+                left: "44%", // 🌟 우측 접기 버튼과 안 겹치도록 왼쪽으로 약간 조정
                 transform: "translateX(-50%)",
                 zIndex: 20,
                 backgroundColor: "rgba(31, 41, 55, 0.95)",
@@ -754,7 +760,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
               style={{
                 position: "absolute",
                 top: "16px",
-                left: "50%",
+                left: "44%", // 🌟 우측 접기 버튼과 안 겹치도록 왼쪽으로 약간 조정
                 transform: "translateX(-50%)",
                 zIndex: 20,
                 backgroundColor: "rgba(31, 41, 55, 0.95)",
@@ -781,7 +787,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
                 style={{
                   position: "absolute",
                   top: "16px",
-                  left: "50%",
+                  left: "44%", // 🌟 우측 접기 버튼과 안 겹치도록 왼쪽으로 약간 조정
                   transform: "translateX(-50%)",
                   zIndex: 20,
                   backgroundColor: "rgba(17, 24, 39, 0.92)",
@@ -806,7 +812,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
                 style={{
                   position: "absolute",
                   top: "16px",
-                  left: "50%",
+                  left: "44%", // 🌟 우측 접기 버튼과 안 겹치도록 왼쪽으로 약간 조정
                   transform: "translateX(-50%)",
                   zIndex: 20,
                   backgroundColor: "#059669",
@@ -831,7 +837,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
               style={{
                 position: "absolute",
                 top: "16px",
-                left: "50%",
+                left: "44%", // 🌟 우측 접기 버튼과 안 겹치도록 왼쪽으로 약간 조정
                 transform: "translateX(-50%)",
                 zIndex: 20,
                 backgroundColor: "rgba(31, 41, 55, 0.95)",
@@ -853,7 +859,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
               <span>
                 {nearestTargetPartner
                   ? `${nearestTargetPartner.partner.name} (약 ${formatDistance(nearestTargetPartner.distance)}) · 가까운 제휴 찾으러 가볼까요?`
-                  : "가까운 제휴를 찾을 수 없습니다."}
+                  : "근처 제휴를 찾을 수 없습니다."}
               </span>
             </div>
           )
