@@ -49,7 +49,6 @@ function formatDistance(meters: number): string {
   return `${Math.round(meters)}m`;
 }
 
-// 🌟 배경 이미지가 비율에 맞게 꽉 차고 반응하도록 보완된 스타일 생성 함수
 function stampBarCssVars(
   event: Pick<MapEvent, "stamp_bar_bg_color" | "stamp_bar_bg_img">,
 ): CSSProperties {
@@ -643,7 +642,8 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   }
 
   const maxStamps = activeEvent?.max_stamps ?? 0;
-  const current = progress?.current_stamps ?? 0;
+  // 🌟 비로그인 상태면 도장 진행도를 0으로 고정하여 빈 도장만 보이게 처리
+  const current = isGuest ? 0 : (progress?.current_stamps ?? 0);
   const isCompleted = Boolean(progress?.is_completed || (maxStamps > 0 && current >= maxStamps));
   const completionPreview = activeEvent ? completionRewardsOf(activeEvent)[0] : null;
   const completionBadgeSrc = activeEvent?.completion_badge_img?.trim() || completionPreview?.reward_img || null;
@@ -654,6 +654,8 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const timerBadgeText = timerTemplate.includes("{remain}")
     ? timerTemplate.replace(/\{remain\}/g, formatCooldownRemain(cooldownRemainMs))
     : `${timerTemplate} ${formatCooldownRemain(cooldownRemainMs)}`;
+
+  const hasStampBarBgImg = Boolean(activeEvent?.stamp_bar_bg_img?.trim());
 
   return (
     <div className="map-event-shell" style={{ position: "relative" }}>
@@ -715,7 +717,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         <>
           {!isDefaultTab && activeEvent ? (
             <>
-              {/* 🌟 반응형 스타일이 적용된 스탬프 바 컨테이너 */}
+              {/* 🌟 1200x800 비율(배너 규격)에 맞춘 고정 비율 컨테이너 적용 */}
               <div 
                 className="map-event-stamp-bar" 
                 style={{
@@ -723,7 +725,9 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
-                  padding: "12px 16px",
+                  padding: "16px 20px",
+                  aspectRatio: "1200 / 300", // 배너 규격 비율 최적화 (세로가 너무 좁지 않게 4:1 비율 유지)
+                  minHeight: "85px",
                   borderRadius: "12px",
                   margin: "8px 0",
                   gap: "12px",
@@ -732,26 +736,31 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
                   overflow: "hidden",
                 }}
               >
-                <div className="map-event-stamp-bar__copy" style={{ flex: 1, minWidth: 0 }}>
-                  <p className="map-event-stamp-bar__title" style={{ fontSize: "15px", fontWeight: "700", margin: "0 0 4px 0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {activeEvent.title}
-                  </p>
-                  {!isEventLive(activeEvent) ? <p className="map-event-stamp-bar__meta" style={{ margin: 0, fontSize: "12px" }}>기간 종료</p> : null}
-                  {activeEvent.guide_text ? <p className="map-event-stamp-bar__guide" style={{ margin: 0, fontSize: "12px", opacity: 0.85, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{activeEvent.guide_text}</p> : null}
-                </div>
-                <div className="map-event-stamps" aria-hidden="true" style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
+                {/* 🌟 3. 그림(배경 이미지)이 추가되면 글자가 자동으로 사라짐 */}
+                {!hasStampBarBgImg && (
+                  <div className="map-event-stamp-bar__copy" style={{ flex: 1, minWidth: 0 }}>
+                    <p className="map-event-stamp-bar__title" style={{ fontSize: "16px", fontWeight: "700", margin: "0 0 4px 0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {activeEvent.title}
+                    </p>
+                    {!isEventLive(activeEvent) ? <p className="map-event-stamp-bar__meta" style={{ margin: 0, fontSize: "12px" }}>기간 종료</p> : null}
+                    {activeEvent.guide_text ? <p className="map-event-stamp-bar__guide" style={{ margin: 0, fontSize: "12px", opacity: 0.85, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{activeEvent.guide_text}</p> : null}
+                  </div>
+                )}
+
+                <div className="map-event-stamps" aria-hidden="true" style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0, marginLeft: hasStampBarBgImg ? "auto" : undefined }}>
                   {Array.from({ length: maxStamps }, (_, index) => {
-                    const filled = index < current;
+                    // 비로그인 상태면 무조건 빈 도장
+                    const filled = !isGuest && index < current;
                     const src = filled ? activeEvent.stamp_active_img : activeEvent.stamp_inactive_img;
                     return src ? (
-                      <img key={index} src={src} alt="" className={`map-event-stamp ${filled ? "map-event-stamp--on" : "map-event-stamp--off"}`} />
+                      <img key={index} src={src} alt="" className={`map-event-stamp ${filled ? "map-event-stamp--on" : "map-event-stamp--off"}`} style={{ width: "32px", height: "32px", objectFit: "contain" }} />
                     ) : (
-                      <span key={index} className={`map-event-stamp map-event-stamp--fallback ${filled ? "map-event-stamp--on" : ""}`} />
+                      <span key={index} className={`map-event-stamp map-event-stamp--fallback ${filled ? "map-event-stamp--on" : ""}`} style={{ width: "32px", height: "32px", borderRadius: "50%", background: filled ? "#059669" : "#d1d5db" }} />
                     );
                   })}
                   {completionBadgeSrc || completionPreview ? (
-                    <span className="map-event-completion-reward">
-                      {completionBadgeSrc ? <img src={completionBadgeSrc} alt="" /> : <span className="map-event-completion-reward__fallback" />}
+                    <span className="map-event-completion-reward" style={{ display: "inline-flex", width: "36px", height: "36px", alignItems: "center", justifyContent: "center" }}>
+                      {completionBadgeSrc ? <img src={completionBadgeSrc} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} /> : <span className="map-event-completion-reward__fallback" />}
                     </span>
                   ) : null}
                 </div>
@@ -1083,6 +1092,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
                       type="button"
                       className="map-event-modal__btn"
                       style={{ background: "#6b7280", flex: 1, padding: "10px", borderRadius: "8px", color: "#fff", fontWeight: "600" }}
+                      onClick={() => setRewardModal(null)}
                     >
                       닫기
                     </button>
