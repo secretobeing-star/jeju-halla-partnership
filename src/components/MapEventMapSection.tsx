@@ -103,6 +103,10 @@ type RewardModalState = {
 };
 
 export default function MapEventMapSection(props: MapEventMapSectionProps) {
+  // 🌟 PWA 전용 진입 여부 및 동시 접속 차단 상태
+  const [isPwaMode, setIsPwaMode] = useState<boolean | null>(null);
+  const [isDuplicateAccess, setIsDuplicateAccess] = useState(false);
+
   const [config, setConfig] = useState<
     MapAppConfig & {
       distance_error_message?: string;
@@ -144,11 +148,90 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const userId = student?.studentId?.trim() || "";
   const isGuest = !userId;
 
-  const isDefaultTab = !activeTabId || activeTabId === DEFAULT_TAB_ID;
+  // 🌟 1. PWA 모드 검증 및 기기별 세션/동시 접속 체크
+  useEffect(() => {
+    const checkEnvironment = () => {
+      // 스탠드어론(PWA 앱) 모드인지 판별
+      const standalone =
+        window.matchMedia("(display-mode: standalone)").matches ||
+        (window.navigator as any).standalone === true;
+
+      setIsPwaMode(standalone);
+    };
+
+    checkEnvironment();
+
+    if (!userId) return;
+
+    // 기기/브라우저별 고유 클라이언트 ID 생성 또는 대조 (동시 접속 감지용)
+    const deviceSessionKey = `halla_event_device_token_${userId}`;
+    let currentDeviceToken = localStorage.getItem(deviceSessionKey);
+    if (!currentDeviceToken) {
+      currentDeviceToken = Math.random().toString(36).substring(2) + Date.now().toString(36);
+      localStorage.setItem(deviceSessionKey, currentDeviceToken);
+    }
+
+    // 다른 창이나 기기에서 동일 유저로 접근하여 토큰이 갱신된 경우 감지
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === deviceSessionKey && e.newValue && e.newValue !== currentDeviceToken) {
+        setIsDuplicateAccess(true);
+      }
+    };
+
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, [userId]);
+
+  // 🌟 2. 일반 모바일 브라우저(크롬, 사파리, 삼브 등)로 접속한 경우 차단 화면 렌더링
+  if (isPwaMode === false) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "60vh", padding: "24px", textAlign: "center", background: "#f9fafb", borderRadius: "16px", margin: "16px" }}>
+        <div style={{ fontSize: "52px", marginBottom: "16px" }}>📱</div>
+        <h2 style={{ fontSize: "20px", fontWeight: "700", color: "#111827", marginBottom: "10px" }}>
+          PWA 전용 이벤트 안내
+        </h2>
+        <p style={{ fontSize: "14px", color: "#4b5563", lineHeight: "1.6", wordBreak: "keep-all", marginBottom: "20px" }}>
+          공정하고 원활한 이벤트 참여를 위해 일반 웹 브라우저(크롬, 사파리, 삼성 인터넷 등) 접근이 제한되어 있습니다.<br />
+          반드시 <b>홈 화면에 추가된 전용 PWA 앱</b>을 실행해서 참여해 주세요!
+        </p>
+        <div style={{ background: "#e5e7eb", padding: "12px 16px", borderRadius: "8px", fontSize: "13px", color: "#374151", textAlign: "left" }}>
+          💡 <b>홈 화면 추가 방법:</b><br />
+          • 크롬/삼성: 우측 상단 메뉴 ➔ '앱 설치' 또는 '홈 화면에 추가'<br />
+          • 사파리(아이폰): 하단 공유 버튼 ➔ '홈 화면에 추가'
+        </div>
+      </div>
+    );
+  }
+
+  // 🌟 3. 다른 기기/창에서 동시 접속이 감지된 경우 차단 팝업
+  if (isDuplicateAccess) {
+    return (
+      <div style={{ position: "fixed", inset: 0, zIndex: 99999, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
+        <div style={{ background: "#fff", borderRadius: "16px", padding: "24px", maxWidth: "340px", width: "100%", textAlign: "center" }}>
+          <div style={{ fontSize: "42px", marginBottom: "12px" }}>⚠️</div>
+          <h3 style={{ fontSize: "18px", fontWeight: "700", color: "#111827", marginBottom: "8px" }}>동시 접속 감지</h3>
+          <p style={{ fontSize: "14px", color: "#4b5563", lineHeight: "1.5", marginBottom: "20px" }}>
+            다른 기기 또는 다른 창에서 이미 해당 계정으로 이벤트에 접속 중입니다.<br />
+            동일 계정으로 중복 접속은 이용하실 수 없습니다.
+          </p>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            style={{ width: "100%", background: "#059669", color: "#fff", padding: "12px", borderRadius: "8px", fontWeight: "600", border: "none", cursor: "pointer" }}
+          >
+            이 기기에서 다시 접속하기
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const isньDefaultTab = !activeTabId || activeTabId === DEFAULT_TAB_ID;
+  const isDefaultTab = isньDefaultTab;
   const hasFavorites = Boolean(props.favoritePartnerIds && props.favoritePartnerIds.size > 0);
 
   const liveEvents = useMemo(
-    () => events.filter((event) => isEventLive(event)),
+    () => events.events ? [] : events.filter((event) => isEventLive(event)),
     [events],
   );
 
@@ -230,44 +313,56 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return null;
   }, [nearestTargetPartner]);
 
+  const getPartnerCooldownKey = useCallback(
+    (eventId: string, placeId: string) => `site_event_remain_seconds_${userId || "guest"}_${eventId}_${placeId}`,
+    [userId],
+  );
+
+  const getPartnerInitializedKey = useCallback(
+    (eventId: string, placeId: string) => `site_event_initialized_${userId || "guest"}_${eventId}_${placeId}`,
+    [userId],
+  );
+
+  const currentActivePartnerId = nearestUnstampedPartnerInside?.partner.id || "";
+
   useEffect(() => {
-    if (isDefaultTab || !activeEvent || isGuest || !userId) {
+    if (isDefaultTab || !activeEvent || isGuest || !currentActivePartnerId) {
       setCooldownTargetTime(0);
       setCooldownRemainMs(0);
       return;
     }
 
-    const fetchTimerState = async () => {
-      try {
-        const res = await fetch(`/api/event/timer?userId=${encodeURIComponent(userId)}&eventId=${encodeURIComponent(activeEvent.id)}`, {
-          cache: "no-store",
-        });
-        const data = await res.json();
-        if (data.cooldown_end_time) {
-          const targetTime = new Date(data.cooldown_end_time).getTime();
-          const now = Date.now();
-          if (targetTime > now) {
-            setCooldownTargetTime(targetTime);
-            setCooldownRemainMs(targetTime - now);
-          } else {
-            setCooldownTargetTime(0);
-            setCooldownRemainMs(0);
-          }
-        } else {
-          setCooldownTargetTime(0);
-          setCooldownRemainMs(0);
-        }
-      } catch {
-        setCooldownTargetTime(0);
-        setCooldownRemainMs(0);
-      }
-    };
+    const storageKey = getPartnerCooldownKey(activeEvent.id, currentActivePartnerId);
+    const initKey = getPartnerInitializedKey(activeEvent.id, currentActivePartnerId);
+    const savedTarget = localStorage.getItem(storageKey);
+    const isInitialized = localStorage.getItem(initKey);
+    const now = Date.now();
+    const cooldownMinutes = Math.max(0, Number(activeEvent?.cooldown_minutes) || 0);
 
-    void fetchTimerState();
-  }, [activeEvent, activeTabId, isDefaultTab, isGuest, userId]);
+    if (savedTarget !== null) {
+      const targetTime = Number(savedTarget);
+      if (targetTime > now) {
+        setCooldownTargetTime(targetTime);
+        setCooldownRemainMs(targetTime - now);
+        return;
+      }
+    }
+
+    if (!isInitialized && cooldownMinutes > 0) {
+      const newTargetTime = now + cooldownMinutes * 60_000;
+      localStorage.setItem(storageKey, String(newTargetTime));
+      localStorage.setItem(initKey, "true");
+      setCooldownTargetTime(newTargetTime);
+      setCooldownRemainMs(cooldownMinutes * 60_000);
+      return;
+    }
+
+    setCooldownTargetTime(0);
+    setCooldownRemainMs(0);
+  }, [activeEvent, activeTabId, isDefaultTab, isGuest, currentActivePartnerId, getPartnerCooldownKey, getPartnerInitializedKey]);
 
   useEffect(() => {
-    if (isDefaultTab || !activeEvent || isGuest || cooldownTargetTime <= 0) {
+    if (isDefaultTab || !activeEvent || isGuest || !currentActivePartnerId || cooldownTargetTime <= 0) {
       return;
     }
 
@@ -277,6 +372,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       if (remain <= 0) {
         setCooldownRemainMs(0);
         setCooldownTargetTime(0);
+        localStorage.removeItem(getPartnerCooldownKey(activeEvent.id, currentActivePartnerId));
       } else {
         setCooldownRemainMs(remain);
       }
@@ -285,7 +381,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     updateRemain();
     const timer = window.setInterval(updateRemain, 1000);
     return () => window.clearInterval(timer);
-  }, [isDefaultTab, activeEvent, isGuest, cooldownTargetTime]);
+  }, [isDefaultTab, activeEvent, isGuest, currentActivePartnerId, cooldownTargetTime, getPartnerCooldownKey]);
 
   const isTimerPaused = useMemo(() => {
     if (isDefaultTab || !activeEvent) return false;
@@ -497,18 +593,9 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         if (payload.cooldownError) {
           const remainMs = payload.cooldownMs ?? 60_000;
           if (activeEvent) {
-            const nextTargetTime = Date.now() + remainMs;
-            await fetch("/api/event/timer", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                userId,
-                eventId: activeEvent.id,
-                cooldownEndTime: new Date(nextTargetTime).toISOString(),
-                introConfirmed: true,
-              }),
-            });
-            setCooldownTargetTime(nextTargetTime);
+            const targetTime = Date.now() + remainMs;
+            localStorage.setItem(getPartnerCooldownKey(activeEvent.id, partner.id), String(targetTime));
+            setCooldownTargetTime(targetTime);
             setCooldownRemainMs(remainMs);
           }
           const remainText = formatCooldownRemain(remainMs);
@@ -552,22 +639,11 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       const activeCooldownMinutes = Number(activeEvent?.cooldown_minutes) || 0;
       if (activeCooldownMinutes > 0) {
         const nextTargetTime = Date.now() + activeCooldownMinutes * 60_000;
-        await fetch("/api/event/timer", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            userId,
-            eventId: activeEvent.id,
-            cooldownEndTime: new Date(nextTargetTime).toISOString(),
-            introConfirmed: true,
-          }),
-        });
+        localStorage.setItem(getPartnerCooldownKey(activeEvent.id, partner.id), String(nextTargetTime));
         setCooldownTargetTime(nextTargetTime);
         setCooldownRemainMs(activeCooldownMinutes * 60_000);
       } else {
-        await fetch(`/api/event/timer?userId=${encodeURIComponent(userId)}&eventId=${encodeURIComponent(activeEvent.id)}`, {
-          method: "DELETE",
-        });
+        localStorage.removeItem(getPartnerCooldownKey(activeEvent.id, partner.id));
         setCooldownTargetTime(0);
         setCooldownRemainMs(0);
       }
@@ -710,7 +786,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
               style={{
                 position: "absolute",
                 top: "16px",
-                left: "44%", // 🌟 우측 접기 버튼과 안 겹치도록 왼쪽으로 약간 조정
+                left: "50%",
                 transform: "translateX(-50%)",
                 zIndex: 20,
                 backgroundColor: "#059669",
@@ -734,7 +810,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
               style={{
                 position: "absolute",
                 top: "16px",
-                left: "44%", // 🌟 우측 접기 버튼과 안 겹치도록 왼쪽으로 약간 조정
+                left: "50%",
                 transform: "translateX(-50%)",
                 zIndex: 20,
                 backgroundColor: "rgba(31, 41, 55, 0.95)",
@@ -760,7 +836,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
               style={{
                 position: "absolute",
                 top: "16px",
-                left: "44%", // 🌟 우측 접기 버튼과 안 겹치도록 왼쪽으로 약간 조정
+                left: "50%",
                 transform: "translateX(-50%)",
                 zIndex: 20,
                 backgroundColor: "rgba(31, 41, 55, 0.95)",
@@ -787,7 +863,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
                 style={{
                   position: "absolute",
                   top: "16px",
-                  left: "44%", // 🌟 우측 접기 버튼과 안 겹치도록 왼쪽으로 약간 조정
+                  left: "50%",
                   transform: "translateX(-50%)",
                   zIndex: 20,
                   backgroundColor: "rgba(17, 24, 39, 0.92)",
@@ -812,7 +888,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
                 style={{
                   position: "absolute",
                   top: "16px",
-                  left: "44%", // 🌟 우측 접기 버튼과 안 겹치도록 왼쪽으로 약간 조정
+                  left: "50%",
                   transform: "translateX(-50%)",
                   zIndex: 20,
                   backgroundColor: "#059669",
@@ -837,7 +913,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
               style={{
                 position: "absolute",
                 top: "16px",
-                left: "44%", // 🌟 우측 접기 버튼과 안 겹치도록 왼쪽으로 약간 조정
+                left: "50%",
                 transform: "translateX(-50%)",
                 zIndex: 20,
                 backgroundColor: "rgba(31, 41, 55, 0.95)",
@@ -859,7 +935,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
               <span>
                 {nearestTargetPartner
                   ? `${nearestTargetPartner.partner.name} (약 ${formatDistance(nearestTargetPartner.distance)}) · 가까운 제휴 찾으러 가볼까요?`
-                  : "근처 제휴를 찾을 수 없습니다."}
+                  : "가까운 제휴를 찾을 수 없습니다."}
               </span>
             </div>
           )
