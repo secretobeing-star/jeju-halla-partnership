@@ -151,7 +151,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   // 🌟 1. PWA 모드 검증 및 기기별 세션/동시 접속 체크
   useEffect(() => {
     const checkEnvironment = () => {
-      // 스탠드어론(PWA 앱) 모드인지 판별
       const standalone =
         window.matchMedia("(display-mode: standalone)").matches ||
         (window.navigator as any).standalone === true;
@@ -163,7 +162,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
     if (!userId) return;
 
-    // 기기/브라우저별 고유 클라이언트 ID 생성 또는 대조 (동시 접속 감지용)
     const deviceSessionKey = `halla_event_device_token_${userId}`;
     let currentDeviceToken = localStorage.getItem(deviceSessionKey);
     if (!currentDeviceToken) {
@@ -171,7 +169,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       localStorage.setItem(deviceSessionKey, currentDeviceToken);
     }
 
-    // 다른 창이나 기기에서 동일 유저로 접근하여 토큰이 갱신된 경우 감지
     const handleStorage = (e: StorageEvent) => {
       if (e.key === deviceSessionKey && e.newValue && e.newValue !== currentDeviceToken) {
         setIsDuplicateAccess(true);
@@ -226,12 +223,12 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     );
   }
 
-  const isньDefaultTab = !activeTabId || activeTabId === DEFAULT_TAB_ID;
-  const isDefaultTab = isньDefaultTab;
+  const isDefaultTab = !activeTabId || activeTabId === DEFAULT_TAB_ID;
   const hasFavorites = Boolean(props.favoritePartnerIds && props.favoritePartnerIds.size > 0);
 
+  // 🌟 liveEvents 타입 에러 수정 완료
   const liveEvents = useMemo(
-    () => events.events ? [] : events.filter((event) => isEventLive(event)),
+    () => (Array.isArray(events) ? events.filter((event) => isEventLive(event)) : []),
     [events],
   );
 
