@@ -642,7 +642,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   }
 
   const maxStamps = activeEvent?.max_stamps ?? 0;
-  // 🌟 비로그인 상태면 도장 진행도를 0으로 고정하여 빈 도장만 보이게 처리
   const current = isGuest ? 0 : (progress?.current_stamps ?? 0);
   const isCompleted = Boolean(progress?.is_completed || (maxStamps > 0 && current >= maxStamps));
   const completionPreview = activeEvent ? completionRewardsOf(activeEvent)[0] : null;
@@ -717,7 +716,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         <>
           {!isDefaultTab && activeEvent ? (
             <>
-              {/* 🌟 1200x800 비율(배너 규격)에 맞춘 고정 비율 컨테이너 적용 */}
               <div 
                 className="map-event-stamp-bar" 
                 style={{
@@ -726,7 +724,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
                   alignItems: "center",
                   justifyContent: "space-between",
                   padding: "16px 20px",
-                  aspectRatio: "1200 / 300", // 배너 규격 비율 최적화 (세로가 너무 좁지 않게 4:1 비율 유지)
+                  aspectRatio: "1200 / 300",
                   minHeight: "85px",
                   borderRadius: "12px",
                   margin: "8px 0",
@@ -736,7 +734,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
                   overflow: "hidden",
                 }}
               >
-                {/* 🌟 3. 그림(배경 이미지)이 추가되면 글자가 자동으로 사라짐 */}
                 {!hasStampBarBgImg && (
                   <div className="map-event-stamp-bar__copy" style={{ flex: 1, minWidth: 0 }}>
                     <p className="map-event-stamp-bar__title" style={{ fontSize: "16px", fontWeight: "700", margin: "0 0 4px 0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -749,7 +746,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
                 <div className="map-event-stamps" aria-hidden="true" style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0, marginLeft: hasStampBarBgImg ? "auto" : undefined }}>
                   {Array.from({ length: maxStamps }, (_, index) => {
-                    // 비로그인 상태면 무조건 빈 도장
                     const filled = !isGuest && index < current;
                     const src = filled ? activeEvent.stamp_active_img : activeEvent.stamp_inactive_img;
                     return src ? (
@@ -958,9 +954,11 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
               )
             )}
 
+            {/* 🌟 핵심 수정: 기본 제휴 탭일 때는 이벤트 마커 설정(불꽃 등)을 차단하여 일반 마커 유지 */}
             <PartnerMainMapPanel
               key={activeTabId}
               {...props}
+              markerSettings={isDefaultTab ? null : props.markerSettings}
               partners={visiblePartners}
               stampAction={
                 isStampFeatureActive
