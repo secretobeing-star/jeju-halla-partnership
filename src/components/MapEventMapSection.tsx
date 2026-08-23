@@ -103,7 +103,7 @@ type RewardModalState = {
 };
 
 export default function MapEventMapSection(props: MapEventMapSectionProps) {
-  // 🌟 PWA 전용 진입 여부 및 동시 접속 차단 상태
+  // 🌟 PWA 전용 진입 여부 및 동시 접속 차단 상태 (초기값 null로 SSR 에러 방지)
   const [isPwaMode, setIsPwaMode] = useState<boolean | null>(null);
   const [isDuplicateAccess, setIsDuplicateAccess] = useState(false);
 
@@ -179,8 +179,13 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return () => window.removeEventListener("storage", handleStorage);
   }, [userId]);
 
-  // 🌟 2. 일반 모바일 브라우저(크롬, 사파리, 삼브 등)로 접속한 경우 차단 화면 렌더링
-  if (isPwaMode === false) {
+  // 🌟 2. 클라이언트 환경 판별 중일 때 안전한 빈 껍데기 반환 (SSR 500 에러 방지)
+  if (isPwaMode === null) {
+    return <div style={{ minHeight: "50vh" }} />;
+  }
+
+  // 🌟 3. 일반 모바일 브라우저(크롬, 사파리, 삼브 등)로 접속한 경우 차단 화면 렌더링
+  if (!isPwaMode) {
     return (
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "60vh", padding: "24px", textAlign: "center", background: "#f9fafb", borderRadius: "16px", margin: "16px" }}>
         <div style={{ fontSize: "52px", marginBottom: "16px" }}>📱</div>
@@ -200,7 +205,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     );
   }
 
-  // 🌟 3. 다른 기기/창에서 동시 접속이 감지된 경우 차단 팝업
+  // 🌟 4. 다른 기기/창에서 동시 접속이 감지된 경우 차단 팝업
   if (isDuplicateAccess) {
     return (
       <div style={{ position: "fixed", inset: 0, zIndex: 99999, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
@@ -226,7 +231,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const isDefaultTab = !activeTabId || activeTabId === DEFAULT_TAB_ID;
   const hasFavorites = Boolean(props.favoritePartnerIds && props.favoritePartnerIds.size > 0);
 
-  // 🌟 liveEvents 타입 에러 수정 완료
   const liveEvents = useMemo(
     () => (Array.isArray(events) ? events.filter((event) => isEventLive(event)) : []),
     [events],
