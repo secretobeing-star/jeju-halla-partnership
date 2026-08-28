@@ -1,6 +1,6 @@
 import { createPwaManifestResponse } from "@/lib/pwa-manifest-response";
 
-export const revalidate = 300;
+export const revalidate = 0;
 
 export async function GET() {
   return createPwaManifestResponse();
