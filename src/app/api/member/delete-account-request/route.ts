@@ -1,8 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
+import { loadSiteMemberWithdrawEnabled } from "@/lib/site-member-withdraw";
 import { createSupabaseServer } from "@/lib/supabase-server";
 import { getSiteMemberSession } from "@/lib/site-member-session";
 
 export async function POST(request: NextRequest) {
+  if (!(await loadSiteMemberWithdrawEnabled())) {
+    return NextResponse.json(
+      { error: "회원 탈퇴 기능이 비활성화되어 있습니다." },
+      { status: 403 },
+    );
+  }
+
   const supabase = createSupabaseServer();
   if (!supabase) {
     return NextResponse.json(

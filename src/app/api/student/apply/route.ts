@@ -6,6 +6,7 @@ import {
   getStudentSheetWebhookUrl,
   loadStudentSheetsConfigFromDb,
   postStudentApplicationWebhook,
+  upsertStudentApprovalRecord,
 } from "@/lib/google-sheets-student";
 import {
   DEFAULT_STUDENT_SHEETS_LOG_TAB,
@@ -161,6 +162,18 @@ export async function POST(request: Request) {
       const duplicate = await checkStudentApplicationDuplicate(config, studentId);
       if (duplicate.duplicate) {
         if (
+          duplicate.reason === "approval_rejected" ||
+          duplicate.reason === "log_rejected"
+        ) {
+          return NextResponse.json(
+            {
+              error: "거절된 학번입니다. 관리자 승인 후 다시 이용해 주세요.",
+              status: "rejected",
+            },
+            { status: 403 },
+          );
+        }
+        if (
           duplicate.reason === "approval_approved" ||
           duplicate.reason === "log_approved"
         ) {
@@ -236,6 +249,14 @@ export async function POST(request: Request) {
         userId,
         createdAt,
       });
+      await upsertStudentApprovalRecord(config, {
+        studentId,
+        name,
+        status: "approved",
+        photoUrl: photoUrl ?? undefined,
+        department,
+        major,
+      });
       wroteViaApi = true;
     } catch (error) {
       writeErrors.push(
@@ -250,7 +271,7 @@ export async function POST(request: Request) {
     sheetName: config?.logTab || DEFAULT_STUDENT_SHEETS_LOG_TAB,
     studentId,
     name,
-    status: "대기",
+    status: "승인",
     imageUrl: photoUrl,
     department,
     remarks: mergedNotes,

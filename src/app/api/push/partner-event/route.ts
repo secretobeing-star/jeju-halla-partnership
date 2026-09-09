@@ -65,10 +65,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // client_key 컬럼 기준으로 구독 정보 조회
+  // client_key 컬럼 기준으로 구독 정보 조회 (학번·기기키 모두 시도)
+  const lookupKeys = [userId].filter((key): key is string => Boolean(key?.trim()));
   let query = admin.from("push_subscriptions").select("endpoint, p256dh, auth");
-  if (userId) {
-    query = query.eq("client_key", userId);
+  if (lookupKeys.length === 1) {
+    query = query.eq("client_key", lookupKeys[0]);
+  } else if (lookupKeys.length > 1) {
+    query = query.in("client_key", lookupKeys);
   }
 
   const { data: subscriptions, error: subError } = await query;

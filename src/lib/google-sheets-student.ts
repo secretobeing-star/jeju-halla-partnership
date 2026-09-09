@@ -687,7 +687,14 @@ export async function listStudentApplicationLogs(
 
 export type StudentDuplicateCheckResult = {
   duplicate: boolean;
-  reason: "log_pending" | "log_approved" | "approval_pending" | "approval_approved" | null;
+  reason:
+    | "log_pending"
+    | "log_approved"
+    | "approval_pending"
+    | "approval_approved"
+    | "approval_rejected"
+    | "log_rejected"
+    | null;
 };
 
 export async function checkStudentApplicationDuplicate(
@@ -700,6 +707,9 @@ export async function checkStudentApplicationDuplicate(
   }
 
   const approval = await lookupStudentApprovalStatus(config, trimmedId);
+  if (approval.approvalStatus === "rejected") {
+    return { duplicate: true, reason: "approval_rejected" };
+  }
   if (approval.approvalStatus === "approved") {
     return { duplicate: true, reason: "approval_approved" };
   }
@@ -712,6 +722,9 @@ export async function checkStudentApplicationDuplicate(
     limit: 500,
   });
   const exact = logs.filter((row) => row.studentId === trimmedId);
+  if (exact.some((row) => row.statusNormalized === "rejected")) {
+    return { duplicate: true, reason: "log_rejected" };
+  }
   if (exact.some((row) => row.statusNormalized === "approved")) {
     return { duplicate: true, reason: "log_approved" };
   }

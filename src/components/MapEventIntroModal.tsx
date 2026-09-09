@@ -1,6 +1,7 @@
 "use client";
 
 import type { MapEvent } from "@/lib/map-events";
+import { prepareRichHtmlForDisplay, richTextHasVisibleContent } from "@/lib/rich-text";
 
 type MapEventIntroModalProps = {
   event: MapEvent | null;
@@ -11,7 +12,7 @@ type MapEventIntroModalProps = {
 
 function resolveIntroHtml(event: MapEvent) {
   const description = event.description?.trim() || "";
-  if (description) {
+  if (richTextHasVisibleContent(description)) {
     return description;
   }
   return event.guide_text?.trim() || "";
@@ -38,106 +39,32 @@ export default function MapEventIntroModal({
     <div
       role="dialog"
       aria-modal="true"
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 9999,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: "rgba(0, 0, 0, 0.6)",
-        padding: "16px",
-        backdropFilter: "blur(2px)",
-      }}
+      className="map-event-intro-overlay"
       onClick={onClose}
     >
-      <div
-        style={{
-          backgroundColor: "#ffffff",
-          borderRadius: "20px",
-          width: "100%",
-          maxWidth: "380px",
-          overflow: "hidden",
-          boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1)",
-          display: "flex",
-          flexDirection: "column",
-          maxHeight: "85vh",
-          animation: "modalFadeIn 0.2s ease-out",
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="map-event-intro-card" onClick={(e) => e.stopPropagation()}>
         {bannerImg ? (
-          <div
-            style={{
-              width: "100%",
-              maxHeight: "200px",
-              overflow: "hidden",
-              backgroundColor: "#f3f4f6",
-            }}
-          >
-            <img
-              src={bannerImg}
-              alt=""
-              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-            />
+          <div className="map-event-intro-banner">
+            <img src={bannerImg} alt="" />
           </div>
         ) : null}
 
-        <div style={{ padding: "20px", overflowY: "auto", flex: 1 }}>
-          <h3
-            style={{
-              fontSize: "18px",
-              fontWeight: "700",
-              color: "#111827",
-              textAlign: "center",
-              marginBottom: "14px",
-              lineHeight: 1.4,
-            }}
-          >
-            {event.title}
-          </h3>
+        <div className="map-event-intro-scroll">
+          <h3 className="map-event-intro-title">{event.title}</h3>
 
           {bodyHtml ? (
-            <div
-              className="map-event-intro-body"
-              style={{
-                backgroundColor: "#f9fafb",
-                borderRadius: "12px",
-                padding: "14px 16px",
-                fontSize: "14px",
-                color: "#374151",
-                lineHeight: 1.6,
-                border: "1px solid #f3f4f6",
-                wordBreak: "break-word",
-              }}
-            >
+            <div className="map-event-intro-body rich-content">
               {isHtml ? (
-                <div dangerouslySetInnerHTML={{ __html: bodyHtml }} />
+                <div dangerouslySetInnerHTML={{ __html: prepareRichHtmlForDisplay(bodyHtml) }} />
               ) : (
-                <p style={{ margin: 0, whiteSpace: "pre-line" }}>{bodyHtml}</p>
+                <p>{bodyHtml}</p>
               )}
             </div>
           ) : null}
         </div>
 
-        <div style={{ padding: "0 20px 20px 20px" }}>
-          <button
-            type="button"
-            onClick={onConfirm}
-            style={{
-              width: "100%",
-              padding: "14px",
-              backgroundColor: "#3b82f6",
-              color: "#ffffff",
-              fontSize: "16px",
-              fontWeight: "700",
-              borderRadius: "12px",
-              border: "none",
-              cursor: "pointer",
-              boxShadow: "0 4px 12px rgba(59, 130, 246, 0.3)",
-              transition: "background-color 0.2s",
-            }}
-          >
+        <div className="map-event-intro-actions">
+          <button type="button" className="map-event-intro-confirm" onClick={onConfirm}>
             참여하기
           </button>
         </div>

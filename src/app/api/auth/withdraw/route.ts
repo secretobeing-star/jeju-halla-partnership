@@ -1,9 +1,17 @@
+import { loadSiteMemberWithdrawEnabled } from "@/lib/site-member-withdraw";
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { google } from 'googleapis';
 
 export async function POST(req: NextRequest) {
   try {
+    if (!(await loadSiteMemberWithdrawEnabled())) {
+      return NextResponse.json(
+        { error: "회원 탈퇴 기능이 비활성화되어 있습니다." },
+        { status: 403 },
+      );
+    }
+
     // 1. 요청 바디에서 사용자 식별 정보 받기
     let userEmail: string | undefined;
     let providerToken: string | undefined;

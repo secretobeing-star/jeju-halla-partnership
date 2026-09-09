@@ -26,6 +26,7 @@ import {
   type HiddenReviewDisplay,
 } from "@/lib/partner-hidden-review";
 import { getSiteMemberSession } from "@/lib/site-member-session";
+import { prepareRichHtmlForDisplay } from "@/lib/rich-text";
 
 type SiteEventsBoardSectionProps = {
   events: SiteEventWithTabs[];
@@ -410,12 +411,6 @@ export default function SiteEventsBoardSection({
                   <h2 className="site-event-dialog__title">
                     {showDetail ? selectedEvent?.title || resolvedLabel : resolvedLabel}
                   </h2>
-                  {showDetail && selectedEvent?.description?.trim() ? (
-                    <div
-                      className="site-event-dialog__desc site-event-dialog__desc--rich"
-                      dangerouslySetInnerHTML={{ __html: selectedEvent.description.trim() }}
-                    />
-                  ) : null}
                   {showDetail ? (
                     <p className="site-event-dialog__range">
                       {formatSiteEventDateRange(selectedEvent?.starts_at, selectedEvent?.ends_at) ||
@@ -516,6 +511,15 @@ export default function SiteEventsBoardSection({
                   ) : null}
 
                   <div className="site-event-tab-body">
+                    {visibleTabs[0]?.id === activeTab.id && selectedEvent.description?.trim() ? (
+                      <div
+                        className="site-event-dialog__desc site-event-dialog__desc--rich rich-content"
+                        dangerouslySetInnerHTML={{
+                          __html: prepareRichHtmlForDisplay(selectedEvent.description.trim()),
+                        }}
+                      />
+                    ) : null}
+
                     {activeTab.image_url?.trim() ? (
                       activeTab.link_url?.trim() ? (
                         <a
@@ -556,7 +560,8 @@ export default function SiteEventsBoardSection({
 
                     {!activeTab.image_url?.trim() &&
                     !activeTab.body_text?.trim() &&
-                    !activeTab.link_url?.trim() ? (
+                    !activeTab.link_url?.trim() &&
+                    !(visibleTabs[0]?.id === activeTab.id && selectedEvent.description?.trim()) ? (
                       <p className="site-event-tab-empty">표시할 내용이 없습니다.</p>
                     ) : null}
 

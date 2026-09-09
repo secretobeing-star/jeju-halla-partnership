@@ -1,14 +1,14 @@
-const CACHE_NAME = 'halla-pass-v3';
+const CACHE_NAME = 'halla-pass-v4';
 
 // 1. 서비스 워커 설치 시 즉시 대기 상태 해제
 self.addEventListener("install", (event) => {
-  console.log("서비스 워커 설치 중 (v3)");
+  console.log("서비스 워커 설치 중 (v4)");
   self.skipWaiting();
 });
 
 // 2. 서비스 워커 활성화 시 구버전 캐시 자동 삭제
 self.addEventListener("activate", (event) => {
-  console.log("서비스 워커 활성화 및 구버전 캐시 청소 (v3)");
+  console.log("서비스 워커 활성화 및 구버전 캐시 청소 (v4)");
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
@@ -65,7 +65,7 @@ self.addEventListener("push", (event) => {
     ...(payload.image ? { image: payload.image } : {}),
     data: { url: payload.url ?? "/" },
     requireInteraction: true,
-    tag: `push-${Date.now()}`,
+    tag: payload.tag || `push-${Date.now()}`,
   };
 
   console.log("알림 표시 시도:", notificationOptions);
@@ -75,5 +75,61 @@ self.addEventListener("push", (event) => {
     }).catch((error) => {
       console.error("알림 표시 실패:", error);
     })
+  );
+});
+
+self.addEventListener("message", (event) => {
+  const data = event.data || {};
+  if (data.type !== "schedule-stamp-ready") {
+    return;
+  }
+
+  const fireAt = Number(data.fireAt) || 0;
+  const delay = Math.max(0, fireAt - Date.now());
+  const title = data.title || "도장 찍기 가능!";
+  const body = data.body || "지금 바로 이벤트 도장을 찍어보세요!";
+
+  const show = () =>
+    self.registration.showNotification(title, {
+      body,
+      data: { url: "/" },
+      requireInteraction: true,
+      tag: "stamp-ready",
+    });
+
+  if (delay === 0) {
+    event.waitUntil(show());
+    return;
+  }
+
+  const timer = setTimeout(() => {
+    void show();
+  }, delay);
+  if (typeof timer === "object" && timer && "unref" in timer) {
+    try {
+      timer.unref();
+    } catch (_) {}
+  }
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const targetUrl = event.notification.data?.url || "/";
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+      for (const client of clients) {
+        if ("focus" in client) {
+          client.focus();
+          if ("navigate" in client) {
+            return client.navigate(targetUrl);
+          }
+          return undefined;
+        }
+      }
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(targetUrl);
+      }
+      return undefined;
+    }),
   );
 });

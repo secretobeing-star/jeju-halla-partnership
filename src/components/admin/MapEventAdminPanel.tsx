@@ -16,6 +16,7 @@ import {
 } from "@/lib/map-events";
 import { fromDatetimeLocalValue, toDatetimeLocalValue } from "@/lib/site-events";
 import { getAdminAccessToken } from "@/lib/admin-api";
+import { richTextHasVisibleContent } from "@/lib/rich-text";
 import { getStorageErrorMessage } from "@/lib/storage";
 import { supabase, type Partner } from "@/lib/supabase";
 import type { PublicCardFrameItem } from "@/data/cardFrames";
@@ -131,10 +132,6 @@ function eventToForm(event: MapEvent): EventForm {
     completion_message: event.completion_popup_message ?? event.completion_message ?? "",
     partner_ids: event.partner_ids ?? [],
   };
-}
-
-function isRichTextEmpty(html: string) {
-  return !html.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
 }
 
 function asHexColor(value: string, fallback = "#ecfdf5") {
@@ -333,7 +330,7 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
       const payload = {
         tab_name: form.tab_name,
         title: form.title,
-        description: isRichTextEmpty(form.description) ? "" : form.description,
+        description: richTextHasVisibleContent(form.description) ? form.description : "",
         is_active: form.is_active,
         start_at: form.start_at ? fromDatetimeLocalValue(form.start_at) : null,
         end_at: form.end_at ? fromDatetimeLocalValue(form.end_at) : null,
@@ -634,17 +631,19 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
             </label>
           </div>
 
-          {/* 설명 입력란 */}
-          <div className="grid gap-4">
-            <label className="text-sm font-medium text-gray-700">
-              설명
+          <div>
+            <p className="text-sm font-medium text-gray-700">설명</p>
+            <p className="mt-0.5 text-xs font-normal text-gray-500">
+              이벤트 시작 화면에 사진·글이 그대로 표시됩니다. 사진만 넣어도 저장됩니다.
+            </p>
+            <div className="mt-2">
               <RichTextEditor
                 value={form.description}
                 onChange={(html) => setForm((prev) => ({ ...prev, description: html }))}
                 placeholder="이벤트 안내 상세 문구를 입력하세요."
                 minHeightClassName="min-h-32"
               />
-            </label>
+            </div>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">

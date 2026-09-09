@@ -9,6 +9,7 @@ type PushPayload = {
   icon?: string | null;
   badge?: string | null;
   image?: string | null;
+  tag?: string | null;
 };
 
 type PushSubscriptionRow = {
@@ -123,7 +124,8 @@ function summarizeRequestDetails(requestDetails: any, vapidSubject: string) {
 }
 
 function getVapidConfig() {
-  const publicKey = process.env.VAPID_PUBLIC_KEY?.trim() ?? "";
+  const publicKey =
+    process.env.VAPID_PUBLIC_KEY?.trim() || process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY?.trim() || "";
   const privateKey = process.env.VAPID_PRIVATE_KEY?.trim() ?? "";
   const subject = process.env.VAPID_SUBJECT?.trim() || "mailto:admin@chu.gg";
 
@@ -173,6 +175,7 @@ export async function sendWebPushNotification(
     icon: payload.icon ?? null,
     badge: payload.badge ?? null,
     image: payload.image ?? null,
+    tag: payload.tag ?? null,
   });
 
   const admin = createSupabaseAdmin();

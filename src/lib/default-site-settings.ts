@@ -235,6 +235,7 @@ export const DEFAULT_SITE_SETTINGS: SiteSettings = {
   settings_panel_notice_color: null,
   settings_panel_enabled: false,
   site_login_enabled: false,
+  site_member_withdraw_enabled: true,
   site_notifications_enabled: false,
   site_push_enabled: false,
   site_push_icon_url: null,

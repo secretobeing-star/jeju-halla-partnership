@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import AdminCollapsibleSection from "@/components/admin/AdminCollapsibleSection";
 import { adminApiFetch } from "@/lib/admin-api";
+import { formatSiteSettingsSaveError } from "@/lib/site-settings-save-error";
+import { isSiteMemberWithdrawEnabled } from "@/lib/site-member-withdraw";
+import { SiteSettings } from "@/lib/supabase";
 
 type Member = {
   id: string;
@@ -32,11 +35,15 @@ type WithdrawalBlock = {
 };
 
 type MembersAdminPanelProps = {
-  settings: unknown;
+  settings: SiteSettings;
+  setSettings: React.Dispatch<React.SetStateAction<SiteSettings>>;
+  saveSettings: (next: SiteSettings) => Promise<{ error: { message: string } | null }>;
 };
 
 export default function MembersAdminPanel({
   settings,
+  setSettings,
+  saveSettings,
 }: MembersAdminPanelProps) {
   const [members, setMembers] = useState<Member[]>([]);
   const [deletionRequests, setDeletionRequests] = useState<DeletionRequest[]>([]);
@@ -60,6 +67,7 @@ export default function MembersAdminPanel({
     deletion_reject_message: "",
   });
   const [messageSaving, setMessageSaving] = useState(false);
+  const [withdrawSaving, setWithdrawSaving] = useState(false);
 
   const loadMembers = useCallback(async () => {
     setLoading(true);
@@ -300,6 +308,18 @@ export default function MembersAdminPanel({
     } finally {
       setMessageSaving(false);
     }
+  }
+
+  async function handleSaveWithdrawEnabled() {
+    setWithdrawSaving(true);
+    setError(null);
+    const { error } = await saveSettings(settings);
+    if (error) {
+      setError(formatSiteSettingsSaveError(error.message));
+      setWithdrawSaving(false);
+      return;
+    }
+    setWithdrawSaving(false);
   }
 
   return (
@@ -628,7 +648,39 @@ export default function MembersAdminPanel({
       )}
 
       {tab === "settings" && (
-        <div className="space-y-4">
+        <div className="space-y-6">
+          <div className="rounded-xl border border-gray-200 bg-white p-4">
+            <label className="flex cursor-pointer items-start gap-3 text-sm text-gray-800">
+              <input
+                type="checkbox"
+                checked={isSiteMemberWithdrawEnabled(settings)}
+                onChange={(e) =>
+                  setSettings((prev) => ({
+                    ...prev,
+                    site_member_withdraw_enabled: e.target.checked,
+                  }))
+                }
+                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-emerald-600"
+              />
+              <span>
+                <span className="font-medium">회원 탈퇴 기능 사용</span>
+                <span className="mt-1 block text-xs font-normal text-gray-500">
+                  끄면 앱 설정 화면의 탈퇴 버튼이 숨겨지고, 탈퇴 API도 차단됩니다.
+                  앱 탈퇴는 구글 시트 기록·로컬 세션을 정리하며, Supabase Auth 계정은
+                  기본적으로 삭제되지 않습니다.
+                </span>
+              </span>
+            </label>
+            <button
+              type="button"
+              onClick={() => void handleSaveWithdrawEnabled()}
+              disabled={withdrawSaving}
+              className="mt-3 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+            >
+              {withdrawSaving ? "저장 중..." : "탈퇴 기능 설정 저장"}
+            </button>
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               탈퇴 신청 완료 메시지

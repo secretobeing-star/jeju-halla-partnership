@@ -3,7 +3,6 @@ import { rowToAdminAccess } from "@/lib/admin-permissions";
 import { getRequestUser, resolveAdminAccess } from "@/lib/admin-permissions-server";
 import {
   buildStudentSheetWebhookPayload,
-  deleteStudentLogRow,
   listStudentApplicationLogs,
   loadStudentSheetsConfigFromDb,
   postStudentApplicationWebhook,
@@ -98,18 +97,6 @@ export async function POST(request: NextRequest) {
   const nextStatus = action === "approve" ? "approved" : "rejected";
 
   try {
-    if (action === "reject") {
-      await deleteStudentLogRow(config, rowNumber);
-      return NextResponse.json({
-        ok: true,
-        status: "deleted",
-        deleted: true,
-        rowNumber,
-        studentId: target.studentId,
-        push: null,
-      });
-    }
-
     await updateStudentLogStatus(config, rowNumber, nextStatus);
     await upsertStudentApprovalRecord(config, {
       studentId: target.studentId,
@@ -124,7 +111,7 @@ export async function POST(request: NextRequest) {
       sheetName: config.approvalTab || DEFAULT_STUDENT_SHEETS_APPROVAL_TAB,
       studentId: target.studentId,
       name: target.name || target.studentId,
-      status: "승인",
+      status: nextStatus === "approved" ? "승인" : "거절",
       imageUrl: target.photoUrl,
       department: target.department,
       remarks: target.notes,
@@ -142,7 +129,7 @@ export async function POST(request: NextRequest) {
   let pushResult: { sent: number; failed: number; skipped: boolean; message?: string } | null =
     null;
 
-  if (action === "approve" && sendPush && target.deviceKey) {
+  if (sendPush && target.deviceKey && (action === "approve" || action === "reject")) {
     const admin = createSupabaseAdmin();
     if (admin) {
       const { data: subscriptions } = await admin
@@ -165,8 +152,11 @@ export async function POST(request: NextRequest) {
       });
 
       pushResult = await sendWebPushNotification(subscriptions ?? [], {
-        title: "학생증 승인",
-        body: "학생증이 승인되었습니다. 다시 로그인해 주세요.",
+        title: action === "approve" ? "학생증 승인" : "학생증 거절",
+        body:
+          action === "approve"
+            ? "학생증이 승인되었습니다. 다시 로그인해 주세요."
+            : "학생 인증이 거절되었습니다. 관리자에게 문의해 주세요.",
         url: "/",
         icon: visuals.icon,
         badge: visuals.badge,

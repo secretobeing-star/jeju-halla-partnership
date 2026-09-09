@@ -53,6 +53,15 @@ export async function POST(request: Request) {
     try {
       const record = await lookupStudentApprovalStatus(config, studentId);
 
+      if (record.approvalStatus === "rejected") {
+        return NextResponse.json({
+          status: "error",
+          message:
+            notices?.statusNotice ||
+            "거절된 학번입니다. 관리자 승인 후 다시 로그인해 주세요.",
+        });
+      }
+
       if (record.approvalStatus !== "none") {
         const student: SiteMemberStudentProfile = {
           studentId: record.studentId,

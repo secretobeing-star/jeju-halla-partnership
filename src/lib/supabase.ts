@@ -450,6 +450,7 @@ export type SiteSettings = {
   settings_panel_notice_color: string | null;
   settings_panel_enabled: boolean;
   site_login_enabled: boolean;
+  site_member_withdraw_enabled: boolean;
   site_notifications_enabled: boolean;
   site_push_enabled: boolean;
   site_push_icon_url: string | null;

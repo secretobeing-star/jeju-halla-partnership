@@ -2215,7 +2215,11 @@ export default function AdminPage() {
 
         {hasAdminNavAccess(adminAccess, "site-members") && activeNav === "site-members" && (
           <div className="space-y-6">
-            <MembersAdminPanel settings={settings} />
+            <MembersAdminPanel
+              settings={settings}
+              setSettings={setSettings}
+              saveSettings={saveSettingsToDb}
+            />
           </div>
         )}
 

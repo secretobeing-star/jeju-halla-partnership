@@ -1,3 +1,4 @@
+import { getBoardVoterKey } from "@/lib/board-voter";
 import { readDeviceJson, writeDeviceJson } from "@/lib/device-storage";
 import type {
   StudentApprovalStatus,
@@ -40,9 +41,8 @@ export function setSiteMemberSession(session: SiteMemberSession | null): void {
   if (session) {
     writeDeviceJson(SITE_MEMBER_SESSION_KEY, session);
     
-    // 로그인 시 푸시 구독 등록
-    const clientKey = session.displayName?.trim() || session.student?.studentId || "";
-    if (clientKey) {
+    const clientKey = getBoardVoterKey();
+    if (clientKey && clientKey !== "server") {
       void registerPushSubscription(clientKey);
     }
   } else {

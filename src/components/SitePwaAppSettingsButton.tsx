@@ -58,6 +58,7 @@ type SitePwaAppSettingsButtonProps = {
   settings: SitePwaAppDisplaySettingsSource;
   pushEnabled: boolean;
   layout?: "fixed" | "toolbar";
+  withdrawEnabled?: boolean;
 };
 
 function DarkModeStateIcon({ dark }: { dark: boolean }) {
@@ -215,6 +216,7 @@ export default function SitePwaAppSettingsButton({
   settings,
   pushEnabled,
   layout = "toolbar",
+  withdrawEnabled = true,
 }: SitePwaAppSettingsButtonProps) {
   const showNotification = isPwaAppSettingsNotificationEnabled(settings);
   const showLocation = isPwaAppSettingsLocationEnabled(settings);
@@ -669,7 +671,7 @@ export default function SitePwaAppSettingsButton({
           </div>
         ) : null}
         
-        {memberLoggedIn ? (
+        {memberLoggedIn && withdrawEnabled ? (
           <div className="site-pwa-app-settings__section site-pwa-app-settings__section--spaced">
             <button
               type="button"
@@ -755,7 +757,7 @@ export default function SitePwaAppSettingsButton({
       ) : null}
       
       <DeleteAccountConfirmDialog
-        open={deleteAccountConfirm && memberLoggedIn}
+        open={deleteAccountConfirm && memberLoggedIn && withdrawEnabled}
         busy={deletingAccount}
         onCancel={() => setDeleteAccountConfirm(false)}
         onConfirm={() => void handleDeleteAccount()}

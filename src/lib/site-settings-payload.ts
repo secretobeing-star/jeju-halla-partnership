@@ -317,6 +317,7 @@ export function buildSiteSettingsPayload(next: SiteSettings) {
     settings_panel_notice_color: normalizeBoardColor(next.settings_panel_notice_color) || null,
     settings_panel_enabled: next.settings_panel_enabled ?? false,
     site_login_enabled: next.site_login_enabled ?? false,
+    site_member_withdraw_enabled: next.site_member_withdraw_enabled ?? true,
     site_notifications_enabled: next.site_notifications_enabled ?? false,
     site_push_enabled: next.site_push_enabled ?? false,
     site_push_icon_url: next.site_push_icon_url?.trim() || null,

@@ -10,6 +10,7 @@ import {
   toDatetimeLocalValue,
 } from "@/lib/site-events";
 import { getStorageErrorMessage, uploadPartnershipImage } from "@/lib/storage";
+import { richTextHasVisibleContent } from "@/lib/rich-text";
 import {
   SiteEvent,
   SiteEventListType,
@@ -57,10 +58,6 @@ const EMPTY_TAB: TabFormState = {
   is_active: true,
   sort_order: 0,
 };
-
-function isRichTextEmpty(html: string) {
-  return !html.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
-}
 
 function stripRichText(html: string) {
   return html.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
@@ -231,7 +228,7 @@ export default function EventAdminPanel({
 
     const payload = {
       title,
-      description: isRichTextEmpty(eventForm.description) ? null : eventForm.description,
+      description: richTextHasVisibleContent(eventForm.description) ? eventForm.description : null,
       thumbnail_url: eventForm.thumbnail_url?.trim() || null,
       starts_at: fromDatetimeLocalValue(eventForm.starts_at),
       ends_at: fromDatetimeLocalValue(eventForm.ends_at),

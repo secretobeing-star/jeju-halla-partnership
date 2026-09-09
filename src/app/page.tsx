@@ -1469,6 +1469,7 @@ export default function HomePage() {
           <SitePwaAppSettingsButton
             settings={settings}
             pushEnabled={settings.site_push_enabled ?? false}
+            withdrawEnabled={settings.site_member_withdraw_enabled !== false}
             layout="toolbar"
           />
         ) : null}
@@ -1506,6 +1507,7 @@ export default function HomePage() {
             noticeText={settings.settings_panel_notice_text}
             noticeUrl={settings.settings_panel_notice_url}
             noticeColor={settings.settings_panel_notice_color}
+            withdrawEnabled={settings.site_member_withdraw_enabled !== false}
           />
         ) : null}
       </>

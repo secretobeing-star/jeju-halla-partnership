@@ -17,6 +17,7 @@ import StudentInfoFormModal from "@/components/student/StudentInfoFormModal";
 import StudentSamsungPaySwipe from "@/components/student/StudentSamsungPaySwipe";
 import { useStandaloneDisplayMode } from "@/hooks/useStandaloneDisplayMode";
 import {
+  clearSiteMemberSession,
   getSiteMemberSession,
   patchSiteMemberStudentProfile,
   SITE_MEMBER_SESSION_EVENT,
@@ -129,6 +130,22 @@ export default function StudentIdProvider({
     const profile = session?.student ?? null;
 
     if (profile?.studentId) {
+      try {
+        const response = await fetch(
+          `/api/student/status?studentId=${encodeURIComponent(profile.studentId)}`,
+        );
+        if (response.ok) {
+          const payload = (await response.json()) as { status?: string };
+          if (payload.status === "rejected") {
+            clearSiteMemberSession();
+            setStudent(null);
+            setStep("idle");
+            return;
+          }
+        }
+      } catch {
+        // 시트 조회 실패 시 기존 세션으로 카드 표시
+      }
       setStudent(profile);
       setStep("card");
       return;

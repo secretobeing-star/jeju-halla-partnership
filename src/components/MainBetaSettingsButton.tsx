@@ -44,6 +44,7 @@ type MainBetaSettingsButtonProps = {
   noticeText?: string | null;
   noticeUrl?: string | null;
   noticeColor?: string | null;
+  withdrawEnabled?: boolean;
 };
 
 function DarkModeStateIcon({ dark }: { dark: boolean }) {
@@ -277,6 +278,7 @@ export default function MainBetaSettingsButton({
   noticeText,
   noticeUrl,
   noticeColor,
+  withdrawEnabled = true,
 }: MainBetaSettingsButtonProps) {
   const [open, setOpen] = useState(false);
   const [prefs, setPrefs] = useState<UserBetaSettings>(() => loadUserBetaSettings());
@@ -547,7 +549,7 @@ export default function MainBetaSettingsButton({
             ) : null}
             <NoticeSection text={trimmedNotice} url={trimmedNoticeUrl} color={noticeColor} />
             
-            {memberLoggedIn ? (
+            {memberLoggedIn && withdrawEnabled ? (
               <div className="mt-4 pt-4 border-t border-gray-200">
                 <button
                   type="button"
@@ -570,7 +572,7 @@ export default function MainBetaSettingsButton({
       )}
 
       <DeleteAccountConfirmDialog
-        open={deleteAccountConfirm && memberLoggedIn}
+        open={deleteAccountConfirm && memberLoggedIn && withdrawEnabled}
         busy={deletingAccount}
         onCancel={() => setDeleteAccountConfirm(false)}
         onConfirm={() => void handleDeleteAccount()}

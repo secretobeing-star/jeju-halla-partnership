@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { loadSiteMemberWithdrawEnabled } from "@/lib/site-member-withdraw";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 import { createSupabaseServer } from "@/lib/supabase-server";
 import {
@@ -40,6 +41,12 @@ export async function POST(request: NextRequest) {
 
   const studentId = body.studentId?.trim() || "";
   const studentName = body.studentName?.trim() || "";
+  if (!(await loadSiteMemberWithdrawEnabled())) {
+    return NextResponse.json(
+      { error: "회원 탈퇴 기능이 비활성화되어 있습니다." },
+      { status: 403 },
+    );
+  }
   if (!studentId) {
     return NextResponse.json(
       { error: "학번이 필요합니다. 로그인 후 다시 시도해 주세요." },

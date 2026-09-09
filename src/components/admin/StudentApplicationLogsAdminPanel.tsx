@@ -57,6 +57,7 @@ export default function StudentApplicationLogsAdminPanel() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [busyRow, setBusyRow] = useState<number | null>(null);
 
   const loadLogs = useCallback(
     async (filters?: {
@@ -124,10 +125,42 @@ export default function StudentApplicationLogsAdminPanel() {
     void loadLogs({ query: "", status: "all", from: "", to: "" });
   }
 
+  async function handleReview(log: StudentApplicationLogRow, action: "approve" | "reject") {
+    setBusyRow(log.rowNumber);
+    setError(null);
+    setMessage(null);
+    try {
+      const payload = (await adminApiFetch("/api/admin/student-logs/review", {
+        method: "POST",
+        timeoutMs: 45_000,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rowNumber: log.rowNumber, action }),
+      })) as { error?: string; status?: string };
+
+      if (payload.error) {
+        setError(payload.error);
+        return;
+      }
+
+      setMessage(
+        action === "reject"
+          ? `${log.studentId || "학번"} 학번을 거절했습니다. 해당 계정은 로그인할 수 없습니다.`
+          : `${log.studentId || "학번"} 학번을 다시 승인했습니다.`,
+      );
+      await loadLogs();
+    } catch (reviewError) {
+      setError(
+        reviewError instanceof Error ? reviewError.message : "처리에 실패했습니다.",
+      );
+    } finally {
+      setBusyRow(null);
+    }
+  }
+
   return (
     <AdminCollapsibleSection
       title="신청 로그"
-      description="구글 시트 신청 로그를 필터하고 조회합니다. 회원가입 시 자동 승인됩니다."
+      description="회원가입은 자동 승인됩니다. 필요하면 아래에서 거절하거나, 거절된 학번을 다시 승인할 수 있습니다."
       defaultExpanded
     >
       <div className="mb-3 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
@@ -248,7 +281,27 @@ export default function StudentApplicationLogsAdminPanel() {
                       >
                         {statusLabel(log.statusNormalized, log.status)}
                       </span>
-                      <span className="text-[10px] text-gray-400">자동 승인</span>
+                      <div className="flex flex-wrap justify-end gap-1.5">
+                        {log.statusNormalized === "rejected" ? (
+                          <button
+                            type="button"
+                            disabled={busyRow === log.rowNumber || loading}
+                            onClick={() => void handleReview(log, "approve")}
+                            className="rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            {busyRow === log.rowNumber ? "처리 중..." : "승인"}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={busyRow === log.rowNumber || loading}
+                            onClick={() => void handleReview(log, "reject")}
+                            className="rounded border border-red-200 bg-red-50 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            {busyRow === log.rowNumber ? "처리 중..." : "거절"}
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                   {open ? (

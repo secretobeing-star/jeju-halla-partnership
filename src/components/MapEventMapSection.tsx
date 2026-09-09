@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import PartnerMainMapPanel from "@/components/PartnerMainMapPanel";
 import MapEventIntroModal from "@/components/MapEventIntroModal";
 import {
@@ -17,6 +17,7 @@ import {
 import type { MapMarkerCustomSettings } from "@/lib/naver-map-partner-ui";
 import { getCurrentGeolocation } from "@/lib/geolocation";
 import { getSiteMemberSession } from "@/lib/site-member-session";
+import { getBoardVoterKey } from "@/lib/board-voter";
 import { SITE_STUDENT_NEED_LOGIN_EVENT } from "@/lib/site-student-auth-settings";
 import { supabase } from "@/lib/supabase";
 
@@ -145,6 +146,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   
   const [cooldownTargetTime, setCooldownTargetTime] = useState<number>(0);
   const [cooldownRemainMs, setCooldownRemainMs] = useState<number>(0);
+  const stampReadyPushSentRef = useRef<Set<string>>(new Set());
 
   const student = getSiteMemberSession()?.student;
   const userId = student?.studentId?.trim() || "";
@@ -278,6 +280,50 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   );
 
   const currentActivePartnerId = nearestUnstampedPartnerInside?.partner.id || "";
+  const currentActivePartnerName = nearestUnstampedPartnerInside?.partner.name || "";
+
+  const notifyStampReady = useCallback(
+    (eventId: string, partnerId: string, partnerName: string, fireAt: number) => {
+      if (!userId || fireAt <= 0) {
+        return;
+      }
+      const dedupeKey = `${userId}:${eventId}:${partnerId}:${fireAt}`;
+      if (stampReadyPushSentRef.current.has(dedupeKey)) {
+        return;
+      }
+      stampReadyPushSentRef.current.add(dedupeKey);
+      void fetch("/api/event/stamp-ready-push", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId,
+          eventId,
+          clientKey: getBoardVoterKey(),
+          partnerId,
+          partnerName,
+          eventTitle: activeEvent?.title,
+        }),
+      }).catch(() => undefined);
+    },
+    [userId, activeEvent?.title],
+  );
+
+  const scheduleStampReadyOnDevice = useCallback((fireAt: number, partnerName: string) => {
+    const delay = fireAt - Date.now();
+    if (delay <= 0 || typeof navigator === "undefined" || !("serviceWorker" in navigator)) {
+      return;
+    }
+    void navigator.serviceWorker.ready
+      .then((registration) => {
+        registration.active?.postMessage({
+          type: "schedule-stamp-ready",
+          fireAt,
+          title: "도장 찍기 가능!",
+          body: `${partnerName}에서 지금 바로 이벤트 도장을 찍어보세요!`,
+        });
+      })
+      .catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     if (isDefaultTab || !activeEvent || isGuest || !currentActivePartnerId) {
@@ -327,6 +373,12 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         setCooldownRemainMs(0);
         setCooldownTargetTime(0);
         localStorage.removeItem(getPartnerCooldownKey(activeEvent.id, currentActivePartnerId));
+        notifyStampReady(
+          activeEvent.id,
+          currentActivePartnerId,
+          currentActivePartnerName,
+          cooldownTargetTime,
+        );
       } else {
         setCooldownRemainMs(remain);
       }
@@ -335,7 +387,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     updateRemain();
     const timer = window.setInterval(updateRemain, 1000);
     return () => window.clearInterval(timer);
-  }, [isDefaultTab, activeEvent, isGuest, currentActivePartnerId, cooldownTargetTime, getPartnerCooldownKey]);
+  }, [isDefaultTab, activeEvent, isGuest, currentActivePartnerId, currentActivePartnerName, cooldownTargetTime, getPartnerCooldownKey, notifyStampReady]);
 
   const isTimerPaused = useMemo(() => {
     if (isDefaultTab || !activeEvent) return false;
@@ -538,6 +590,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
           longitude: geo.longitude,
           timestamp: Date.now(),
           sessionToken,
+          clientKey: getBoardVoterKey(),
         }),
       });
 
@@ -596,6 +649,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
         localStorage.setItem(getPartnerCooldownKey(activeEvent.id, partner.id), String(nextTargetTime));
         setCooldownTargetTime(nextTargetTime);
         setCooldownRemainMs(activeCooldownMinutes * 60_000);
+        scheduleStampReadyOnDevice(nextTargetTime, partner.name);
       } else {
         localStorage.removeItem(getPartnerCooldownKey(activeEvent.id, partner.id));
         setCooldownTargetTime(0);
@@ -718,50 +772,50 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
           {!isDefaultTab && activeEvent ? (
             <>
               <div 
-                className="map-event-stamp-bar" 
-                style={{
-                  ...stampBarCssVars(activeEvent),
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "16px 20px",
-                  aspectRatio: "1200 / 300",
-                  minHeight: "85px",
-                  borderRadius: "12px",
-                  margin: "8px 0",
-                  gap: "12px",
-                  width: "100%",
-                  boxSizing: "border-box",
-                  overflow: "hidden",
-                }}
+                className={`map-event-stamp-bar${hasStampBarBgImg ? " map-event-stamp-bar--has-bg" : ""}`}
+                style={stampBarCssVars(activeEvent)}
               >
                 {!hasStampBarBgImg && (
-                  <div className="map-event-stamp-bar__copy" style={{ flex: 1, minWidth: 0 }}>
-                    <p className="map-event-stamp-bar__title" style={{ fontSize: "16px", fontWeight: "700", margin: "0 0 4px 0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {activeEvent.title}
-                    </p>
-                    {!isEventLive(activeEvent) ? <p className="map-event-stamp-bar__meta" style={{ margin: 0, fontSize: "12px" }}>기간 종료</p> : null}
-                    {activeEvent.guide_text ? <p className="map-event-stamp-bar__guide" style={{ margin: 0, fontSize: "12px", opacity: 0.85, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{activeEvent.guide_text}</p> : null}
+                  <div className="map-event-stamp-bar__copy">
+                    <p className="map-event-stamp-bar__title">{activeEvent.title}</p>
+                    {!isEventLive(activeEvent) ? (
+                      <p className="map-event-stamp-bar__meta">기간 종료</p>
+                    ) : null}
                   </div>
                 )}
 
-                <div className="map-event-stamps" aria-hidden="true" style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0, marginLeft: hasStampBarBgImg ? "auto" : undefined }}>
+                <div className="map-event-stamps" aria-hidden="true">
                   {Array.from({ length: maxStamps }, (_, index) => {
                     const filled = !isGuest && index < current;
                     const src = filled ? activeEvent.stamp_active_img : activeEvent.stamp_inactive_img;
                     return src ? (
-                      <img key={index} src={src} alt="" className={`map-event-stamp ${filled ? "map-event-stamp--on" : "map-event-stamp--off"}`} style={{ width: "32px", height: "32px", objectFit: "contain" }} />
+                      <img
+                        key={index}
+                        src={src}
+                        alt=""
+                        className={`map-event-stamp ${filled ? "map-event-stamp--on" : "map-event-stamp--off"}`}
+                      />
                     ) : (
-                      <span key={index} className={`map-event-stamp map-event-stamp--fallback ${filled ? "map-event-stamp--on" : ""}`} style={{ width: "32px", height: "32px", borderRadius: "50%", background: filled ? "#059669" : "#d1d5db" }} />
+                      <span
+                        key={index}
+                        className={`map-event-stamp map-event-stamp--fallback ${filled ? "map-event-stamp--on" : ""}`}
+                      />
                     );
                   })}
                   {completionBadgeSrc || completionPreview ? (
-                    <span className="map-event-completion-reward" style={{ display: "inline-flex", width: "36px", height: "36px", alignItems: "center", justifyContent: "center" }}>
-                      {completionBadgeSrc ? <img src={completionBadgeSrc} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} /> : <span className="map-event-completion-reward__fallback" />}
+                    <span className="map-event-completion-reward">
+                      {completionBadgeSrc ? (
+                        <img src={completionBadgeSrc} alt="" />
+                      ) : (
+                        <span className="map-event-completion-reward__fallback" />
+                      )}
                     </span>
                   ) : null}
                 </div>
               </div>
+              {activeEvent.guide_text?.trim() ? (
+                <p className="map-event-map-guide">{activeEvent.guide_text.trim()}</p>
+              ) : null}
 
               <div style={{ display: "flex", justifyContent: "flex-end", padding: "4px 8px 8px 8px" }}>
                 <button

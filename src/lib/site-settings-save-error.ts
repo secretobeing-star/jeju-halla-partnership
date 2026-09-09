@@ -62,6 +62,7 @@ const COLUMN_SQL_HINTS: Record<string, string> = {
   settings_panel_notice_url: "settings-panel-notice.sql",
   settings_panel_enabled: "settings-panel-notice.sql",
   site_login_enabled: "site-member-features.sql",
+  site_member_withdraw_enabled: "site-member-withdraw-settings.sql",
   site_notifications_enabled: "site-member-features.sql",
   site_push_enabled: "site-member-features.sql",
   site_push_icon_url: "site-notification-push-customization.sql",
