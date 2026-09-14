@@ -18,7 +18,7 @@ export default function SiteNavLinksListEditor({
   items,
   onItemsChange,
   emptyMessage = "등록된 메뉴가 없습니다. 아래 버튼으로 메뉴를 추가해 주세요.",
-  linkHint = "페이지 안 이동은 #partner-list-anchor, 게시판 팝업은 #board-popup, 선물함은 #gift-inbox, 보관함은 #frame-inventory 을 사용하세요.",
+  linkHint = "페이지 안 이동은 #partner-list-anchor, 게시판 팝업은 #board-popup, 선물함은 #gift-inbox, 보관함은 #frame-inventory, 시즌패스는 #season-pass, 골드상점은 #gold-shop 을 사용하세요.",
   onUploadIcon,
   uploadingIndex = null,
   onUploadImage,
@@ -142,7 +142,7 @@ export default function SiteNavLinksListEditor({
               <input
                 value={item.href}
                 onChange={(event) => updateItem(index, { href: event.target.value })}
-                placeholder="https://www.halla.ac.kr 또는 #gift-inbox"
+                placeholder="https://www.halla.ac.kr 또는 #gift-inbox, #season-pass"
                 className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-emerald-500"
               />
               <span className="mt-1 block text-xs font-normal text-gray-500">{linkHint}</span>

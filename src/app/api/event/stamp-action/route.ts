@@ -16,6 +16,7 @@ import {
   type MapEventRewardType,
 } from "@/lib/map-events";
 import { scheduleStampReadyPush } from "@/lib/stamp-ready-push";
+import { completeVisit } from "@/lib/season-pass-server";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 
 type StampBody = {
@@ -372,9 +373,11 @@ export async function POST(request: NextRequest) {
       .join(" / "),
   };
   void postPlainJsonWebhook({ ...webhookPayload });
+  const seasonVisit = await completeVisit({ userId, partnerId: placeId });
 
   return NextResponse.json({
     ok: true,
+    seasonPass: seasonVisit,
     progress: {
       user_id: userId,
       event_id: eventId,

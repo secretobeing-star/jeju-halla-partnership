@@ -13,6 +13,7 @@ import {
   getPublicSiteSettingsForMetadata,
 } from "@/lib/site-settings-server";
 import "./globals.css";
+import "./season-pass.css";
 
 export const revalidate = 300;
 

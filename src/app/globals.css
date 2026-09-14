@@ -637,12 +637,128 @@ html.dark-mode .site-footer--dark {
   color: #e5e7eb;
 }
 
+.site-footer-policy-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .site-footer--dark .site-footer-policy-link {
   color: #e5e7eb;
 }
 
 .site-footer--dark .site-footer-policy-link:hover {
   color: #ffffff;
+}
+
+.site-footer-policy-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 280;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(0.75rem, env(safe-area-inset-top, 0px))
+    max(0.75rem, env(safe-area-inset-right, 0px))
+    max(0.75rem, env(safe-area-inset-bottom, 0px))
+    max(0.75rem, env(safe-area-inset-left, 0px));
+  background: rgb(15 23 42 / 0.55);
+}
+
+.site-footer-policy-dialog {
+  display: flex;
+  flex-direction: column;
+  width: min(100%, 40rem);
+  max-height: min(88dvh, 40rem);
+  overflow: hidden;
+  border-radius: 1rem;
+  background: #fff;
+  box-shadow: 0 20px 45px rgb(15 23 42 / 0.25);
+}
+
+.site-footer-policy-dialog__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.site-footer-policy-dialog__title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.site-footer-policy-dialog__close {
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  border: 0;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #4b5563;
+  font-size: 1.35rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.site-footer-policy-dialog__body {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: 1rem;
+}
+
+.site-footer-policy-dialog__text {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  font-size: 0.875rem;
+  line-height: 1.65;
+  color: #374151;
+}
+
+.site-footer-policy-dialog__html {
+  font-size: 0.875rem;
+  line-height: 1.65;
+  color: #374151;
+}
+
+.site-footer-policy-dialog__frame {
+  display: block;
+  width: 100%;
+  min-height: 22rem;
+  height: min(58dvh, 28rem);
+  border: 0;
+  border-radius: 0.5rem;
+  background: #f9fafb;
+}
+
+html.dark-mode .site-footer-policy-dialog {
+  background: #1f2937;
+}
+
+html.dark-mode .site-footer-policy-dialog__header {
+  border-bottom-color: #374151;
+}
+
+html.dark-mode .site-footer-policy-dialog__title,
+html.dark-mode .site-footer-policy-dialog__text,
+html.dark-mode .site-footer-policy-dialog__html {
+  color: #e5e7eb;
+}
+
+html.dark-mode .site-footer-policy-dialog__close {
+  background: #374151;
+  color: #e5e7eb;
 }
 
 .site-footer-social-link {

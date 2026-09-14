@@ -1,0 +1,399 @@
+.season-pass-kart-overlay .season-pass-kart-dialog {
+  position: relative;
+  width: min(96vw, 76rem);
+  max-height: min(92vh, 54rem);
+  overflow: hidden;
+  border-radius: 0.35rem;
+  background: #10284d;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+}
+
+.season-pass-kart__close {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.4rem;
+  z-index: 2;
+  width: 2rem;
+  height: 2rem;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.season-pass-kart {
+  height: 100%;
+  max-height: min(92vh, 54rem);
+  overflow: auto;
+  padding: 0.65rem 0.7rem 0.9rem;
+  color: #fff;
+  background:
+    radial-gradient(circle at top, #1c4d8a 0%, #0b1c3a 55%);
+  background-size: cover;
+  background-position: center;
+}
+
+.season-pass-kart__banners {
+  display: flex;
+  gap: 0.4rem;
+  min-height: 0;
+  margin-right: 2.25rem;
+}
+
+.season-pass-kart.has-images .season-pass-kart__banner-fallback {
+  display: none;
+}
+
+.season-pass-kart__banners img,
+.season-pass-kart__banner-fallback {
+  flex: 1;
+  height: 3.5rem;
+  object-fit: cover;
+  border-radius: 0.25rem;
+  background: linear-gradient(90deg, #163a6b, #2a6cb0);
+}
+
+.season-pass-kart__banner-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+}
+
+.season-pass-kart__tabs {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  margin-top: 0.45rem;
+  padding-bottom: 0.2rem;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.18);
+}
+
+.season-pass-kart__tabs button {
+  border: 0;
+  border-radius: 0.35rem 0.35rem 0 0;
+  padding: 0.38rem 0.95rem;
+  background: rgba(255, 255, 255, 0.08);
+  color: #cfe3ff;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.season-pass-kart__tabs button.is-active {
+  background: #f4f7ff;
+  color: #163a6b;
+}
+
+.season-pass-kart__remain {
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  min-width: 5.2rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 0.3rem;
+  background: rgba(8, 20, 42, 0.55);
+  font-size: 0.68rem;
+  color: #d7e6ff;
+}
+
+.season-pass-kart__remain strong {
+  display: flex;
+  align-items: baseline;
+  gap: 0.15rem;
+  font-size: 1.35rem;
+  line-height: 1;
+  color: #fff;
+}
+
+.season-pass-kart__remain em {
+  font-style: normal;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.season-pass-kart__progress {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-top: 0.55rem;
+  padding: 0.4rem 0.55rem;
+  border-radius: 0.4rem;
+  background: rgba(8, 20, 42, 0.45);
+}
+
+.season-pass-kart__lv {
+  flex: none;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #7ecbff;
+}
+
+.season-pass-kart__bar-wrap {
+  flex: 1;
+  min-width: 0;
+}
+
+.season-pass-kart__bar-wrap p {
+  margin: 0.18rem 0 0;
+  font-size: 0.72rem;
+  color: #d7e6ff;
+}
+
+.season-pass-kart__bar {
+  height: 0.78rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #12315a;
+}
+
+.season-pass-kart__bar > div {
+  height: 100%;
+  background: linear-gradient(90deg, #3ec6ff, #7ae1ff);
+}
+
+.season-pass-kart__gold {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #ffe08a;
+}
+
+.season-pass-kart__board {
+  margin-top: 0.55rem;
+  overflow-x: auto;
+}
+
+.season-pass-kart__level-labels,
+.season-pass-kart__track {
+  display: grid;
+  grid-template-columns: 6.6rem;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(5.8rem, 1fr);
+  gap: 0.3rem;
+  min-width: 44rem;
+}
+
+.season-pass-kart__side-spacer {
+  min-height: 1.4rem;
+}
+
+.season-pass-kart__lv-tag {
+  text-align: center;
+  padding: 0.28rem 0.2rem;
+  border-radius: 0.25rem 0.25rem 0 0;
+  background: #1a3d6e;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.season-pass-kart__lv-tag.is-now {
+  background: #2f7fe8;
+  box-shadow: inset 0 0 0 2px #9ad0ff;
+}
+
+.season-pass-kart__lv-tag.is-final {
+  background: #c9a227;
+  color: #1b1400;
+}
+
+.season-pass-kart__collect {
+  display: flex;
+  align-items: stretch;
+}
+
+.season-pass-kart__collect button {
+  width: 100%;
+  border: 0;
+  border-radius: 0.4rem;
+  background: #eaf3ff;
+  color: #163a6b;
+  font-weight: 800;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.season-pass-kart__collect--premium button {
+  background: #f6e27a;
+  color: #5b3b00;
+}
+
+.season-pass-kart__row {
+  display: contents;
+}
+
+.season-pass-kart__row--premium .season-pass-kart__cell {
+  background: linear-gradient(180deg, #f4de7a, #d7b24a);
+  color: #3d2a00;
+}
+
+.season-pass-kart__cell {
+  position: relative;
+  min-height: 6.6rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.2rem;
+  padding: 0.4rem 0.28rem 0.32rem;
+  border-radius: 0.3rem;
+  background: #eef5ff;
+  color: #163a6b;
+}
+
+.season-pass-kart__cell.is-ready {
+  box-shadow: inset 0 0 0 2px #4ade80;
+}
+
+.season-pass-kart__cell--empty {
+  opacity: 0.35;
+}
+
+.season-pass-kart__reward-img {
+  width: 2.7rem;
+  height: 2.7rem;
+  object-fit: contain;
+}
+
+.season-pass-kart__reward-spacer {
+  width: 2.7rem;
+  height: 2.7rem;
+}
+
+.season-pass-kart.has-images .season-pass-kart__reward-name {
+  display: none;
+}
+
+.season-pass-kart__reward-name {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.season-pass-kart__qty {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.3rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.season-pass-kart.has-images .season-pass-kart__qty {
+  display: none;
+}
+
+.season-pass-kart__claim {
+  width: 100%;
+  border: 0;
+  border-radius: 0.25rem;
+  padding: 0.22rem 0;
+  background: #2d6cdf;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.season-pass-kart__row--premium .season-pass-kart__claim {
+  background: #8a5a12;
+}
+
+.season-pass-kart__claim:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.season-pass-kart__check {
+  position: absolute;
+  inset: 0.2rem 0.2rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.4rem;
+  font-weight: 900;
+  color: #22c55e;
+  text-shadow: 0 1px 0 #fff, 0 0 8px rgba(34, 197, 94, 0.6);
+  pointer-events: none;
+}
+
+.is-final-cell .season-pass-kart__cell {
+  outline: 2px solid #f3d36a;
+}
+
+.season-pass-kart__quests {
+  margin-top: 0.8rem;
+  padding: 0.8rem;
+  border-radius: 0.6rem;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.season-pass-kart__attend {
+  margin-bottom: 0.7rem;
+  border: 0;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.8rem;
+  background: #34d399;
+  color: #064e3b;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.season-pass-kart__attend:disabled {
+  opacity: 0.5;
+}
+
+.season-pass-kart__msg,
+.season-pass-kart__empty {
+  margin: 0.7rem 0 0;
+  font-size: 0.82rem;
+}
+
+.gold-shop-dialog {
+  width: min(92vw, 28rem);
+}
+
+.gold-shop__balance {
+  margin: 0 0 0.8rem;
+  font-weight: 700;
+}
+
+.gold-shop__card {
+  border: 1px solid #e5e7eb;
+  border-radius: 0.85rem;
+  padding: 1rem;
+}
+
+.gold-shop__name {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.gold-shop__price {
+  margin: 0.35rem 0 0.8rem;
+  color: #6b7280;
+}
+
+.gold-shop__buy {
+  border: 0;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.9rem;
+  background: #d97706;
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.gold-shop__buy:disabled {
+  opacity: 0.5;
+}
+
+.gold-shop__owned,
+.gold-shop__msg {
+  margin: 0.6rem 0 0;
+  font-size: 0.9rem;
+  color: #047857;
+}

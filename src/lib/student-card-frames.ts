@@ -19,7 +19,7 @@ export type ExtendedPublicCardFrameItem = PublicCardFrameItem & {
 export type { CardFrameItem, PublicCardFrameItem };
 
 /** 해금 출처 — 이벤트 보상 연동 시 `event` 사용 */
-export type CardFrameUnlockSource = "default" | "code" | "event" | "admin";
+export type CardFrameUnlockSource = "default" | "code" | "event" | "admin" | "season";
 
 export type CardFrameUserState = {
   unlockedIds: string[];

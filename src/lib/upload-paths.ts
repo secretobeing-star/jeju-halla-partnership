@@ -32,6 +32,7 @@ export type UploadFolder =
   | "student-card-frames"
   | "student-card-brand"
   | "step-quest"
+  | "season-pass"
   | "map-events"
   | "push-notifications"
   | "pwa-icons"
@@ -71,6 +72,7 @@ export const ALLOWED_UPLOAD_FOLDERS = new Set<string>([
   "student-card-frames",
   "student-card-brand",
   "step-quest",
+  "season-pass",
   "map-events",
   "push-notifications",
   "pwa-icons",

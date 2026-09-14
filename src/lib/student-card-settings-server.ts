@@ -11,7 +11,8 @@ function asUnlockSource(value: unknown): CardFrameUnlockSource | null {
     value === "default" ||
     value === "code" ||
     value === "event" ||
-    value === "admin"
+    value === "admin" ||
+    value === "season"
   ) {
     return value;
   }

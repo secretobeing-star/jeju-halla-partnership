@@ -56,7 +56,7 @@ export default function SiteNavDropdownLinksAdminPanel({
           onUploadImage={onUploadImage}
           uploadingImageIndex={uploadingImageIndex}
           emptyMessage="드롭다운 전용 메뉴가 없습니다. 비어 있으면 상단 가로 메뉴를 그대로 사용합니다."
-          linkHint="다른 홈페이지 URL, #partner-list-anchor, #board-popup, #gift-inbox, #frame-inventory 등을 입력할 수 있습니다."
+          linkHint="다른 홈페이지 URL, #partner-list-anchor, #board-popup, #gift-inbox, #frame-inventory, #season-pass, #gold-shop 등을 입력할 수 있습니다."
         />
       </div>
     </AdminCollapsibleSection>

@@ -2,6 +2,8 @@ import {
   isBoardPopupNavHref,
   isFrameInventoryNavHref,
   isGiftInboxNavHref,
+  isGoldShopNavHref,
+  isSeasonPassNavHref,
 } from "@/lib/site-nav-links";
 
 type SiteNavMenuItemIconProps = {
@@ -13,7 +15,7 @@ type SiteNavMenuItemIconProps = {
   fallbackClassName?: string;
 };
 
-type NavLinkIconPreset = "board" | "partners" | "gift" | "inventory" | "external" | "letter";
+type NavLinkIconPreset = "board" | "partners" | "gift" | "inventory" | "pass" | "gold" | "external" | "letter";
 
 function resolveNavLinkIconPreset(href: string | undefined, label: string): NavLinkIconPreset {
   const normalizedHref = href?.trim().toLowerCase() ?? "";
@@ -28,6 +30,14 @@ function resolveNavLinkIconPreset(href: string | undefined, label: string): NavL
 
   if (isFrameInventoryNavHref(normalizedHref) || label.includes("보관")) {
     return "inventory";
+  }
+
+  if (isSeasonPassNavHref(normalizedHref) || label.includes("시즌패스") || label.includes("시즌 패스")) {
+    return "pass";
+  }
+
+  if (isGoldShopNavHref(normalizedHref) || label.includes("골드")) {
+    return "gold";
   }
 
   if (normalizedHref.includes("partner-list")) {
@@ -111,6 +121,45 @@ function NavLinkPresetIcon({
         <rect x="3" y="3" width="18" height="18" rx="2" />
         <path d="M3 9h18" />
         <path d="M9 21V9" />
+      </svg>
+    );
+  }
+
+  if (preset === "pass") {
+    return (
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="h-full w-full"
+        aria-hidden
+      >
+        <path d="M3 9a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v1a2 2 0 0 0 0 4v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1a2 2 0 0 0 0-4z" />
+        <path d="M9 7v10" />
+      </svg>
+    );
+  }
+
+  if (preset === "gold") {
+    return (
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="h-full w-full"
+        aria-hidden
+      >
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7v10" />
+        <path d="M9.5 9.5c.7-.8 1.6-1.2 2.5-1.2 1.7 0 3 1 3 2.4 0 3-6 1.6-6 4.4 0 1.4 1.4 2.4 3.2 2.4 1 0 1.9-.4 2.6-1.1" />
       </svg>
     );
   }

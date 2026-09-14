@@ -23,6 +23,8 @@ import SitePopupModal from "@/components/SitePopupModal";
 import SiteEventsBoardSection from "@/components/SiteEventsBoardSection";
 import GiftInboxNavChip from "@/components/GiftInboxNavChip";
 import FrameInventoryNavChip from "@/components/FrameInventoryNavChip";
+import SeasonPassNavChip from "@/components/SeasonPassNavChip";
+import GoldShopNavChip from "@/components/GoldShopNavChip";
 import SiteBrowserGuideBanner from "@/components/SiteBrowserGuideBanner";
 import SiteAppBackSettingsSync from "@/components/SiteAppBackSettingsSync";
 import SiteAppBackLoadingSplashSync from "@/components/SiteAppBackLoadingSplashSync";
@@ -122,6 +124,8 @@ import {
   isBoardPopupNavHref,
   isFrameInventoryNavHref,
   isGiftInboxNavHref,
+  isGoldShopNavHref,
+  isSeasonPassNavHref,
   resolveSiteNavBrandLinkUrl,
   resolveSiteNavDisplayTitle,
 } from "@/lib/site-nav-links";
@@ -414,7 +418,10 @@ export default function HomePage() {
     }
     return activeNavLinks.filter(
       (link) =>
-        !isGiftInboxNavHref(link.href) && !isFrameInventoryNavHref(link.href),
+        !isGiftInboxNavHref(link.href) &&
+        !isFrameInventoryNavHref(link.href) &&
+        !isSeasonPassNavHref(link.href) &&
+        !isGoldShopNavHref(link.href),
     );
   }, [activeNavLinks, memberStudentLoggedIn]);
   const activeDropdownLinks = useMemo(
@@ -427,7 +434,10 @@ export default function HomePage() {
     }
     return activeDropdownLinks.filter(
       (link) =>
-        !isGiftInboxNavHref(link.href) && !isFrameInventoryNavHref(link.href),
+        !isGiftInboxNavHref(link.href) &&
+        !isFrameInventoryNavHref(link.href) &&
+        !isSeasonPassNavHref(link.href) &&
+        !isGoldShopNavHref(link.href),
     );
   }, [activeDropdownLinks, memberStudentLoggedIn]);
   const navSearchPlaceholder = useMemo(
@@ -995,6 +1005,14 @@ export default function HomePage() {
     }
     if (isFrameInventoryNavHref(href)) {
       window.dispatchEvent(new Event("site-frame-inventory-open"));
+      return;
+    }
+    if (isSeasonPassNavHref(href)) {
+      window.dispatchEvent(new Event("site-season-pass-open"));
+      return;
+    }
+    if (isGoldShopNavHref(href)) {
+      window.dispatchEvent(new Event("site-gold-shop-open"));
     }
   }, []);
 
@@ -1008,6 +1026,18 @@ export default function HomePage() {
     () =>
       memberStudentLoggedIn &&
       activeNavLinks.some((link) => isFrameInventoryNavHref(link.href)),
+    [activeNavLinks, memberStudentLoggedIn],
+  );
+  const navHasSeasonPass = useMemo(
+    () =>
+      memberStudentLoggedIn &&
+      activeNavLinks.some((link) => isSeasonPassNavHref(link.href)),
+    [activeNavLinks, memberStudentLoggedIn],
+  );
+  const navHasGoldShop = useMemo(
+    () =>
+      memberStudentLoggedIn &&
+      activeNavLinks.some((link) => isGoldShopNavHref(link.href)),
     [activeNavLinks, memberStudentLoggedIn],
   );
 
@@ -1190,20 +1220,22 @@ export default function HomePage() {
   // 🎯 지도 패널에 유효한 validFavoriteIds 전달
   const mainMapPanel =
     mainPartnerMapDisplay.enabled && !loading ? (
-    <MapEventMapSection
-      partners={sortedMapPartners}
-      title={mainPartnerMapDisplay.title}
-      defaultExpanded={mainPartnerMapDisplay.defaultExpanded}
-      onPartnerSelect={(partnerId) => setSelectedPartnerId(partnerId)}
-      favoritesEnabled={partnerFavoritesEnabled}
-      favoritePartnerIds={validFavoriteIds}
-      locateEnabled={settings.partner_map_locate_enabled ?? true}
-      holdLoadingOverlay={pwaHoldMapLoading}
-      onMapReady={handleMainMapReady}
-      onFavoriteToggle={togglePartnerFavorite}
-      favoritesTerm={partnerFavoritesDisplay.label}
-      markerSettings={mapMarkerSettings}
-    />
+    <>
+      <MapEventMapSection
+        partners={sortedMapPartners}
+        title={mainPartnerMapDisplay.title}
+        defaultExpanded={mainPartnerMapDisplay.defaultExpanded}
+        onPartnerSelect={(partnerId) => setSelectedPartnerId(partnerId)}
+        favoritesEnabled={partnerFavoritesEnabled}
+        favoritePartnerIds={validFavoriteIds}
+        locateEnabled={settings.partner_map_locate_enabled ?? true}
+        holdLoadingOverlay={pwaHoldMapLoading}
+        onMapReady={handleMainMapReady}
+        onFavoriteToggle={togglePartnerFavorite}
+        favoritesTerm={partnerFavoritesDisplay.label}
+        markerSettings={mapMarkerSettings}
+      />
+    </>
   ) : null;
 
   const renderSelectedPartnerDetail = (closeLabel: string, options?: { splitLayout?: boolean }) => {
@@ -1624,6 +1656,8 @@ export default function HomePage() {
                 cardFrames={studentCardFrames}
                 hideChip={navHasFrameInventory}
               />
+              <SeasonPassNavChip hideChip={navHasSeasonPass} />
+              <GoldShopNavChip hideChip={navHasGoldShop} />
             </>
           }
         />

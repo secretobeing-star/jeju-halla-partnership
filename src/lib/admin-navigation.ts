@@ -131,6 +131,7 @@ export const ADMIN_NAV_GROUPS: ReadonlyArray<{
       { kind: "item", key: "partner-reviews", permission: "partners", label: "후기 관리" },
       { kind: "item", key: "partner-display", permission: "partners", label: "목록·지도·정렬" },
       { kind: "item", key: "map-events", permission: "partners", label: "지도 이벤트" },
+      { kind: "item", key: "season-pass", permission: "partners", label: "시즌패스" },
     ],
   },
   {
@@ -189,6 +190,7 @@ export type AdminNavKey =
   | "partner-reviews"
   | "partner-display"
   | "map-events"
+  | "season-pass"
   | "boards"
   | "board-settings"
   | "posts"

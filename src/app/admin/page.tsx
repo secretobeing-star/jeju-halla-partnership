@@ -33,6 +33,7 @@ import AdminPermissionsPanel from "@/components/admin/AdminPermissionsPanel";
 import AdminSidebar, { readStoredAdminNav } from "@/components/admin/AdminSidebar";
 import PartnerListSettingsPanel from "@/components/admin/PartnerListSettingsPanel";
 import MapEventAdminPanel from "@/components/admin/MapEventAdminPanel";
+import SeasonPassAdminPanel from "@/components/admin/SeasonPassAdminPanel";
 import Pagination from "@/components/Pagination";
 import SiteFeaturesApplier from "@/components/SiteFeaturesApplier";
 import SiteFaviconApplier from "@/components/SiteFaviconApplier";
@@ -74,6 +75,7 @@ import { buildSiteSettingsPayload } from "@/lib/site-settings-payload";
 import { getBoardDefinitions } from "@/lib/board-definitions";
 import SiteFooter from "@/components/SiteFooter";
 import FooterSocialLinksListEditor from "@/components/admin/FooterSocialLinksListEditor";
+import { isFooterPolicyHttpUrl } from "@/lib/site-footer";
 import {
   getPartnerCategories,
   normalizeStoredPartnerCategory,
@@ -2679,7 +2681,7 @@ export default function AdminPage() {
 
             <AdminCollapsibleSection
               title="메인 하단 문구"
-              description="메인 화면 맨 아래에 사업자 정보, 약관 링크, 저작권, 추가 안내 문구를 표시할 수 있습니다."
+              description="메인 화면 맨 아래에 사업자 정보, 약관 팝업, 저작권, 추가 안내 문구를 표시할 수 있습니다."
               headerActions={
                 <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-700">
                   <input
@@ -2880,9 +2882,16 @@ export default function AdminPage() {
                 />
               </label>
               <label className="mt-3 block text-sm font-medium text-gray-700">
-                개인정보처리방침 URL
-                <input
-                  type="text"
+                개인정보처리방침
+                <span className="ml-1 text-xs font-normal text-gray-500">
+                  (하단 글자 클릭 시 팝업. 외부 링크가 아니라 본문을 입력하세요.)
+                </span>
+                {isFooterPolicyHttpUrl(settings.footer_privacy_policy_url ?? "") ? (
+                  <p className="mt-1 text-xs font-normal text-amber-700">
+                    지금 값은 외부 링크입니다. 메인에서는 숨깁니다. 팝업에 보여줄 내용을 붙여넣으세요.
+                  </p>
+                ) : null}
+                <textarea
                   value={settings.footer_privacy_policy_url ?? ""}
                   onChange={(e) =>
                     setSettings((prev) => ({
@@ -2890,14 +2899,22 @@ export default function AdminPage() {
                       footer_privacy_policy_url: e.target.value,
                     }))
                   }
-                  placeholder="https://..."
+                  rows={8}
+                  placeholder="팝업에 표시할 개인정보처리방침 내용을 입력하세요."
                   className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 outline-none focus:border-emerald-500"
                 />
               </label>
               <label className="mt-3 block text-sm font-medium text-gray-700">
-                이용약관 URL
-                <input
-                  type="text"
+                이용약관
+                <span className="ml-1 text-xs font-normal text-gray-500">
+                  (하단 글자 클릭 시 팝업. 외부 링크가 아니라 본문을 입력하세요.)
+                </span>
+                {isFooterPolicyHttpUrl(settings.footer_terms_url ?? "") ? (
+                  <p className="mt-1 text-xs font-normal text-amber-700">
+                    지금 값은 외부 링크입니다. 메인에서는 숨깁니다. 팝업에 보여줄 내용을 붙여넣으세요.
+                  </p>
+                ) : null}
+                <textarea
                   value={settings.footer_terms_url ?? ""}
                   onChange={(e) =>
                     setSettings((prev) => ({
@@ -2905,7 +2922,8 @@ export default function AdminPage() {
                       footer_terms_url: e.target.value,
                     }))
                   }
-                  placeholder="https://..."
+                  rows={8}
+                  placeholder="팝업에 표시할 이용약관 내용을 입력하세요."
                   className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 outline-none focus:border-emerald-500"
                 />
               </label>
@@ -2921,7 +2939,7 @@ export default function AdminPage() {
                   }
                   className="mt-2 text-sm text-red-600 hover:underline"
                 >
-                  약관 링크 삭제
+                  약관 내용 삭제
                 </button>
               )}
               <label className="mt-3 block text-sm font-medium text-gray-700">
@@ -3206,6 +3224,15 @@ export default function AdminPage() {
               <p className="text-sm text-emerald-700">{settingsMessage}</p>
             ) : null}
             <MapEventAdminPanel onMessage={setSettingsMessage} />
+          </div>
+        )}
+
+        {hasAdminNavAccess(adminAccess, "season-pass") && activeNav === "season-pass" && (
+          <div className="space-y-4">
+            {settingsMessage ? (
+              <p className="text-sm text-emerald-700">{settingsMessage}</p>
+            ) : null}
+            <SeasonPassAdminPanel onMessage={setSettingsMessage} />
           </div>
         )}
 

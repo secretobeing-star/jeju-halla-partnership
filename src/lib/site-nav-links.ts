@@ -20,6 +20,10 @@ export const BOARD_POPUP_NAV_HREF = "#board-popup";
 export const GIFT_INBOX_NAV_HREF = "#gift-inbox";
 /** 학생증 코스튬 보관함 모달 */
 export const FRAME_INVENTORY_NAV_HREF = "#frame-inventory";
+/** 시즌패스 모달 */
+export const SEASON_PASS_NAV_HREF = "#season-pass";
+/** 골드 상점 모달 */
+export const GOLD_SHOP_NAV_HREF = "#gold-shop";
 
 export function isBoardPopupNavHref(href: string) {
   const normalized = href.trim().toLowerCase();
@@ -34,12 +38,22 @@ export function isFrameInventoryNavHref(href: string) {
   return href.trim().toLowerCase() === FRAME_INVENTORY_NAV_HREF;
 }
 
+export function isSeasonPassNavHref(href: string) {
+  return href.trim().toLowerCase() === SEASON_PASS_NAV_HREF;
+}
+
+export function isGoldShopNavHref(href: string) {
+  return href.trim().toLowerCase() === GOLD_SHOP_NAV_HREF;
+}
+
 /** 상단 메뉴 클릭 시 페이지 이동 대신 앱 액션(모달)을 여는 링크 */
 export function isSiteNavActionHref(href: string) {
   return (
     isBoardPopupNavHref(href) ||
     isGiftInboxNavHref(href) ||
-    isFrameInventoryNavHref(href)
+    isFrameInventoryNavHref(href) ||
+    isSeasonPassNavHref(href) ||
+    isGoldShopNavHref(href)
   );
 }
 
@@ -103,6 +117,28 @@ export const DEFAULT_SITE_NAV_LINKS: SiteNavLinkItem[] = [
     id: "nav-frame-inventory",
     label: "보관함",
     href: FRAME_INVENTORY_NAV_HREF,
+    external: false,
+    enabled: true,
+    icon_url: null,
+    image_url: null,
+    hint: null,
+    notify_message: null,
+  },
+  {
+    id: "nav-season-pass",
+    label: "시즌패스",
+    href: SEASON_PASS_NAV_HREF,
+    external: false,
+    enabled: true,
+    icon_url: null,
+    image_url: null,
+    hint: null,
+    notify_message: null,
+  },
+  {
+    id: "nav-gold-shop",
+    label: "골드상점",
+    href: GOLD_SHOP_NAV_HREF,
     external: false,
     enabled: true,
     icon_url: null,
@@ -218,7 +254,12 @@ export function getSiteNavNotifyMessage(
     return `${item.label}을(를) 엽니다`;
   }
 
-  if (isGiftInboxNavHref(item.href) || isFrameInventoryNavHref(item.href)) {
+  if (
+    isGiftInboxNavHref(item.href) ||
+    isFrameInventoryNavHref(item.href) ||
+    isSeasonPassNavHref(item.href) ||
+    isGoldShopNavHref(item.href)
+  ) {
     return `${item.label}을(를) 엽니다`;
   }
 
@@ -258,10 +299,47 @@ export function getActiveSiteNavDropdownLinks(
   return getActiveSiteNavLinks(settings);
 }
 
+function withSeasonPassAndGoldShopNav(items: SiteNavLinkItem[]): SiteNavLinkItem[] {
+  const next = [...items];
+  if (next.length >= 12) {
+    return next.slice(0, 12);
+  }
+
+  if (!next.some((item) => isSeasonPassNavHref(item.href))) {
+    const afterCostume = next.findIndex((item) => isFrameInventoryNavHref(item.href));
+    next.splice(
+      afterCostume >= 0 ? afterCostume + 1 : next.length,
+      0,
+      createSiteNavLinkItem({
+        id: "nav-season-pass",
+        label: "시즌패스",
+        href: SEASON_PASS_NAV_HREF,
+        external: false,
+      }),
+    );
+  }
+
+  if (next.length < 12 && !next.some((item) => isGoldShopNavHref(item.href))) {
+    const afterPass = next.findIndex((item) => isSeasonPassNavHref(item.href));
+    next.splice(
+      afterPass >= 0 ? afterPass + 1 : next.length,
+      0,
+      createSiteNavLinkItem({
+        id: "nav-gold-shop",
+        label: "골드상점",
+        href: GOLD_SHOP_NAV_HREF,
+        external: false,
+      }),
+    );
+  }
+
+  return next.slice(0, 12);
+}
+
 export function getSiteNavLinks(settings: SiteNavSettingsSource | null | undefined): SiteNavLinkItem[] {
   const normalized = normalizeSiteNavLinks(settings?.site_nav_links);
   if (normalized.length > 0) {
-    return normalized;
+    return withSeasonPassAndGoldShopNav(normalized);
   }
 
   return DEFAULT_SITE_NAV_LINKS.map((item) => ({ ...item }));
