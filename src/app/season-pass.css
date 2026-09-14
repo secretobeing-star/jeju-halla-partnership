@@ -128,9 +128,10 @@
 }
 
 .season-pass-kart__progress {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 0.55rem;
+  column-gap: 0.55rem;
   margin-top: 0.55rem;
   padding: 0.4rem 0.55rem;
   border-radius: 0.4rem;
@@ -142,15 +143,32 @@
   font-size: 1.15rem;
   font-weight: 800;
   color: #7ecbff;
+  white-space: nowrap;
+}
+
+.season-pass-kart__lv--from {
+  justify-self: start;
+}
+
+.season-pass-kart__lv--to {
+  justify-self: end;
 }
 
 .season-pass-kart__bar-wrap {
-  flex: 1;
   min-width: 0;
 }
 
+.season-pass-kart__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-top: 0.18rem;
+}
+
 .season-pass-kart__bar-wrap p {
-  margin: 0.18rem 0 0;
+  margin: 0;
+  min-width: 0;
   font-size: 0.72rem;
   color: #d7e6ff;
 }
@@ -677,34 +695,17 @@
   }
 
   .season-pass-kart__progress {
-    display: grid;
-    grid-template-columns: auto 1fr auto;
-    grid-template-areas:
-      "from to gold"
-      "bar bar bar";
-    align-items: center;
     column-gap: 0.4rem;
-    row-gap: 0.28rem;
   }
 
-  .season-pass-kart__lv--from {
-    grid-area: from;
-    font-size: 0.95rem;
-  }
-
+  .season-pass-kart__lv--from,
   .season-pass-kart__lv--to {
-    grid-area: to;
     font-size: 0.95rem;
   }
 
   .season-pass-kart__gold {
-    grid-area: gold;
     font-size: 0.72rem;
     white-space: nowrap;
-  }
-
-  .season-pass-kart__bar-wrap {
-    grid-area: bar;
   }
 
   .season-pass-kart__bar-wrap p {

@@ -156,16 +156,18 @@ export default function SeasonPassModalBody({
               <div className="season-pass-kart__bar">
                 <div style={{ width: `${userId ? percent : 0}%` }} />
               </div>
-              <p>
-                {userId
-                  ? `필요한 패스 포인트 ${state.expIntoLevel} / ${state.expForLevel}`
-                  : "로그인 후 진행도가 표시됩니다"}
-              </p>
+              <div className="season-pass-kart__meta">
+                <p>
+                  {userId
+                    ? `필요한 패스 포인트 ${state.expIntoLevel} / ${state.expForLevel}`
+                    : "로그인 후 진행도가 표시됩니다"}
+                </p>
+                <span className="season-pass-kart__gold">골드 {state.progress?.gold ?? 0}</span>
+              </div>
             </div>
             <span className="season-pass-kart__lv season-pass-kart__lv--to">
               LV {userId ? nextLevel : "-"}
             </span>
-            <span className="season-pass-kart__gold">골드 {state.progress?.gold ?? 0}</span>
           </div>
 
           <div className="season-pass-kart__board">
