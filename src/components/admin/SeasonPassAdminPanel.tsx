@@ -932,6 +932,7 @@ export default function SeasonPassAdminPanel({ onMessage }: SeasonPassAdminPanel
                   )
                 }
               />
+              <button
                 type="button"
                 className="text-sm text-emerald-700"
                 onClick={async () => {
