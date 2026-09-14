@@ -89,6 +89,7 @@ export function useSeasonPassClient() {
         state?: SeasonPassWidgetState;
         error?: string;
         frameId?: string | null;
+        gifted?: boolean;
       };
       if (!response.ok) {
         throw new Error(payload.error || "수령에 실패했습니다.");
@@ -96,11 +97,16 @@ export function useSeasonPassClient() {
       if (payload.state) {
         setState(payload.state);
       }
-      if (payload.frameId) {
-        grantCardFrameUnlock(userId, payload.frameId, "season", { activate: false });
+      if (payload.gifted) {
+        setMessage("보상을 선물함으로 보냈습니다. 선물함에서 받아 주세요.");
+        window.dispatchEvent(new Event("site-gift-inbox-refresh"));
+      } else {
+        if (payload.frameId) {
+          grantCardFrameUnlock(userId, payload.frameId, "season", { activate: false });
+        }
+        setMessage("보상을 수령했습니다.");
+        window.dispatchEvent(new Event("site-frame-inventory-refresh"));
       }
-      setMessage("보상을 수령했습니다.");
-      window.dispatchEvent(new Event("site-frame-inventory-refresh"));
       window.dispatchEvent(new Event("site-season-pass-refresh"));
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "수령에 실패했습니다.");

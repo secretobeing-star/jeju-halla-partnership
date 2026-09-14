@@ -97,6 +97,28 @@ export type UserGift = {
   claimed_at: string | null;
 };
 
+export const GIFT_COUPON_PREFIX = "coupon:";
+
+export function encodeGiftCouponValue(code: string) {
+  return `${GIFT_COUPON_PREFIX}${code.trim()}`;
+}
+
+export function parseGiftPayload(gift: Pick<UserGift, "frame_css_value">): {
+  kind: "costume" | "coupon" | "other";
+  frameId: string | null;
+  couponCode: string | null;
+} {
+  const raw = String(gift.frame_css_value ?? "").trim();
+  if (!raw) {
+    return { kind: "other", frameId: null, couponCode: null };
+  }
+  if (raw.startsWith(GIFT_COUPON_PREFIX)) {
+    const couponCode = raw.slice(GIFT_COUPON_PREFIX.length).trim();
+    return { kind: couponCode ? "coupon" : "other", frameId: null, couponCode: couponCode || null };
+  }
+  return { kind: "costume", frameId: raw, couponCode: null };
+}
+
 export function parseStepProbabilities(value: unknown, maxStamps: number): number[] {
   const count = Math.max(1, Math.floor(maxStamps) || 1);
   const source = Array.isArray(value) ? value : [];

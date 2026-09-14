@@ -1,4 +1,3 @@
-import { grantStudentCardFrameOnServer } from "@/lib/student-card-settings-server";
 import {
   findCardFrameByRef,
   loadCardFrameCatalogFromDb,
@@ -19,6 +18,7 @@ import {
 } from "@/lib/season-pass";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 import { logSeasonPassToSheets } from "@/lib/google-sheets-student";
+import { encodeGiftCouponValue } from "@/lib/map-events";
 
 type AdminClient = NonNullable<ReturnType<typeof createSupabaseAdmin>>;
 
@@ -659,7 +659,71 @@ async function resolveCostumeFrameId(item: RewardItem): Promise<string> {
   return fallback;
 }
 
-async function grantRewardItem(admin: AdminClient, userId: string, seasonId: string, item: RewardItem) {
+async function sendSeasonPassInboxGift(
+  admin: AdminClient,
+  userId: string,
+  seasonTitle: string,
+  item: RewardItem,
+) {
+  let giftValue = "";
+  let displayName = item.name.trim() && item.name.trim() !== "새 보상" ? item.name.trim() : "";
+  let imageUrl = item.image_url;
+
+  if (item.item_type === "coupon") {
+    const code = String(item.metadata.coupon_code ?? item.metadata.code ?? "").trim();
+    if (!code) {
+      throw new Error("쿠폰 코드가 없습니다. 보상 아이템에 코드를 입력해 주세요.");
+    }
+    giftValue = encodeGiftCouponValue(code);
+    displayName = displayName || "시즌패스 쿠폰";
+  } else {
+    const frameId = await resolveCostumeFrameId(item);
+    const catalog = await loadCardFrameCatalogFromDb().catch(() => []);
+    const frame = findCardFrameByRef(catalog, frameId);
+    giftValue = frameId;
+    displayName = displayName || frame?.name?.trim() || "시즌패스 코스튬";
+    imageUrl = item.image_url || frame?.imageUrl || null;
+  }
+
+  const rewardName = seasonTitle.trim() ? `${seasonTitle.trim()} · ${displayName}` : displayName;
+
+  const { data: pending } = await admin
+    .from("user_gifts")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("frame_css_value", giftValue)
+    .eq("is_claimed", false)
+    .limit(1);
+  if ((pending ?? []).length > 0) {
+    return item.item_type === "costume" ? giftValue : null;
+  }
+
+  const { error } = await admin.from("user_gifts").insert({
+    user_id: userId,
+    reward_id: null,
+    event_id: null,
+    reward_name: rewardName,
+    reward_img: imageUrl,
+    frame_css_value: giftValue,
+    is_claimed: false,
+  });
+  if (error) {
+    throw new Error(
+      error.message.includes("user_gifts")
+        ? "선물함 테이블이 없습니다. supabase/map-events-gifts.sql 을 실행해 주세요."
+        : error.message || "보상을 선물함으로 보내지 못했습니다.",
+    );
+  }
+  return item.item_type === "costume" ? giftValue : null;
+}
+
+async function grantRewardItem(
+  admin: AdminClient,
+  userId: string,
+  seasonId: string,
+  seasonTitle: string,
+  item: RewardItem,
+) {
   const meta = item.metadata;
   let grantedFrameId: string | null = null;
 
@@ -671,23 +735,17 @@ async function grantRewardItem(admin: AdminClient, userId: string, seasonId: str
     }
   }
 
-  if (item.item_type === "costume") {
-    grantedFrameId = await resolveCostumeFrameId(item);
-    await grantStudentCardFrameOnServer(userId, grantedFrameId, "season", { activate: false });
+  if (item.item_type === "costume" || item.item_type === "coupon") {
+    grantedFrameId = await sendSeasonPassInboxGift(admin, userId, seasonTitle, item);
+    return grantedFrameId;
   }
 
   const inventoryPayload = {
     user_id: userId,
-    category: item.item_type === "costume" ? "CARD_SKIN" : item.item_type.toUpperCase(),
+    category: item.item_type.toUpperCase(),
     reward_name: item.name,
     reward_img: item.image_url,
-    item_value:
-      grantedFrameId ||
-      (typeof meta.frame_id === "string"
-        ? meta.frame_id
-        : typeof meta.coupon_code === "string"
-          ? meta.coupon_code
-          : null),
+    item_value: typeof meta.coupon_code === "string" ? meta.coupon_code : null,
     source: "SEASON_PASS",
     reward_item_id: item.id,
     season_id: seasonId,
@@ -748,10 +806,9 @@ export async function claimSeasonReward(input: {
 
   const already = state.claims.some((claim) => claim.level === level && claim.track === track);
   if (already) {
-    if (item.item_type === "costume") {
-      const frameId = await resolveCostumeFrameId(item);
-      await grantStudentCardFrameOnServer(userId, frameId, "season", { activate: false });
-      return { state: await getSeasonPassState(userId), frameId };
+    if (item.item_type === "costume" || item.item_type === "coupon") {
+      await sendSeasonPassInboxGift(admin, userId, state.season.title, item);
+      return { state: await getSeasonPassState(userId), frameId: null, gifted: true };
     }
     throw new Error("이미 수령한 보상입니다.");
   }
@@ -765,25 +822,31 @@ export async function claimSeasonReward(input: {
   });
   if (error) {
     if (error.code === "23505") {
-      if (item.item_type === "costume") {
-        const frameId = await resolveCostumeFrameId(item);
-        await grantStudentCardFrameOnServer(userId, frameId, "season", { activate: false });
-        return { state: await getSeasonPassState(userId), frameId };
+      if (item.item_type === "costume" || item.item_type === "coupon") {
+        await sendSeasonPassInboxGift(admin, userId, state.season.title, item);
+        return { state: await getSeasonPassState(userId), frameId: null, gifted: true };
       }
       throw new Error("이미 수령한 보상입니다.");
     }
     throw error;
   }
 
-  const frameId = await grantRewardItem(admin, userId, state.season.id, item);
+  const frameId = await grantRewardItem(admin, userId, state.season.id, state.season.title, item);
+  const gifted = item.item_type === "costume" || item.item_type === "coupon";
   const trackLabel = track === "premium" ? "프리미엄" : "무료";
   logSeasonPassToSheets({
     studentId: userId,
     action: "claim",
     seasonTitle: state.season.title,
-    detail: `LV ${level} ${trackLabel} · ${item.name}`,
+    detail: gifted
+      ? `LV ${level} ${trackLabel} · ${item.name} (선물함)`
+      : `LV ${level} ${trackLabel} · ${item.name}`,
   });
-  return { state: await getSeasonPassState(userId), frameId };
+  return {
+    state: await getSeasonPassState(userId),
+    frameId: gifted ? null : frameId,
+    gifted,
+  };
 }
 
 export async function purchasePremiumPass(userIdRaw: string) {

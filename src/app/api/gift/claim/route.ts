@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { parseGiftPayload } from "@/lib/map-events";
 import { grantStudentCardFrameOnServer } from "@/lib/student-card-settings-server";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -33,7 +34,16 @@ export async function POST(request: NextRequest) {
   }
 
   if (gift.is_claimed) {
-    return NextResponse.json({ ok: true, alreadyClaimed: true, gift });
+    const parsed = parseGiftPayload({
+      frame_css_value: String(gift.frame_css_value ?? ""),
+    });
+    return NextResponse.json({
+      ok: true,
+      alreadyClaimed: true,
+      gift,
+      frameId: parsed.frameId,
+      couponCode: parsed.couponCode,
+    });
   }
 
   const claimedAt = new Date().toISOString();
@@ -48,24 +58,41 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: updateError.message }, { status: 500 });
   }
 
-  const frameId = String(gift.frame_css_value ?? "").trim();
-  if (frameId) {
+  const parsed = parseGiftPayload({
+    frame_css_value: String(gift.frame_css_value ?? ""),
+  });
+  if (parsed.kind === "costume" && parsed.frameId) {
     await admin.from("user_frames").insert({
       user_id: userId,
-      frame_id: frameId,
+      frame_id: parsed.frameId,
       acquired_at: claimedAt,
     });
     try {
-      await grantStudentCardFrameOnServer(userId, frameId, "event", { activate: true });
+      await grantStudentCardFrameOnServer(userId, parsed.frameId, "event", { activate: true });
     } catch (grantError) {
       console.error("코스튬 보관함 연동 실패:", grantError);
+    }
+  }
+
+  if (parsed.kind === "coupon" && parsed.couponCode) {
+    const { error: couponError } = await admin.from("user_inventory").insert({
+      user_id: userId,
+      category: "COUPON",
+      reward_name: String(gift.reward_name ?? "쿠폰"),
+      reward_img: (gift.reward_img as string | null) ?? null,
+      item_value: parsed.couponCode,
+      source: "GIFT_INBOX",
+    });
+    if (couponError) {
+      console.error("쿠폰 인벤토리 저장 실패:", couponError);
     }
   }
 
   return NextResponse.json({
     ok: true,
     alreadyClaimed: false,
-    frameId: frameId || null,
+    frameId: parsed.frameId,
+    couponCode: parsed.couponCode,
     claimedAt,
   });
 }

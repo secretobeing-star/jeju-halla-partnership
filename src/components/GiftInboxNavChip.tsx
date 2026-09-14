@@ -7,6 +7,7 @@ import { getSiteMemberSession, SITE_MEMBER_SESSION_EVENT } from "@/lib/site-memb
 import { grantCardFrameUnlock } from "@/lib/student-card-frames";
 import type { StudentRewardPublic } from "@/lib/student-rewards";
 import type { UserGift } from "@/lib/map-events";
+import { parseGiftPayload } from "@/lib/map-events";
 import type { PublicCardFrameItem } from "@/data/cardFrames";
 import { requestStudentLoginModal } from "@/lib/site-student-auth-settings";
 
@@ -181,6 +182,7 @@ export default function GiftInboxNavChip({ hideChip = false }: GiftInboxNavChipP
       const payload = (await response.json()) as {
         error?: string;
         frameId?: string | null;
+        couponCode?: string | null;
         alreadyClaimed?: boolean;
       };
       if (!response.ok) {
@@ -190,11 +192,24 @@ export default function GiftInboxNavChip({ hideChip = false }: GiftInboxNavChipP
       if (payload.frameId) {
         grantCardFrameUnlock(studentId, payload.frameId, "event", { activate: true });
       }
-      setMessage(
-        payload.alreadyClaimed
-          ? "이미 수령한 보상입니다."
-          : "보상을 수령했습니다. 코스튬 보관함에서 확인할 수 있습니다.",
-      );
+      if (payload.couponCode) {
+        try {
+          await navigator.clipboard.writeText(payload.couponCode);
+        } catch {
+          /* ignore */
+        }
+        setMessage(
+          payload.alreadyClaimed
+            ? `이미 수령한 쿠폰입니다. 코드: ${payload.couponCode}`
+            : `쿠폰 코드 ${payload.couponCode} 를 복사했습니다.`,
+        );
+      } else {
+        setMessage(
+          payload.alreadyClaimed
+            ? "이미 수령한 보상입니다."
+            : "보상을 수령했습니다. 코스튬 보관함에서 확인할 수 있습니다.",
+        );
+      }
       await refresh();
       window.dispatchEvent(new Event("site-frame-inventory-refresh"));
     } catch {
@@ -418,12 +433,32 @@ export default function GiftInboxNavChip({ hideChip = false }: GiftInboxNavChipP
                           )}
                           <div className="gift-inbox__body">
                             <p className="gift-inbox__title">{gift.reward_name}</p>
-                            {gift.frame_css_value ? (
-                              <p className="gift-inbox__description" style={{ whiteSpace: "pre-line" }}>
-                                코스튬 프레임이 포함되어 있습니다.
-                              </p>
-                            ) : null}
-                            <p className="gift-inbox__msg">이벤트 보상 · 코스튬 보관함으로 수령</p>
+                            {(() => {
+                              const parsed = parseGiftPayload(gift);
+                              if (parsed.kind === "coupon") {
+                                return (
+                                  <>
+                                    <p className="gift-inbox__description" style={{ whiteSpace: "pre-line" }}>
+                                      {gift.is_claimed && parsed.couponCode
+                                        ? `쿠폰 코드: ${parsed.couponCode}`
+                                        : "쿠폰이 포함되어 있습니다. 받으면 코드가 표시됩니다."}
+                                    </p>
+                                    <p className="gift-inbox__msg">시즌패스·이벤트 쿠폰</p>
+                                  </>
+                                );
+                              }
+                              if (parsed.kind === "costume") {
+                                return (
+                                  <>
+                                    <p className="gift-inbox__description" style={{ whiteSpace: "pre-line" }}>
+                                      코스튬 프레임이 포함되어 있습니다.
+                                    </p>
+                                    <p className="gift-inbox__msg">받기 전까지 보관함에 들어가지 않습니다</p>
+                                  </>
+                                );
+                              }
+                              return <p className="gift-inbox__msg">선물함 보상</p>;
+                            })()}
                             <p className="gift-inbox__meta">
                               {gift.is_claimed ? "수령 완료" : "미수령"} ·{" "}
                               {new Date(gift.created_at).toLocaleDateString("ko-KR")}
