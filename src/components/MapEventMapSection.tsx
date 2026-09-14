@@ -195,6 +195,30 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     [isDefaultTab, liveEvents, activeTabId],
   );
 
+  const tabMarkerSettings = useMemo((): MapMarkerCustomSettings | null => {
+    if (isDefaultTab) {
+      return {
+        ...(props.markerSettings ?? {}),
+        topIconImg: config.default_map_marker_img?.trim() || props.markerSettings?.topIconImg || null,
+      };
+    }
+    if (!activeEvent) {
+      return props.markerSettings ?? null;
+    }
+    return {
+      ...(props.markerSettings ?? {}),
+      topIconImg: activeEvent.marker_icon_img?.trim() || null,
+      borderColor: activeEvent.marker_border_color?.trim() || props.markerSettings?.borderColor || null,
+      timeIcon: activeEvent.marker_time_icon?.trim() || props.markerSettings?.timeIcon || null,
+      timeFormat: activeEvent.marker_time_format?.trim() || props.markerSettings?.timeFormat || null,
+    };
+  }, [
+    activeEvent,
+    config.default_map_marker_img,
+    isDefaultTab,
+    props.markerSettings,
+  ]);
+
   // 🌟 원본 파트너 데이터 유지 (pinImageUrl 강제 초기화 제거)[cite: 6]
   const visiblePartners = useMemo(() => {
     const raw = props.partners || [];
@@ -1009,12 +1033,13 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
               )
             )}
 
-            {/* 🌟 핵심 수정: 기본 제휴 탭일 때는 markerSettings를 아예 전달하지 않고(undefined), 이벤트 탭일 때만 props.markerSettings 전달 */}
+            {/* 탭마다 마커 설정(상단 아이콘·테두리)을 따로 적용 */}
             <PartnerMainMapPanel
-              key={activeTabId}
+              key={`${activeTabId}:${tabMarkerSettings?.topIconImg ?? ""}:${tabMarkerSettings?.borderColor ?? ""}`}
               {...props}
-              markerSettings={isDefaultTab ? undefined : props.markerSettings}
+              markerSettings={tabMarkerSettings}
               partners={visiblePartners}
+              favoriteCountdownEndAt={activeEvent?.end_at ?? null}
               stampAction={
                 isStampFeatureActive
                   ? {

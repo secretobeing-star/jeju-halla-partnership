@@ -6,7 +6,7 @@ export const DEFAULT_BENEFIT_BTN_LABEL_KEY = "default_benefit_btn_label";
 export const EVENT_STAMP_BTN_LABEL_KEY = "event_stamp_btn_label";
 export const STAMP_BUTTON_LABEL_KEY = "stamp_button_label";
 
-export const DEFAULT_MAP_TAB_NAME = "🌿 제휴처";
+export const DEFAULT_MAP_TAB_NAME = "제휴처";
 export const DEFAULT_BENEFIT_BTN_LABEL = "자세히 보기";
 export const DEFAULT_STAMP_BTN_LABEL = "도장 찍기";
 export const DEFAULT_RADIUS_METERS = 30;
@@ -40,6 +40,9 @@ export type MapEvent = {
   stamp_active_img: string | null;
   stamp_inactive_img: string | null;
   marker_icon_img: string | null;
+  marker_border_color?: string | null;
+  marker_time_icon?: string | null;
+  marker_time_format?: string | null;
   banner_img: string | null;
   stamp_bar_bg_img: string | null;
   stamp_bar_bg_color: string | null;

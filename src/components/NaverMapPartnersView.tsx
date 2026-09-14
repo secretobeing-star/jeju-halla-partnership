@@ -24,8 +24,7 @@ import { refreshMapLayout, SITE_MAP_REFRESH_EVENT } from "@/lib/naver-map-layout
 import { usePartnerMapLocate } from "@/lib/use-partner-map-locate";
 import PartnerMapLocateControl from "@/components/PartnerMapLocateControl";
 import { hasValidPartnerMapCoords } from "@/lib/partner-map-url";
-import { formatHeartCountdown, type MapEvent } from "@/lib/map-events";
-import { supabase } from "@/lib/supabase";
+import { formatHeartCountdown } from "@/lib/map-events";
 
 export type { NaverMapPartnerMarker };
 
@@ -140,62 +139,22 @@ export default function NaverMapPartnersView({
   const [mapRevealed, setMapRevealed] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const [activeDbEvent, setActiveDbEvent] = useState<MapEvent | null>(null);
-
-  useEffect(() => {
-    let isCancelled = false;
-    async function fetchActiveEvent() {
-      try {
-        const { data, error } = await supabase
-          .from("events")
-          .select("*")
-          .eq("is_active", true)
-          .order("created_at", { ascending: false })
-          .limit(1);
-
-        if (error) {
-          const res = await fetch("/api/map-events");
-          const json = (await res.json()) as { events?: MapEvent[] };
-          if (!isCancelled && json.events?.length) {
-            const ev = json.events.find((e) => e.is_active) ?? json.events[0];
-            setActiveDbEvent(ev);
-          }
-          return;
-        }
-
-        if (!isCancelled && data && data.length > 0) {
-          setActiveDbEvent(data[0] as MapEvent);
-        }
-      } catch {}
-    }
-    void fetchActiveEvent();
-    return () => {
-      isCancelled = true;
-    };
-  }, []);
-
-  const effectiveEndAt = favoriteCountdownEndAt || activeDbEvent?.end_at || null;
+  const effectiveEndAt = favoriteCountdownEndAt || null;
   const effectiveStampLabel =
     stampAction?.label?.trim() ||
-    activeDbEvent?.stamp_btn_label?.trim() ||
     "도장 찍기";
 
-  const effectiveMarkerSettings = useMemo<MapMarkerCustomSettings>(() => {
-    const extra = (activeDbEvent ?? {}) as unknown as {
-      marker_border_color?: string;
-      marker_time_icon?: string;
-      marker_time_format?: string;
-    };
-
-    return {
-      borderColor: extra.marker_border_color || initialMarkerSettings?.borderColor || null,
-      topIconImg: activeDbEvent?.marker_icon_img || initialMarkerSettings?.topIconImg || null,
-      timeIcon: extra.marker_time_icon || initialMarkerSettings?.timeIcon || "🔥",
-      timeFormat: extra.marker_time_format || initialMarkerSettings?.timeFormat || "D_DAY_TIME",
+  const effectiveMarkerSettings = useMemo<MapMarkerCustomSettings>(
+    () => ({
+      borderColor: initialMarkerSettings?.borderColor || null,
+      topIconImg: initialMarkerSettings?.topIconImg || null,
+      timeIcon: initialMarkerSettings?.timeIcon || null,
+      timeFormat: initialMarkerSettings?.timeFormat || null,
       thumbnailEnabled: initialMarkerSettings?.thumbnailEnabled ?? true,
       bgImg: initialMarkerSettings?.bgImg || null,
-    };
-  }, [initialMarkerSettings, activeDbEvent]);
+    }),
+    [initialMarkerSettings],
+  );
 
   const markerSettingsRef = useRef(effectiveMarkerSettings);
 
@@ -423,7 +382,7 @@ export default function NaverMapPartnersView({
     const pinSignature = validPartners
       .map((partner) => `${partner.id}:${partner.pinImageUrl ?? ""}`)
       .join("|");
-    const nextSignature = `${getMapPartnerMarkersSignature(validPartners)}:${Boolean(stampAction?.enabled)}:${detailButtonLabel ?? ""}:${favKey}:${pinSignature}:${effectiveMarkerSettings?.topIconImg ?? ""}`;
+    const nextSignature = `${getMapPartnerMarkersSignature(validPartners)}:${Boolean(stampAction?.enabled)}:${detailButtonLabel ?? ""}:${favKey}:${pinSignature}:${effectiveMarkerSettings?.topIconImg ?? ""}:${effectiveMarkerSettings?.borderColor ?? ""}:${effectiveMarkerSettings?.timeIcon ?? ""}:${effectiveMarkerSettings?.timeFormat ?? ""}`;
 
     if (mapMarkersSignatureRef.current === nextSignature && markersRef.current.length > 0) {
       return;
@@ -538,14 +497,13 @@ export default function NaverMapPartnersView({
 
       const isFav = favoritesEnabled && Boolean(favoritePartnerIds?.has(partner.id));
 
-      const favoriteTopIconImg =
-        partner.pinImageUrl?.trim() ||
-        effectiveMarkerSettings.topIconImg?.trim() ||
-        null;
-
-      const markerCustomSettings = isFav
-        ? { ...effectiveMarkerSettings, topIconImg: favoriteTopIconImg }
-        : { ...effectiveMarkerSettings, topIconImg: null };
+      const markerCustomSettings = {
+        ...effectiveMarkerSettings,
+        topIconImg:
+          (isFav ? partner.pinImageUrl?.trim() : "") ||
+          effectiveMarkerSettings.topIconImg?.trim() ||
+          null,
+      };
 
       const markerElement = createPartnerMapMarkerElement(
         partner,

@@ -486,7 +486,6 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
                 setConfig((prev) => ({ ...prev, default_map_tab_name: e.target.value }))
               }
               className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-              placeholder="🌿 제휴처"
             />
           </label>
           <ImageField
@@ -617,7 +616,6 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
                 value={form.tab_name}
                 onChange={(e) => setForm((prev) => ({ ...prev, tab_name: e.target.value }))}
                 className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                placeholder="🎒 미나르숲 소풍"
               />
             </label>
             <label className="text-sm font-medium text-gray-700">

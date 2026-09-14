@@ -26,6 +26,8 @@ export type Season = {
   ui_image_url: string | null;
   track_image_url: string | null;
   premium_badge_url: string | null;
+  free_pass_image_url: string | null;
+  premium_pass_image_url: string | null;
   exp_per_level: number;
   visit_exp: number;
   visit_gold: number;

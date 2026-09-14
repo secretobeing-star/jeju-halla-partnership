@@ -168,7 +168,12 @@ export default function SeasonPassModalBody({
           </div>
 
           <div className="season-pass-kart__board">
-            <div className="season-pass-kart__level-labels">
+            <div
+              className="season-pass-kart__level-labels"
+              style={{
+                gridTemplateColumns: `6.6rem repeat(${Math.max(1, state.levels.length)}, minmax(5.8rem, 1fr)) 6.6rem`,
+              }}
+            >
               <div className="season-pass-kart__side-spacer" />
               {state.levels.map((level, index) => (
                 <div
@@ -182,13 +187,15 @@ export default function SeasonPassModalBody({
                     : `LV ${level.level}`}
                 </div>
               ))}
+              <div className="season-pass-kart__side-spacer" />
             </div>
-            <div className="season-pass-kart__track">
-              <div className="season-pass-kart__collect">
-                <button type="button" disabled={busy !== null} onClick={() => void claimAll("free")}>
-                  보상 모두 받기
-                </button>
-              </div>
+            <div
+              className="season-pass-kart__track"
+              style={{
+                gridTemplateColumns: `6.6rem repeat(${Math.max(1, state.levels.length)}, minmax(5.8rem, 1fr)) 6.6rem`,
+              }}
+            >
+              <TrackName imageUrl={season.free_pass_image_url} label="일반 패스" />
               <TrackRow
                 state={state}
                 userId={userId}
@@ -197,8 +204,31 @@ export default function SeasonPassModalBody({
                 hideText={hideSeasonText}
                 onClaim={claim}
               />
+              <div className="season-pass-kart__collect">
+                <button type="button" disabled={busy !== null} onClick={() => void claimAll("free")}>
+                  보상 모두 받기
+                </button>
+              </div>
             </div>
-            <div className="season-pass-kart__track">
+            <div
+              className="season-pass-kart__track"
+              style={{
+                gridTemplateColumns: `6.6rem repeat(${Math.max(1, state.levels.length)}, minmax(5.8rem, 1fr)) 6.6rem`,
+              }}
+            >
+              <TrackName
+                imageUrl={season.premium_pass_image_url}
+                label="프리미엄 패스"
+                premium
+              />
+              <TrackRow
+                state={state}
+                userId={userId}
+                track="premium"
+                busy={busy !== null}
+                hideText={hideSeasonText}
+                onClaim={claim}
+              />
               <div className="season-pass-kart__collect season-pass-kart__collect--premium">
                 <button
                   type="button"
@@ -208,19 +238,30 @@ export default function SeasonPassModalBody({
                   보상 모두 받기
                 </button>
               </div>
-              <TrackRow
-                state={state}
-                userId={userId}
-                track="premium"
-                busy={busy !== null}
-                hideText={hideSeasonText}
-                onClaim={claim}
-              />
             </div>
           </div>
         </>
       )}
       {message ? <p className="season-pass-kart__msg">{message}</p> : null}
+    </div>
+  );
+}
+
+function TrackName({
+  imageUrl,
+  label,
+  premium = false,
+}: {
+  imageUrl?: string | null;
+  label: string;
+  premium?: boolean;
+}) {
+  return (
+    <div
+      className={`season-pass-kart__track-name ${premium ? "is-premium" : ""}`}
+      aria-label={label}
+    >
+      {imageUrl ? <img src={imageUrl} alt="" /> : <span>{label}</span>}
     </div>
   );
 }

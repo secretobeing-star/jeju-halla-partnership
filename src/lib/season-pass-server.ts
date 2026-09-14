@@ -29,6 +29,8 @@ function mapSeason(row: Record<string, unknown>): Season {
     ui_image_url: (row.ui_image_url as string | null) ?? null,
     track_image_url: (row.track_image_url as string | null) ?? null,
     premium_badge_url: (row.premium_badge_url as string | null) ?? null,
+    free_pass_image_url: (row.free_pass_image_url as string | null) ?? null,
+    premium_pass_image_url: (row.premium_pass_image_url as string | null) ?? null,
     exp_per_level: Math.max(1, Number(row.exp_per_level) || 1000),
     visit_exp: Math.max(0, Number(row.visit_exp) || 0),
     visit_gold: Math.max(0, Number(row.visit_gold) || 0),

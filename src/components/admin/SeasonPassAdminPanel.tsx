@@ -421,6 +421,42 @@ export default function SeasonPassAdminPanel({ onMessage }: SeasonPassAdminPanel
                 )
               }
             />
+            <ImageField
+              label="일반 패스 탭 이미지"
+              value={selected.free_pass_image_url ?? ""}
+              uploading={uploadingKey === "free-pass"}
+              onUpload={async (file) => {
+                const url = await uploadImage(file, "free-pass");
+                if (url) {
+                  setSeasons((prev) =>
+                    prev.map((item) => (item.id === selected.id ? { ...item, free_pass_image_url: url } : item)),
+                  );
+                }
+              }}
+              onClear={() =>
+                setSeasons((prev) =>
+                  prev.map((item) => (item.id === selected.id ? { ...item, free_pass_image_url: null } : item)),
+                )
+              }
+            />
+            <ImageField
+              label="프리미엄 패스 탭 이미지"
+              value={selected.premium_pass_image_url ?? ""}
+              uploading={uploadingKey === "premium-pass"}
+              onUpload={async (file) => {
+                const url = await uploadImage(file, "premium-pass");
+                if (url) {
+                  setSeasons((prev) =>
+                    prev.map((item) => (item.id === selected.id ? { ...item, premium_pass_image_url: url } : item)),
+                  );
+                }
+              }}
+              onClear={() =>
+                setSeasons((prev) =>
+                  prev.map((item) => (item.id === selected.id ? { ...item, premium_pass_image_url: null } : item)),
+                )
+              }
+            />
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
             <button
@@ -441,6 +477,8 @@ export default function SeasonPassAdminPanel({ onMessage }: SeasonPassAdminPanel
                   attendance_gold: selected.attendance_gold,
                   bg_image_url: selected.bg_image_url,
                   ui_image_url: selected.ui_image_url,
+                  free_pass_image_url: selected.free_pass_image_url,
+                  premium_pass_image_url: selected.premium_pass_image_url,
                   is_active: selected.is_active,
                 })
               }

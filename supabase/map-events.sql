@@ -23,12 +23,24 @@ create table if not exists public.events (
   stamp_active_img text,
   stamp_inactive_img text,
   marker_icon_img text,
+  marker_border_color text,
+  marker_time_icon text,
+  marker_time_format text,
   banner_img text,
   sort_order integer not null default 0,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint events_max_stamps_positive check (max_stamps >= 1)
 );
+
+alter table public.events
+  add column if not exists marker_border_color text;
+
+alter table public.events
+  add column if not exists marker_time_icon text;
+
+alter table public.events
+  add column if not exists marker_time_format text;
 
 create table if not exists public.event_rewards (
   id uuid primary key default gen_random_uuid(),

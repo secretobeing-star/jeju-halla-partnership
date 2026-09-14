@@ -97,12 +97,21 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     patch.sort_order = Number(body.sort_order) || 0;
   }
 
-  const { data, error } = await admin
+  let { data, error } = await admin
     .from("events")
     .update(patch)
     .eq("id", id)
     .select("*")
     .maybeSingle();
+
+  if (error && /marker_border_color|marker_time_icon|marker_time_format|schema cache|does not exist/i.test(error.message)) {
+    delete patch.marker_border_color;
+    delete patch.marker_time_icon;
+    delete patch.marker_time_format;
+    const retry = await admin.from("events").update(patch).eq("id", id).select("*").maybeSingle();
+    data = retry.data;
+    error = retry.error;
+  }
 
   if (error || !data) {
     return NextResponse.json({ error: error?.message || "이벤트를 수정하지 못했습니다." }, { status: 500 });

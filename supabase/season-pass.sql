@@ -12,6 +12,8 @@ create table if not exists public.seasons (
   ui_image_url text,
   track_image_url text,
   premium_badge_url text,
+  free_pass_image_url text,
+  premium_pass_image_url text,
   exp_per_level integer not null default 1000,
   visit_exp integer not null default 100,
   visit_gold integer not null default 10,
@@ -65,6 +67,12 @@ alter table public.seasons
 
 alter table public.seasons
   add column if not exists gold_shop_enabled boolean not null default true;
+
+alter table public.seasons
+  add column if not exists free_pass_image_url text;
+
+alter table public.seasons
+  add column if not exists premium_pass_image_url text;
 
 create table if not exists public.reward_claims (
   id uuid primary key default gen_random_uuid(),
