@@ -96,13 +96,17 @@ async function loadItemsMap(admin: AdminClient) {
   const catalog = await loadCardFrameCatalogFromDb().catch(() => []);
   const items = ((data ?? []) as Record<string, unknown>[]).map((row) => {
     const item = mapItem(row);
-    if (item.item_type === "costume" && !item.image_url) {
+    if (item.item_type === "costume") {
       const ref =
         (typeof item.metadata.frame_id === "string" && item.metadata.frame_id) || item.name;
       const frame = findCardFrameByRef(catalog, ref);
-      if (frame?.imageUrl) {
-        return { ...item, image_url: frame.imageUrl };
-      }
+      if (!frame) return item;
+      const keepName = item.name.trim() && item.name.trim() !== "새 보상";
+      return {
+        ...item,
+        image_url: item.image_url || frame.imageUrl || null,
+        name: keepName ? item.name : frame.name,
+      };
     }
     return item;
   });

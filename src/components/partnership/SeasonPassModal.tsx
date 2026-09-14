@@ -43,17 +43,23 @@ function RewardCell({
   }
   const qty = rewardQty(reward);
   const imageUrl = reward.image_url || (reward.item_type === "gold" ? goldIconUrl : null) || null;
-  const showName = !hideText && !imageUrl;
+  const isCostume = reward.item_type === "costume";
+  const showName = isCostume
+    ? Boolean(reward.name.trim())
+    : !hideText && !imageUrl;
   const showQty = qty > 0 && (reward.item_type === "gold" || !hideText);
   return (
     <div className={`season-pass-kart__cell ${claimed ? "is-claimed" : ""} ${reached && !claimed ? "is-ready" : ""}`}>
       {imageUrl ? (
         <img src={imageUrl} alt="" className="season-pass-kart__reward-img" />
-      ) : showName ? (
-        <span className="season-pass-kart__reward-name">{reward.name}</span>
-      ) : (
+      ) : showName ? null : (
         <span className="season-pass-kart__reward-spacer" aria-hidden />
       )}
+      {showName ? (
+        <span className={`season-pass-kart__reward-name ${isCostume ? "is-costume" : ""}`}>
+          {reward.name}
+        </span>
+      ) : null}
       {showQty ? (
         <span className={`season-pass-kart__qty ${reward.item_type === "gold" ? "is-gold" : ""}`}>{qty}개</span>
       ) : null}
