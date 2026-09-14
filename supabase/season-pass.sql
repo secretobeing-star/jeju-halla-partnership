@@ -14,6 +14,8 @@ create table if not exists public.seasons (
   premium_badge_url text,
   free_pass_image_url text,
   premium_pass_image_url text,
+  gold_icon_url text,
+  claimed_check_image_url text,
   exp_per_level integer not null default 1000,
   visit_exp integer not null default 100,
   visit_gold integer not null default 10,
@@ -74,6 +76,12 @@ alter table public.seasons
 alter table public.seasons
   add column if not exists premium_pass_image_url text;
 
+alter table public.seasons
+  add column if not exists gold_icon_url text;
+
+alter table public.seasons
+  add column if not exists claimed_check_image_url text;
+
 create table if not exists public.reward_claims (
   id uuid primary key default gen_random_uuid(),
   user_id text not null,
@@ -89,6 +97,7 @@ create table if not exists public.quests (
   id uuid primary key default gen_random_uuid(),
   season_id uuid not null references public.seasons(id) on delete cascade,
   title text not null default '',
+  description text not null default '',
   quest_type text not null default 'partner_visit',
   target_count integer not null default 1,
   reward_exp integer not null default 0,
@@ -97,6 +106,9 @@ create table if not exists public.quests (
   sort_order integer not null default 0,
   created_at timestamptz not null default now()
 );
+
+alter table public.quests
+  add column if not exists description text not null default '';
 
 create table if not exists public.user_quest_logs (
   id uuid primary key default gen_random_uuid(),

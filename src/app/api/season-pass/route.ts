@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSeasonPassState } from "@/lib/season-pass-server";
 
+export const maxDuration = 60;
+
 export async function GET(request: NextRequest) {
   const userId = request.nextUrl.searchParams.get("userId")?.trim() || "";
   try {

@@ -28,6 +28,8 @@ export type Season = {
   premium_badge_url: string | null;
   free_pass_image_url: string | null;
   premium_pass_image_url: string | null;
+  gold_icon_url: string | null;
+  claimed_check_image_url: string | null;
   exp_per_level: number;
   visit_exp: number;
   visit_gold: number;
@@ -77,6 +79,7 @@ export type SeasonQuest = {
   id: string;
   season_id: string;
   title: string;
+  description: string;
   quest_type: string;
   target_count: number;
   reward_exp: number;

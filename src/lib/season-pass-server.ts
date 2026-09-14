@@ -1,5 +1,9 @@
 import { grantStudentCardFrameOnServer } from "@/lib/student-card-settings-server";
 import {
+  findCardFrameByRef,
+  loadCardFrameCatalogFromDb,
+} from "@/lib/student-card-frames";
+import {
   asRewardMetadata,
   asSeasonPassQuestType,
   computeLevelFromExp,
@@ -31,6 +35,8 @@ function mapSeason(row: Record<string, unknown>): Season {
     premium_badge_url: (row.premium_badge_url as string | null) ?? null,
     free_pass_image_url: (row.free_pass_image_url as string | null) ?? null,
     premium_pass_image_url: (row.premium_pass_image_url as string | null) ?? null,
+    gold_icon_url: (row.gold_icon_url as string | null) ?? null,
+    claimed_check_image_url: (row.claimed_check_image_url as string | null) ?? null,
     exp_per_level: Math.max(1, Number(row.exp_per_level) || 1000),
     visit_exp: Math.max(0, Number(row.visit_exp) || 0),
     visit_gold: Math.max(0, Number(row.visit_gold) || 0),
@@ -78,7 +84,7 @@ export async function getActiveSeason(admin: AdminClient): Promise<Season | null
     .order("created_at", { ascending: false });
 
   if (error) {
-    throw error;
+    return null;
   }
 
   const live = ((data ?? []) as Record<string, unknown>[]).map(mapSeason).find((season) => isSeasonLive(season));
@@ -87,7 +93,19 @@ export async function getActiveSeason(admin: AdminClient): Promise<Season | null
 
 async function loadItemsMap(admin: AdminClient) {
   const { data } = await admin.from("reward_items").select("*").order("sort_order", { ascending: true });
-  const items = ((data ?? []) as Record<string, unknown>[]).map(mapItem);
+  const catalog = await loadCardFrameCatalogFromDb().catch(() => []);
+  const items = ((data ?? []) as Record<string, unknown>[]).map((row) => {
+    const item = mapItem(row);
+    if (item.item_type === "costume" && !item.image_url) {
+      const ref =
+        (typeof item.metadata.frame_id === "string" && item.metadata.frame_id) || item.name;
+      const frame = findCardFrameByRef(catalog, ref);
+      if (frame?.imageUrl) {
+        return { ...item, image_url: frame.imageUrl };
+      }
+    }
+    return item;
+  });
   return new Map(items.map((item) => [item.id, item]));
 }
 
@@ -118,7 +136,15 @@ export async function getSeasonPassState(userId: string): Promise<SeasonPassWidg
       return empty;
     }
 
-    const itemsById = await loadItemsMap(admin);
+    const seasonOnly: SeasonPassWidgetState = {
+      ...empty,
+      season,
+      nextLevelExp: season.exp_per_level,
+      expForLevel: season.exp_per_level,
+    };
+
+    try {
+      const itemsById = await loadItemsMap(admin);
     const [{ data: levelRows }, { data: progressRow }, { data: claimRows }, { data: questRows }] =
       await Promise.all([
         admin.from("season_pass_levels").select("*").eq("season_id", season.id).order("level", { ascending: true }),
@@ -155,6 +181,7 @@ export async function getSeasonPassState(userId: string): Promise<SeasonPassWidg
       id: String(row.id),
       season_id: String(row.season_id),
       title: String(row.title ?? ""),
+      description: String(row.description ?? ""),
       quest_type: asSeasonPassQuestType(row.quest_type),
       target_count: Math.max(1, Number(row.target_count) || 1),
       reward_exp: Number(row.reward_exp) || 0,
@@ -218,12 +245,11 @@ export async function getSeasonPassState(userId: string): Promise<SeasonPassWidg
       expForLevel: computed.expForLevel,
       isPremium: Boolean(progress?.is_premium),
     };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "";
-    if (message.includes("seasons") || message.includes("schema cache") || message.includes("does not exist")) {
-      return empty;
+    } catch {
+      return seasonOnly;
     }
-    throw error;
+  } catch {
+    return empty;
   }
 }
 
@@ -474,8 +500,42 @@ export async function completeAttendance(userIdRaw: string): Promise<{
   }
 }
 
+async function resolveCostumeFrameId(item: RewardItem): Promise<string> {
+  const meta = item.metadata;
+  const candidates = [
+    typeof meta.frame_id === "string" ? meta.frame_id : "",
+    typeof meta.costume_id === "string" ? meta.costume_id : "",
+    typeof meta.item_value === "string" ? meta.item_value : "",
+    item.name,
+  ]
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  if (candidates.length === 0) {
+    throw new Error("코스튬 ID가 없습니다. 보상 아이템을 저장한 뒤 다시 수령해 주세요.");
+  }
+
+  const catalog = await loadCardFrameCatalogFromDb().catch(() => []);
+  for (const value of candidates) {
+    const matched = findCardFrameByRef(catalog, value);
+    if (matched?.id) {
+      return matched.id;
+    }
+  }
+
+  const fallback = candidates[0];
+  if (catalog.length > 0 && !findCardFrameByRef(catalog, fallback)) {
+    throw new Error(
+      "코스튬을 찾을 수 없습니다. 학생증 코스튬 목록의 ID 또는 정확한 이름을 입력해 주세요.",
+    );
+  }
+  return fallback;
+}
+
 async function grantRewardItem(admin: AdminClient, userId: string, seasonId: string, item: RewardItem) {
   const meta = item.metadata;
+  let grantedFrameId: string | null = null;
+
   if (item.item_type === "gold") {
     const amount = Math.max(0, Number(meta.gold_amount ?? meta.amount ?? 0));
     const { data: progress } = await admin
@@ -492,29 +552,41 @@ async function grantRewardItem(admin: AdminClient, userId: string, seasonId: str
     }
   }
 
-  await admin.from("user_inventory").insert({
+  if (item.item_type === "costume") {
+    grantedFrameId = await resolveCostumeFrameId(item);
+    await grantStudentCardFrameOnServer(userId, grantedFrameId, "season", { activate: false });
+  }
+
+  const inventoryPayload = {
     user_id: userId,
-    category: item.item_type.toUpperCase(),
+    category: item.item_type === "costume" ? "CARD_SKIN" : item.item_type.toUpperCase(),
     reward_name: item.name,
     reward_img: item.image_url,
     item_value:
-      typeof meta.frame_id === "string"
+      grantedFrameId ||
+      (typeof meta.frame_id === "string"
         ? meta.frame_id
         : typeof meta.coupon_code === "string"
           ? meta.coupon_code
-          : null,
+          : null),
     source: "SEASON_PASS",
     reward_item_id: item.id,
     season_id: seasonId,
     is_equipped: false,
-  });
-
-  if (item.item_type === "costume") {
-    const frameId = typeof meta.frame_id === "string" ? meta.frame_id.trim() : "";
-    if (frameId) {
-      await grantStudentCardFrameOnServer(userId, frameId, "season", { activate: false });
-    }
+  };
+  const inserted = await admin.from("user_inventory").insert(inventoryPayload);
+  if (inserted.error) {
+    await admin.from("user_inventory").insert({
+      user_id: userId,
+      category: inventoryPayload.category,
+      reward_name: item.name,
+      reward_img: item.image_url,
+      item_value: inventoryPayload.item_value,
+      source: "SEASON_PASS",
+    });
   }
+
+  return grantedFrameId;
 }
 
 export async function claimSeasonReward(input: {
@@ -545,11 +617,6 @@ export async function claimSeasonReward(input: {
     throw new Error("프리미엄 패스가 필요합니다.");
   }
 
-  const already = state.claims.some((claim) => claim.level === level && claim.track === track);
-  if (already) {
-    throw new Error("이미 수령한 보상입니다.");
-  }
-
   const row = state.levels.find((item) => item.level === level);
   if (!row) {
     throw new Error("레벨 보상이 없습니다.");
@@ -558,6 +625,16 @@ export async function claimSeasonReward(input: {
   const item = track === "premium" ? row.premium_reward : row.free_reward;
   if (!item) {
     throw new Error("지급할 보상이 없습니다.");
+  }
+
+  const already = state.claims.some((claim) => claim.level === level && claim.track === track);
+  if (already) {
+    if (item.item_type === "costume") {
+      const frameId = await resolveCostumeFrameId(item);
+      await grantStudentCardFrameOnServer(userId, frameId, "season", { activate: false });
+      return { state: await getSeasonPassState(userId), frameId };
+    }
+    throw new Error("이미 수령한 보상입니다.");
   }
 
   const { error } = await admin.from("reward_claims").insert({
@@ -569,13 +646,18 @@ export async function claimSeasonReward(input: {
   });
   if (error) {
     if (error.code === "23505") {
+      if (item.item_type === "costume") {
+        const frameId = await resolveCostumeFrameId(item);
+        await grantStudentCardFrameOnServer(userId, frameId, "season", { activate: false });
+        return { state: await getSeasonPassState(userId), frameId };
+      }
       throw new Error("이미 수령한 보상입니다.");
     }
     throw error;
   }
 
-  await grantRewardItem(admin, userId, state.season.id, item);
-  return getSeasonPassState(userId);
+  const frameId = await grantRewardItem(admin, userId, state.season.id, item);
+  return { state: await getSeasonPassState(userId), frameId };
 }
 
 export async function purchasePremiumPass(userIdRaw: string) {

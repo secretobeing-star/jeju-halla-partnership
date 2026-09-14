@@ -1,6 +1,6 @@
 import { supabase } from "@/lib/supabase";
 
-const ADMIN_API_TIMEOUT_MS = 12_000;
+const ADMIN_API_TIMEOUT_MS = 25_000;
 
 export async function getAdminAccessToken() {
   const { data } = await supabase.auth.getSession();

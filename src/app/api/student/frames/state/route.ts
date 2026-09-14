@@ -28,7 +28,8 @@ function parseStateBody(body: unknown): CardFrameUserState | null {
       value === "default" ||
       value === "code" ||
       value === "event" ||
-      value === "admin"
+      value === "admin" ||
+      value === "season"
     ) {
       sources[key] = value;
     }

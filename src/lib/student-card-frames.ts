@@ -144,6 +144,28 @@ export function findCardFrameById(
   return catalog.find((item) => item.id === id) ?? null;
 }
 
+/** 코스튬 ID, 이름, 시크릿 코드 중 하나로 찾습니다. */
+export function findCardFrameByRef(
+  catalog: ExtendedCardFrameItem[],
+  value: string,
+): ExtendedCardFrameItem | null {
+  const raw = value.trim();
+  if (!raw) {
+    return null;
+  }
+  const byId = findCardFrameById(catalog, raw);
+  if (byId) {
+    return byId;
+  }
+  const byCode = findCardFrameByCode(catalog, raw);
+  if (byCode) {
+    return byCode;
+  }
+  const lower = raw.toLowerCase();
+  const names = catalog.filter((item) => item.name.trim().toLowerCase() === lower);
+  return names.length === 1 ? names[0] : names[0] ?? null;
+}
+
 function storageKey(studentId: string) {
   return `${STATE_STORAGE_PREFIX}${studentId.trim()}`;
 }

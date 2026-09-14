@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { adminAuthMiddleware } from "@/lib/admin-auth-guard";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 import { SEASON_PASS_ITEM_TYPES, asSeasonPassQuestType, type SeasonPassItemType } from "@/lib/season-pass";
+
+export const maxDuration = 60;
 
 function asItemType(value: unknown): SeasonPassItemType {
   return SEASON_PASS_ITEM_TYPES.includes(value as SeasonPassItemType)
@@ -8,8 +11,35 @@ function asItemType(value: unknown): SeasonPassItemType {
     : "costume";
 }
 
+async function rowsOrEmpty(
+  query: PromiseLike<{ data: unknown[] | null; error: { message: string } | null }>,
+) {
+  try {
+    const { data, error } = await query;
+    if (error) return [];
+    return data ?? [];
+  } catch {
+    return [];
+  }
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(fallback), ms);
+    void promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      () => {
+        clearTimeout(timer);
+        resolve(fallback);
+      },
+    );
+  });
+}
+
 export async function GET(request: NextRequest) {
-  const { adminAuthMiddleware } = await import("@/lib/admin-auth-guard");
   const auth = await adminAuthMiddleware(request, "partners");
   if ("error" in auth) {
     return auth.error;
@@ -21,30 +51,43 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const [seasons, items, levels, quests] = await Promise.all([
-      admin.from("seasons").select("*").order("sort_order", { ascending: true }).order("created_at", { ascending: false }),
-      admin.from("reward_items").select("*").order("sort_order", { ascending: true }),
-      admin.from("season_pass_levels").select("*").order("level", { ascending: true }),
-      admin.from("quests").select("*").order("sort_order", { ascending: true }),
-    ]);
+    let seasonsQuery = await admin
+      .from("seasons")
+      .select("*")
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: false });
 
-    const firstError = seasons.error || items.error || levels.error || quests.error;
-    if (firstError) {
+    if (seasonsQuery.error) {
+      seasonsQuery = await admin.from("seasons").select("*").order("sort_order", { ascending: true });
+    }
+
+    if (seasonsQuery.error) {
+      const message = seasonsQuery.error.message;
       return NextResponse.json(
         {
-          error: firstError.message.includes("does not exist")
+          error: message.includes("does not exist")
             ? "시즌패스 테이블이 없습니다. supabase/season-pass.sql 을 실행해 주세요."
-            : firstError.message,
+            : message,
         },
         { status: 500 },
       );
     }
 
+    const [items, levels, quests] = await withTimeout(
+      Promise.all([
+        rowsOrEmpty(admin.from("reward_items").select("*").order("sort_order", { ascending: true })),
+        rowsOrEmpty(admin.from("season_pass_levels").select("*").order("level", { ascending: true })),
+        rowsOrEmpty(admin.from("quests").select("*").order("sort_order", { ascending: true }).limit(500)),
+      ]),
+      8_000,
+      [[], [], []] as [unknown[], unknown[], unknown[]],
+    );
+
     return NextResponse.json({
-      seasons: seasons.data ?? [],
-      items: items.data ?? [],
-      levels: levels.data ?? [],
-      quests: quests.data ?? [],
+      seasons: seasonsQuery.data ?? [],
+      items,
+      levels,
+      quests,
     });
   } catch (error) {
     return NextResponse.json(
@@ -55,7 +98,6 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const { adminAuthMiddleware } = await import("@/lib/admin-auth-guard");
   const auth = await adminAuthMiddleware(request, "partners");
   if ("error" in auth) {
     return auth.error;
@@ -134,22 +176,24 @@ export async function POST(request: NextRequest) {
     }
 
     if (entity === "quest") {
-      const { data, error } = await admin
-        .from("quests")
-        .insert({
-          season_id: String(body.season_id ?? ""),
-          title: String(body.title ?? "").trim() || (asSeasonPassQuestType(body.quest_type) === "attendance" ? "출석 체크" : "제휴 방문"),
-          quest_type: asSeasonPassQuestType(body.quest_type),
-          target_count: Math.max(1, Number(body.target_count) || 1),
-          reward_exp: Math.max(0, Number(body.reward_exp) || 0),
-          reward_gold: Math.max(0, Number(body.reward_gold) || 0),
-          is_active: body.is_active !== false,
-          sort_order: Number(body.sort_order) || 0,
-        })
-        .select("*")
-        .maybeSingle();
-      if (error) throw error;
-      return NextResponse.json({ quest: data });
+      const payload = {
+        season_id: String(body.season_id ?? ""),
+        title: String(body.title ?? "").trim() || (asSeasonPassQuestType(body.quest_type) === "attendance" ? "출석 체크" : "제휴 방문"),
+        description: String(body.description ?? "").trim(),
+        quest_type: asSeasonPassQuestType(body.quest_type),
+        target_count: Math.max(1, Number(body.target_count) || 1),
+        reward_exp: Math.max(0, Number(body.reward_exp) || 0),
+        reward_gold: Math.max(0, Number(body.reward_gold) || 0),
+        is_active: body.is_active !== false,
+        sort_order: Number(body.sort_order) || 0,
+      };
+      let inserted = await admin.from("quests").insert(payload).select("*").maybeSingle();
+      if (inserted.error?.message.includes("description")) {
+        const { description: _description, ...withoutDescription } = payload;
+        inserted = await admin.from("quests").insert(withoutDescription).select("*").maybeSingle();
+      }
+      if (inserted.error) throw inserted.error;
+      return NextResponse.json({ quest: inserted.data });
     }
 
     if (entity === "premium") {
@@ -158,10 +202,19 @@ export async function POST(request: NextRequest) {
       if (!userId || !seasonId) {
         return NextResponse.json({ error: "학번과 시즌이 필요합니다." }, { status: 400 });
       }
+      const { data: existing } = await admin
+        .from("user_season_progress")
+        .select("*")
+        .eq("user_id", userId)
+        .eq("season_id", seasonId)
+        .maybeSingle();
       const { error } = await admin.from("user_season_progress").upsert(
         {
           user_id: userId,
           season_id: seasonId,
+          level: Number(existing?.level) || 1,
+          exp: Number(existing?.exp) || 0,
+          gold: Number(existing?.gold) || 0,
           is_premium: true,
           updated_at: new Date().toISOString(),
         },
@@ -181,7 +234,6 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  const { adminAuthMiddleware } = await import("@/lib/admin-auth-guard");
   const auth = await adminAuthMiddleware(request, "partners");
   if ("error" in auth) {
     return auth.error;
@@ -217,6 +269,8 @@ export async function PATCH(request: NextRequest) {
         "premium_badge_url",
         "free_pass_image_url",
         "premium_pass_image_url",
+        "gold_icon_url",
+        "claimed_check_image_url",
         "exp_per_level",
         "visit_exp",
         "visit_gold",
@@ -231,7 +285,18 @@ export async function PATCH(request: NextRequest) {
         }
       }
       const { error } = await admin.from("seasons").update(patch).eq("id", id);
-      if (error) throw error;
+      if (error) {
+        const missing =
+          error.message.includes("gold_icon_url") || error.message.includes("claimed_check_image_url");
+        if (missing) {
+          delete patch.gold_icon_url;
+          delete patch.claimed_check_image_url;
+          const retry = await admin.from("seasons").update(patch).eq("id", id);
+          if (retry.error) throw retry.error;
+        } else {
+          throw error;
+        }
+      }
       return NextResponse.json({ ok: true });
     }
 
@@ -266,13 +331,22 @@ export async function PATCH(request: NextRequest) {
     if (entity === "quest") {
       const patch: Record<string, unknown> = {};
       if (body.title !== undefined) patch.title = body.title;
+      if (body.description !== undefined) patch.description = String(body.description ?? "").trim();
       if (body.quest_type !== undefined) patch.quest_type = asSeasonPassQuestType(body.quest_type);
       if (body.target_count !== undefined) patch.target_count = Number(body.target_count);
       if (body.reward_exp !== undefined) patch.reward_exp = Number(body.reward_exp);
       if (body.reward_gold !== undefined) patch.reward_gold = Number(body.reward_gold);
       if (body.is_active !== undefined) patch.is_active = body.is_active;
       const { error } = await admin.from("quests").update(patch).eq("id", id);
-      if (error) throw error;
+      if (error) {
+        if (error.message.includes("description")) {
+          delete patch.description;
+          const retry = await admin.from("quests").update(patch).eq("id", id);
+          if (retry.error) throw retry.error;
+        } else {
+          throw error;
+        }
+      }
       return NextResponse.json({ ok: true });
     }
 
@@ -286,7 +360,6 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const { adminAuthMiddleware } = await import("@/lib/admin-auth-guard");
   const auth = await adminAuthMiddleware(request, "partners");
   if ("error" in auth) {
     return auth.error;

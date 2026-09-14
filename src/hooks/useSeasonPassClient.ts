@@ -5,6 +5,7 @@ import {
   getSiteMemberSession,
   SITE_MEMBER_SESSION_EVENT,
 } from "@/lib/site-member-session";
+import { grantCardFrameUnlock } from "@/lib/student-card-frames";
 import type { SeasonPassTrack, SeasonPassWidgetState } from "@/lib/season-pass";
 
 export const EMPTY_SEASON_PASS_STATE: SeasonPassWidgetState = {
@@ -84,12 +85,19 @@ export function useSeasonPassClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, level, track }),
       });
-      const payload = (await response.json()) as { state?: SeasonPassWidgetState; error?: string };
+      const payload = (await response.json()) as {
+        state?: SeasonPassWidgetState;
+        error?: string;
+        frameId?: string | null;
+      };
       if (!response.ok) {
         throw new Error(payload.error || "수령에 실패했습니다.");
       }
       if (payload.state) {
         setState(payload.state);
+      }
+      if (payload.frameId) {
+        grantCardFrameUnlock(userId, payload.frameId, "season", { activate: false });
       }
       setMessage("보상을 수령했습니다.");
       window.dispatchEvent(new Event("site-frame-inventory-refresh"));

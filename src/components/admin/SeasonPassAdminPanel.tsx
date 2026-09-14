@@ -7,6 +7,7 @@ import { fromDatetimeLocalValue, toDatetimeLocalValue } from "@/lib/site-events"
 import { getStorageErrorMessage } from "@/lib/storage";
 import type { RewardItem, Season, SeasonPassLevel, SeasonQuest } from "@/lib/season-pass";
 import { asSeasonPassQuestType, seasonPassQuestTypeLabel } from "@/lib/season-pass";
+import type { PublicCardFrameItem } from "@/lib/student-card-frames";
 
 type SeasonPassAdminPanelProps = {
   onMessage: (message: string) => void;
@@ -62,6 +63,7 @@ export default function SeasonPassAdminPanel({ onMessage }: SeasonPassAdminPanel
   const [saving, setSaving] = useState(false);
   const [uploadingKey, setUploadingKey] = useState<string | null>(null);
   const [premiumUserId, setPremiumUserId] = useState("");
+  const [costumes, setCostumes] = useState<PublicCardFrameItem[]>([]);
 
   const selected = useMemo(
     () => seasons.find((item) => item.id === selectedId) ?? null,
@@ -78,7 +80,7 @@ export default function SeasonPassAdminPanel({ onMessage }: SeasonPassAdminPanel
 
   const loadAll = useCallback(async () => {
     try {
-      const payload = (await adminApiFetch("/api/admin/season-pass")) as {
+      const payload = (await adminApiFetch("/api/admin/season-pass", { timeoutMs: 28_000 })) as {
         seasons?: SeasonRow[];
         items?: RewardItem[];
         levels?: SeasonPassLevel[];
@@ -91,6 +93,10 @@ export default function SeasonPassAdminPanel({ onMessage }: SeasonPassAdminPanel
       setLevels(payload.levels ?? []);
       setQuests(payload.quests ?? []);
       setSelectedId((current) => current ?? payload.seasons?.[0]?.id ?? null);
+      const framesPayload = (await fetch("/api/student/frames")
+        .then((res) => res.json())
+        .catch(() => ({ frames: [] }))) as { frames?: PublicCardFrameItem[] };
+      setCostumes((framesPayload.frames ?? []).filter((frame) => frame.id?.trim() && frame.name?.trim()));
     } catch (error) {
       onMessage(error instanceof Error ? error.message : "시즌패스를 불러오지 못했습니다.");
     }
@@ -457,6 +463,42 @@ export default function SeasonPassAdminPanel({ onMessage }: SeasonPassAdminPanel
                 )
               }
             />
+            <ImageField
+              label="골드 기본 이미지"
+              value={selected.gold_icon_url ?? ""}
+              uploading={uploadingKey === "gold-icon"}
+              onUpload={async (file) => {
+                const url = await uploadImage(file, "gold-icon");
+                if (url) {
+                  setSeasons((prev) =>
+                    prev.map((item) => (item.id === selected.id ? { ...item, gold_icon_url: url } : item)),
+                  );
+                }
+              }}
+              onClear={() =>
+                setSeasons((prev) =>
+                  prev.map((item) => (item.id === selected.id ? { ...item, gold_icon_url: null } : item)),
+                )
+              }
+            />
+            <ImageField
+              label="수령 완료 체크 이미지"
+              value={selected.claimed_check_image_url ?? ""}
+              uploading={uploadingKey === "claimed-check"}
+              onUpload={async (file) => {
+                const url = await uploadImage(file, "claimed-check");
+                if (url) {
+                  setSeasons((prev) =>
+                    prev.map((item) => (item.id === selected.id ? { ...item, claimed_check_image_url: url } : item)),
+                  );
+                }
+              }}
+              onClear={() =>
+                setSeasons((prev) =>
+                  prev.map((item) => (item.id === selected.id ? { ...item, claimed_check_image_url: null } : item)),
+                )
+              }
+            />
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
             <button
@@ -479,6 +521,8 @@ export default function SeasonPassAdminPanel({ onMessage }: SeasonPassAdminPanel
                   ui_image_url: selected.ui_image_url,
                   free_pass_image_url: selected.free_pass_image_url,
                   premium_pass_image_url: selected.premium_pass_image_url,
+                  gold_icon_url: selected.gold_icon_url,
+                  claimed_check_image_url: selected.claimed_check_image_url,
                   is_active: selected.is_active,
                 })
               }
@@ -539,10 +583,11 @@ export default function SeasonPassAdminPanel({ onMessage }: SeasonPassAdminPanel
         </AdminCollapsibleSection>
       ) : null}
 
-      <AdminCollapsibleSection title="보상 아이템" description="코스튬은 학생증 코스튬 ID, 쿠폰은 코드, 골드는 수량을 입력합니다.">
+      <AdminCollapsibleSection title="보상 아이템" description="코스튬은 목록에서 선택하세요. ID나 이름을 직접 적어도 지급됩니다. 쿠폰은 코드, 골드는 수량입니다.">
         <div className="space-y-3">
           {items.map((item) => (
-            <div key={item.id} className="grid gap-2 rounded-xl border p-3 sm:grid-cols-5">
+            <div key={item.id} className="space-y-2 rounded-xl border p-3">
+            <div className="grid gap-2 sm:grid-cols-5">
               <input
                 className="rounded border px-2 py-1 text-sm"
                 value={item.name}
@@ -565,31 +610,61 @@ export default function SeasonPassAdminPanel({ onMessage }: SeasonPassAdminPanel
                 <option value="coupon">쿠폰</option>
                 <option value="gold">골드</option>
               </select>
-              <input
-                className="rounded border px-2 py-1 text-sm"
-                value={
-                  typeof item.metadata.frame_id === "string"
-                    ? item.metadata.frame_id
-                    : typeof item.metadata.coupon_code === "string"
+              {item.item_type === "costume" ? (
+                <select
+                  className="rounded border px-2 py-1 text-sm"
+                  value={typeof item.metadata.frame_id === "string" ? item.metadata.frame_id : ""}
+                  onChange={(e) => {
+                    const costume = costumes.find((frame) => frame.id === e.target.value);
+                    setItems((prev) =>
+                      prev.map((row) => {
+                        if (row.id !== item.id) return row;
+                        return {
+                          ...row,
+                          metadata: { frame_id: e.target.value },
+                          image_url: costume?.imageUrl || row.image_url,
+                          name: row.name === "새 보상" && costume?.name ? costume.name : row.name,
+                        };
+                      }),
+                    );
+                  }}
+                >
+                  <option value="">코스튬 선택</option>
+                  {typeof item.metadata.frame_id === "string" &&
+                  item.metadata.frame_id &&
+                  !costumes.some((frame) => frame.id === item.metadata.frame_id) ? (
+                    <option value={item.metadata.frame_id}>{item.metadata.frame_id}</option>
+                  ) : null}
+                  {costumes.map((frame) => (
+                    <option key={frame.id} value={frame.id}>
+                      {frame.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  className="rounded border px-2 py-1 text-sm"
+                  placeholder={item.item_type === "coupon" ? "쿠폰 코드" : "골드 수량"}
+                  value={
+                    typeof item.metadata.coupon_code === "string"
                       ? item.metadata.coupon_code
                       : String(item.metadata.gold_amount ?? "")
-                }
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setItems((prev) =>
-                    prev.map((row) => {
-                      if (row.id !== item.id) return row;
-                      const metadata =
-                        row.item_type === "costume"
-                          ? { frame_id: value }
-                          : row.item_type === "coupon"
+                  }
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setItems((prev) =>
+                      prev.map((row) => {
+                        if (row.id !== item.id) return row;
+                        const metadata =
+                          row.item_type === "coupon"
                             ? { coupon_code: value }
                             : { gold_amount: Number(value) || 0 };
-                      return { ...row, metadata };
-                    }),
-                  );
-                }}
-              />
+                        return { ...row, metadata };
+                      }),
+                    );
+                  }}
+                />
+              )}
               <button
                 type="button"
                 className="text-sm text-emerald-700"
@@ -620,6 +695,27 @@ export default function SeasonPassAdminPanel({ onMessage }: SeasonPassAdminPanel
               >
                 삭제
               </button>
+            </div>
+            <ImageField
+              label={
+                item.item_type === "gold"
+                  ? "골드 이미지"
+                  : item.item_type === "costume"
+                    ? "코스튬 이미지"
+                    : "보상 이미지"
+              }
+              value={item.image_url ?? ""}
+              uploading={uploadingKey === `item-${item.id}`}
+              onUpload={async (file) => {
+                const url = await uploadImage(file, `item-${item.id}`);
+                if (url) {
+                  setItems((prev) => prev.map((row) => (row.id === item.id ? { ...row, image_url: url } : row)));
+                }
+              }}
+              onClear={() =>
+                setItems((prev) => prev.map((row) => (row.id === item.id ? { ...row, image_url: null } : row)))
+              }
+            />
             </div>
           ))}
           <button
@@ -755,9 +851,9 @@ export default function SeasonPassAdminPanel({ onMessage }: SeasonPassAdminPanel
       ) : null}
 
       {selected ? (
-        <AdminCollapsibleSection title="제휴 퀘스트" description="제휴 방문은 지도 도장, 출석 체크는 위젯 버튼으로 진행됩니다.">
+        <AdminCollapsibleSection title="제휴 퀘스트" description="목표를 채우면 패스 EXP와 골드가 지급됩니다. 제휴 방문은 지도 도장, 출석 체크는 위젯 버튼으로 진행됩니다.">
           {seasonQuests.map((quest) => (
-            <div key={quest.id} className="mb-2 grid gap-2 rounded-xl border p-3 sm:grid-cols-5">
+            <div key={quest.id} className="mb-2 grid gap-2 rounded-xl border p-3 sm:grid-cols-7">
               <select
                 className="rounded border px-2 py-1 text-sm"
                 value={asSeasonPassQuestType(quest.quest_type)}
@@ -781,19 +877,61 @@ export default function SeasonPassAdminPanel({ onMessage }: SeasonPassAdminPanel
                   )
                 }
               />
-              <input
-                type="number"
-                className="rounded border px-2 py-1 text-sm"
-                value={quest.target_count}
+              <label className="text-xs text-gray-500">
+                목표 횟수
+                <input
+                  type="number"
+                  className="mt-1 w-full rounded border px-2 py-1 text-sm"
+                  value={quest.target_count}
+                  onChange={(e) =>
+                    setQuests((prev) =>
+                      prev.map((row) =>
+                        row.id === quest.id ? { ...row, target_count: Number(e.target.value) || 1 } : row,
+                      ),
+                    )
+                  }
+                />
+              </label>
+              <label className="text-xs text-gray-500">
+                패스 EXP
+                <input
+                  type="number"
+                  className="mt-1 w-full rounded border px-2 py-1 text-sm"
+                  value={quest.reward_exp}
+                  onChange={(e) =>
+                    setQuests((prev) =>
+                      prev.map((row) =>
+                        row.id === quest.id ? { ...row, reward_exp: Number(e.target.value) || 0 } : row,
+                      ),
+                    )
+                  }
+                />
+              </label>
+              <label className="text-xs text-gray-500">
+                골드
+                <input
+                  type="number"
+                  className="mt-1 w-full rounded border px-2 py-1 text-sm"
+                  value={quest.reward_gold}
+                  onChange={(e) =>
+                    setQuests((prev) =>
+                      prev.map((row) =>
+                        row.id === quest.id ? { ...row, reward_gold: Number(e.target.value) || 0 } : row,
+                      ),
+                    )
+                  }
+                />
+              </label>
+              <textarea
+                className="sm:col-span-7 min-h-16 rounded border px-2 py-1 text-sm"
+                placeholder="퀘스트 설명 (오른쪽 상세에 표시)"
+                value={quest.description ?? ""}
                 onChange={(e) =>
                   setQuests((prev) =>
-                    prev.map((row) =>
-                      row.id === quest.id ? { ...row, target_count: Number(e.target.value) || 1 } : row,
-                    ),
+                    prev.map((row) => (row.id === quest.id ? { ...row, description: e.target.value } : row)),
                   )
                 }
               />
-              <button
                 type="button"
                 className="text-sm text-emerald-700"
                 onClick={async () => {
@@ -807,6 +945,7 @@ export default function SeasonPassAdminPanel({ onMessage }: SeasonPassAdminPanel
                       target_count: quest.target_count,
                       reward_exp: quest.reward_exp,
                       reward_gold: quest.reward_gold,
+                      description: quest.description ?? "",
                     }),
                   });
                   onMessage(`${seasonPassQuestTypeLabel(quest.quest_type)} 퀘스트를 저장했습니다.`);
@@ -840,6 +979,7 @@ export default function SeasonPassAdminPanel({ onMessage }: SeasonPassAdminPanel
                     title: "제휴처 N곳 방문",
                     target_count: 3,
                     reward_exp: 200,
+                    reward_gold: 0,
                   }),
                 });
                 await loadAll();
@@ -860,6 +1000,7 @@ export default function SeasonPassAdminPanel({ onMessage }: SeasonPassAdminPanel
                     title: "N일 출석",
                     target_count: 7,
                     reward_exp: 300,
+                    reward_gold: 0,
                   }),
                 });
                 await loadAll();

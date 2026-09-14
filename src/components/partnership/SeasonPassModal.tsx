@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import type { RewardItem, SeasonPassTrack, SeasonPassWidgetState } from "@/lib/season-pass";
 import { seasonPassQuestTypeLabel } from "@/lib/season-pass";
 import { useSeasonPassClient } from "@/hooks/useSeasonPassClient";
@@ -23,6 +24,8 @@ function RewardCell({
   locked,
   busy,
   hideText,
+  goldIconUrl,
+  checkImageUrl,
   onClaim,
 }: {
   reward?: RewardItem | null;
@@ -31,27 +34,37 @@ function RewardCell({
   locked: boolean;
   busy: boolean;
   hideText: boolean;
+  goldIconUrl?: string | null;
+  checkImageUrl?: string | null;
   onClaim: () => void;
 }) {
   if (!reward) {
     return <div className="season-pass-kart__cell season-pass-kart__cell--empty" />;
   }
   const qty = rewardQty(reward);
-  const showName = !hideText && !reward.image_url;
+  const imageUrl = reward.image_url || (reward.item_type === "gold" ? goldIconUrl : null) || null;
+  const showName = !hideText && !imageUrl;
+  const showQty = qty > 0 && (reward.item_type === "gold" || !hideText);
   return (
     <div className={`season-pass-kart__cell ${claimed ? "is-claimed" : ""} ${reached && !claimed ? "is-ready" : ""}`}>
-      {reward.image_url ? (
-        <img src={reward.image_url} alt="" className="season-pass-kart__reward-img" />
+      {imageUrl ? (
+        <img src={imageUrl} alt="" className="season-pass-kart__reward-img" />
       ) : showName ? (
         <span className="season-pass-kart__reward-name">{reward.name}</span>
       ) : (
         <span className="season-pass-kart__reward-spacer" aria-hidden />
       )}
-      {qty > 0 && !hideText ? <span className="season-pass-kart__qty">{qty}개</span> : null}
+      {showQty ? (
+        <span className={`season-pass-kart__qty ${reward.item_type === "gold" ? "is-gold" : ""}`}>{qty}개</span>
+      ) : null}
       {claimed ? (
-        <span className="season-pass-kart__check" aria-hidden>
-          ✓
-        </span>
+        checkImageUrl ? (
+          <img src={checkImageUrl} alt="" className="season-pass-kart__check-img" />
+        ) : (
+          <span className="season-pass-kart__check" aria-hidden>
+            ✓
+          </span>
+        )
       ) : (
         <button
           type="button"
@@ -75,7 +88,7 @@ export default function SeasonPassModalBody({
   tab: "pass" | "quest";
   onTabChange: (tab: "pass" | "quest") => void;
 }) {
-  const { userId, state, busy, message, percent, claim, claimAll, checkIn } = client;
+  const { userId, state, busy, message, percent, claim, claimAll } = client;
   const season = state.season;
   const hideSeasonText = Boolean(season?.ui_image_url || season?.bg_image_url || season?.track_image_url);
   const days = remainingDays(season?.ends_at ?? null);
@@ -99,6 +112,7 @@ export default function SeasonPassModalBody({
           : undefined
       }
     >
+      {tab === "pass" ? (
       <div className="season-pass-kart__banners">
         {season.ui_image_url ? <img src={season.ui_image_url} alt="" /> : null}
         {season.premium_badge_url ? <img src={season.premium_badge_url} alt="" /> : null}
@@ -107,6 +121,7 @@ export default function SeasonPassModalBody({
           <div className="season-pass-kart__banner-fallback">{season.title}</div>
         ) : null}
       </div>
+      ) : null}
 
       <div className="season-pass-kart__tabs">
         <button type="button" className={tab === "pass" ? "is-active" : ""} onClick={() => onTabChange("pass")}>
@@ -127,32 +142,16 @@ export default function SeasonPassModalBody({
       </div>
 
       {tab === "quest" ? (
-        <div className="season-pass-kart__quests">
-          <button
-            type="button"
-            className="season-pass-kart__attend"
-            disabled={!userId || state.attendedToday || busy !== null}
-            onClick={() => void checkIn()}
-          >
-            {state.attendedToday ? "오늘 출석 완료" : "출석 체크"}
-          </button>
-          {state.quests.length === 0 ? (
-            <p>등록된 퀘스트가 없습니다.</p>
-          ) : (
-            <ul>
-              {state.quests.map((quest) => (
-                <li key={quest.id}>
-                  {seasonPassQuestTypeLabel(quest.quest_type)} · {quest.title} ({quest.progress}/{quest.target_count})
-                  {quest.is_completed ? " 완료" : ""}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+        <QuestBoard
+          client={client}
+          onGoPass={() => onTabChange("pass")}
+        />
       ) : (
         <>
           <div className="season-pass-kart__progress">
-            <span className="season-pass-kart__lv">LV {userId ? state.currentLevel : "-"}</span>
+            <span className="season-pass-kart__lv season-pass-kart__lv--from">
+              LV {userId ? state.currentLevel : "-"}
+            </span>
             <div className="season-pass-kart__bar-wrap">
               <div className="season-pass-kart__bar">
                 <div style={{ width: `${userId ? percent : 0}%` }} />
@@ -163,7 +162,9 @@ export default function SeasonPassModalBody({
                   : "로그인 후 진행도가 표시됩니다"}
               </p>
             </div>
-            <span className="season-pass-kart__lv">LV {userId ? nextLevel : "-"}</span>
+            <span className="season-pass-kart__lv season-pass-kart__lv--to">
+              LV {userId ? nextLevel : "-"}
+            </span>
             <span className="season-pass-kart__gold">골드 {state.progress?.gold ?? 0}</span>
           </div>
 
@@ -202,6 +203,8 @@ export default function SeasonPassModalBody({
                 track="free"
                 busy={busy !== null}
                 hideText={hideSeasonText}
+                goldIconUrl={season.gold_icon_url}
+                checkImageUrl={season.claimed_check_image_url}
                 onClaim={claim}
               />
               <div className="season-pass-kart__collect">
@@ -227,6 +230,8 @@ export default function SeasonPassModalBody({
                 track="premium"
                 busy={busy !== null}
                 hideText={hideSeasonText}
+                goldIconUrl={season.gold_icon_url}
+                checkImageUrl={season.claimed_check_image_url}
                 onClaim={claim}
               />
               <div className="season-pass-kart__collect season-pass-kart__collect--premium">
@@ -272,6 +277,8 @@ function TrackRow({
   track,
   busy,
   hideText,
+  goldIconUrl,
+  checkImageUrl,
   onClaim,
 }: {
   state: SeasonPassWidgetState;
@@ -279,6 +286,8 @@ function TrackRow({
   track: SeasonPassTrack;
   busy: boolean;
   hideText: boolean;
+  goldIconUrl?: string | null;
+  checkImageUrl?: string | null;
   onClaim: (level: number, track: SeasonPassTrack) => void | Promise<void>;
 }) {
   const lastId = state.levels[state.levels.length - 1]?.id;
@@ -299,11 +308,190 @@ function TrackRow({
               locked={locked}
               busy={busy}
               hideText={hideText}
+              goldIconUrl={goldIconUrl}
+              checkImageUrl={checkImageUrl}
               onClaim={() => void onClaim(level.level, track)}
             />
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function formatQuestRange(startsAt: string | null, endsAt: string | null) {
+  const fmt = (value: string | null) => {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    return new Intl.DateTimeFormat("ko-KR", {
+      timeZone: "Asia/Seoul",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    })
+      .format(date)
+      .replace(/\./g, "-");
+  };
+  const start = fmt(startsAt);
+  const end = fmt(endsAt);
+  if (!start && !end) return "시즌 기간 동안 진행";
+  return `${start || "시작"}  ${end || "종료"}`;
+}
+
+function questObjective(quest: SeasonPassWidgetState["quests"][number]) {
+  if (quest.quest_type === "attendance") {
+    return `출석 체크 ${quest.target_count}일 달성`;
+  }
+  return `제휴처 ${quest.target_count}곳 방문`;
+}
+
+function QuestBoard({
+  client,
+  onGoPass,
+}: {
+  client: ReturnType<typeof useSeasonPassClient>;
+  onGoPass: () => void;
+}) {
+  const { userId, state, busy, checkIn } = client;
+  const season = state.season;
+  const quests = state.quests;
+  const [selectedId, setSelectedId] = useState(quests[0]?.id ?? "");
+
+  useEffect(() => {
+    if (!quests.some((quest) => quest.id === selectedId)) {
+      setSelectedId(quests[0]?.id ?? "");
+    }
+  }, [quests, selectedId]);
+
+  const selected = useMemo(
+    () => quests.find((quest) => quest.id === selectedId) ?? quests[0] ?? null,
+    [quests, selectedId],
+  );
+  const visitQuests = quests.filter((quest) => quest.quest_type !== "attendance");
+  const attendQuests = quests.filter((quest) => quest.quest_type === "attendance");
+
+  if (!season) return null;
+
+  return (
+    <div className="season-pass-quest">
+      <div className="season-pass-quest__chrome">
+        <h2>퀘스트 정보</h2>
+      </div>
+      <div className="season-pass-quest__layout">
+        <aside className="season-pass-quest__list">
+          {visitQuests.length > 0 ? (
+            <section>
+              <h3>제휴 방문 퀘스트</h3>
+              {visitQuests.map((quest) => (
+                <button
+                  key={quest.id}
+                  type="button"
+                  className={selected?.id === quest.id ? "is-active" : ""}
+                  onClick={() => setSelectedId(quest.id)}
+                >
+                  <span>{quest.title}</span>
+                  {quest.is_completed ? <em>CLEAR</em> : null}
+                </button>
+              ))}
+            </section>
+          ) : null}
+          <section>
+            <h3>출석 체크 퀘스트</h3>
+            <button
+              type="button"
+              className="season-pass-quest__attend"
+              disabled={!userId || state.attendedToday || busy !== null}
+              onClick={() => void checkIn()}
+            >
+              {state.attendedToday ? "오늘 출석 완료" : "오늘 출석 체크"}
+            </button>
+            {attendQuests.map((quest) => (
+              <button
+                key={quest.id}
+                type="button"
+                className={selected?.id === quest.id ? "is-active" : ""}
+                onClick={() => setSelectedId(quest.id)}
+              >
+                <span>{quest.title}</span>
+                {quest.is_completed ? <em>CLEAR</em> : null}
+              </button>
+            ))}
+          </section>
+          {quests.length === 0 ? <p className="season-pass-quest__empty">등록된 퀘스트가 없습니다.</p> : null}
+        </aside>
+        <section className="season-pass-quest__detail">
+          {selected ? (
+            <>
+              <header>
+                <h3>
+                  [{seasonPassQuestTypeLabel(selected.quest_type)}] {selected.title}
+                </h3>
+                <p className="season-pass-quest__dates">{formatQuestRange(season.starts_at, season.ends_at)}</p>
+                <p className="season-pass-quest__desc">
+                  {selected.description.trim() ||
+                    `${questObjective(selected)}하면 패스 EXP와 골드를 받을 수 있습니다.`}
+                </p>
+              </header>
+              <div className="season-pass-quest__status">
+                <span>진행 가능 상태</span>
+                <strong>{selected.is_completed ? "진행 완료" : "진행 중"}</strong>
+                <label>
+                  <input type="checkbox" checked={selected.is_completed} readOnly />
+                  {questObjective(selected)}
+                </label>
+              </div>
+              <div className="season-pass-quest__goal">
+                <h4>도전과제</h4>
+                <p>
+                  {questObjective(selected)} ({selected.progress}/{selected.target_count})
+                </p>
+                {selected.is_completed ? (
+                  <b>퀘스트를 완료하였습니다. 패스 EXP와 골드가 지급되었습니다.</b>
+                ) : (
+                  <b>목표를 채우면 보상이 자동으로 지급됩니다.</b>
+                )}
+              </div>
+              <div className="season-pass-quest__rewards">
+                <h4>보 상</h4>
+                <div className="season-pass-quest__slots">
+                  {selected.reward_exp > 0 ? (
+                    <div className="is-filled">
+                      <span>패스 EXP</span>
+                      <strong>{selected.reward_exp}</strong>
+                    </div>
+                  ) : (
+                    <div className="is-empty" />
+                  )}
+                  {selected.reward_gold > 0 ? (
+                    <div className="is-filled">
+                      {season.gold_icon_url ? <img src={season.gold_icon_url} alt="" /> : <span>골드</span>}
+                      <strong>{selected.reward_gold}</strong>
+                    </div>
+                  ) : (
+                    <div className="is-empty" />
+                  )}
+                  <div className="is-empty" />
+                  <div className="is-empty" />
+                </div>
+              </div>
+            </>
+          ) : (
+            <p className="season-pass-quest__empty">왼쪽에서 퀘스트를 선택해 주세요.</p>
+          )}
+          <div className="season-pass-quest__actions">
+            <button type="button" className="season-pass-quest__goto" onClick={onGoPass}>
+              시즌패스 바로 가기
+            </button>
+            <button type="button" className="season-pass-quest__ok" onClick={onGoPass}>
+              확인
+            </button>
+          </div>
+        </section>
+      </div>
     </div>
   );
 }

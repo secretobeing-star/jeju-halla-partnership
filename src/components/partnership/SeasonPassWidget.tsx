@@ -7,6 +7,7 @@ import {
 } from "@/lib/site-member-session";
 import type { SeasonPassTrack, SeasonPassWidgetState } from "@/lib/season-pass";
 import { seasonPassQuestTypeLabel } from "@/lib/season-pass";
+import { grantCardFrameUnlock } from "@/lib/student-card-frames";
 
 const EMPTY: SeasonPassWidgetState = {
   season: null,
@@ -81,12 +82,19 @@ export default function SeasonPassWidget() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, level, track }),
       });
-      const payload = (await response.json()) as { state?: SeasonPassWidgetState; error?: string };
+      const payload = (await response.json()) as {
+        state?: SeasonPassWidgetState;
+        error?: string;
+        frameId?: string | null;
+      };
       if (!response.ok) {
         throw new Error(payload.error || "수령에 실패했습니다.");
       }
       if (payload.state) {
         setState(payload.state);
+      }
+      if (payload.frameId) {
+        grantCardFrameUnlock(userId, payload.frameId, "season", { activate: false });
       }
       setMessage("보상을 수령했습니다.");
       window.dispatchEvent(new Event("site-frame-inventory-refresh"));
@@ -226,6 +234,9 @@ export default function SeasonPassWidget() {
           {state.quests.map((quest) => (
             <li key={quest.id}>
               {seasonPassQuestTypeLabel(quest.quest_type)} · {quest.title} ({quest.progress}/{quest.target_count})
+              {quest.reward_exp || quest.reward_gold
+                ? ` · 보상 패스 EXP ${quest.reward_exp}${quest.reward_gold ? ` / 골드 ${quest.reward_gold}` : ""}`
+                : ""}
               {quest.is_completed ? " 완료" : ""}
             </li>
           ))}
