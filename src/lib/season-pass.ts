@@ -32,8 +32,13 @@ export type Season = {
   attendance_exp: number;
   attendance_gold: number;
   premium_gold_price: number;
+  gold_shop_enabled: boolean;
   sort_order: number;
 };
+
+export function isGoldShopEnabled(season: Pick<Season, "gold_shop_enabled"> | null | undefined) {
+  return Boolean(season) && season?.gold_shop_enabled !== false;
+}
 
 export type RewardItem = {
   id: string;

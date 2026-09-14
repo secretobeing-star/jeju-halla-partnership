@@ -159,6 +159,32 @@ export default function SeasonPassAdminPanel({ onMessage }: SeasonPassAdminPanel
     }
   }
 
+  async function handleDeleteSeason() {
+    if (!selected) return;
+    const title = selected.title || selected.code || "이 시즌";
+    const confirmed = window.confirm(
+      selected.is_active
+        ? `"${title}"은(는) 현재 진행 중인 시즌입니다. 진행도·보상 기록까지 모두 삭제됩니다. 삭제할까요?`
+        : `"${title}" 시즌을 삭제할까요? 진행도·보상 기록도 함께 삭제됩니다.`,
+    );
+    if (!confirmed) return;
+
+    setSaving(true);
+    try {
+      await adminApiFetch(`/api/admin/season-pass?entity=season&id=${encodeURIComponent(selected.id)}`, {
+        method: "DELETE",
+      });
+      const remaining = seasons.filter((item) => item.id !== selected.id);
+      setSelectedId(remaining[0]?.id ?? null);
+      onMessage("시즌을 삭제했습니다.");
+      await loadAll();
+    } catch (error) {
+      onMessage(error instanceof Error ? error.message : "삭제 실패");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <AdminCollapsibleSection
@@ -316,6 +342,20 @@ export default function SeasonPassAdminPanel({ onMessage }: SeasonPassAdminPanel
                 }
               />
             </label>
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 sm:col-span-2">
+              <input
+                type="checkbox"
+                checked={selected.gold_shop_enabled !== false}
+                onChange={(e) =>
+                  setSeasons((prev) =>
+                    prev.map((item) =>
+                      item.id === selected.id ? { ...item, gold_shop_enabled: e.target.checked } : item,
+                    ),
+                  )
+                }
+              />
+              골드 상점 사용
+            </label>
             <label className="text-sm font-medium text-gray-700">
               출석 EXP / 골드
               <div className="mt-1 grid grid-cols-2 gap-2">
@@ -396,6 +436,7 @@ export default function SeasonPassAdminPanel({ onMessage }: SeasonPassAdminPanel
                   visit_exp: selected.visit_exp,
                   visit_gold: selected.visit_gold,
                   premium_gold_price: selected.premium_gold_price,
+                  gold_shop_enabled: selected.gold_shop_enabled !== false,
                   attendance_exp: selected.attendance_exp,
                   attendance_gold: selected.attendance_gold,
                   bg_image_url: selected.bg_image_url,
@@ -414,6 +455,14 @@ export default function SeasonPassAdminPanel({ onMessage }: SeasonPassAdminPanel
               className="rounded-lg border px-4 py-2 text-sm"
             >
               {selected.is_active ? "비활성화" : "이 시즌 활성화"}
+            </button>
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => void handleDeleteSeason()}
+              className="rounded-lg border border-red-200 px-4 py-2 text-sm text-red-600"
+            >
+              시즌 삭제
             </button>
           </div>
           <div className="mt-4 flex flex-wrap items-end gap-2">

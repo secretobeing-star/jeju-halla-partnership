@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { useAppBackHandler } from "@/lib/app-back-stack";
 import { getSiteMemberSession } from "@/lib/site-member-session";
 import { requestStudentLoginModal } from "@/lib/site-student-auth-settings";
+import { isGoldShopEnabled } from "@/lib/season-pass";
 import { useSeasonPassClient } from "@/hooks/useSeasonPassClient";
 
 function CoinIcon({ className = "h-5 w-5" }: { className?: string }) {
@@ -37,6 +38,7 @@ export default function GoldShopNavChip({ hideChip = false }: GoldShopNavChipPro
   const client = useSeasonPassClient();
   const price = client.state.season?.premium_gold_price ?? 0;
   const gold = client.state.progress?.gold ?? 0;
+  const shopEnabled = isGoldShopEnabled(client.state.season);
 
   useEffect(() => {
     setMounted(true);
@@ -46,6 +48,9 @@ export default function GoldShopNavChip({ hideChip = false }: GoldShopNavChipPro
     const id = getSiteMemberSession()?.student?.studentId?.trim() || "";
     if (!id) {
       requestStudentLoginModal();
+      return;
+    }
+    if (!isGoldShopEnabled(client.state.season)) {
       return;
     }
     setOpen(true);
@@ -108,7 +113,7 @@ export default function GoldShopNavChip({ hideChip = false }: GoldShopNavChipPro
 
   return (
     <>
-        {hideChip ? null : (
+      {hideChip || !shopEnabled ? null : (
         <div className="site-top-nav__link-item group relative site-top-nav__link-item--custom-visual">
           <button
             type="button"

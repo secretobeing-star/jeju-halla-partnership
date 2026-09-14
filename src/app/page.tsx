@@ -25,6 +25,7 @@ import GiftInboxNavChip from "@/components/GiftInboxNavChip";
 import FrameInventoryNavChip from "@/components/FrameInventoryNavChip";
 import SeasonPassNavChip from "@/components/SeasonPassNavChip";
 import GoldShopNavChip from "@/components/GoldShopNavChip";
+import { isGoldShopEnabled, type SeasonPassWidgetState } from "@/lib/season-pass";
 import SiteBrowserGuideBanner from "@/components/SiteBrowserGuideBanner";
 import SiteAppBackSettingsSync from "@/components/SiteAppBackSettingsSync";
 import SiteAppBackLoadingSplashSync from "@/components/SiteAppBackLoadingSplashSync";
@@ -125,7 +126,9 @@ import {
   isFrameInventoryNavHref,
   isGiftInboxNavHref,
   isGoldShopNavHref,
+  isGoldShopNavItem,
   isSeasonPassNavHref,
+  isSeasonPassNavItem,
   resolveSiteNavBrandLinkUrl,
   resolveSiteNavDisplayTitle,
 } from "@/lib/site-nav-links";
@@ -376,6 +379,7 @@ export default function HomePage() {
   const yearOptions = useMemo(() => getPartnerYearOptions(partners), [partners]);
   const activeNavLinks = useMemo(() => getActiveSiteNavLinks(settings), [settings]);
   const [memberStudentLoggedIn, setMemberStudentLoggedIn] = useState(false);
+  const [goldShopEnabled, setGoldShopEnabled] = useState(false);
   useEffect(() => {
     function syncMemberLogin() {
       setMemberStudentLoggedIn(
@@ -388,6 +392,29 @@ export default function HomePage() {
     return () => {
       window.removeEventListener(SITE_MEMBER_SESSION_EVENT, syncMemberLogin);
       window.removeEventListener("focus", syncMemberLogin);
+    };
+  }, []);
+  useEffect(() => {
+    let cancelled = false;
+    function loadGoldShopEnabled() {
+      void fetch("/api/season-pass")
+        .then((response) => response.json())
+        .then((payload: { state?: SeasonPassWidgetState }) => {
+          if (!cancelled) {
+            setGoldShopEnabled(isGoldShopEnabled(payload.state?.season ?? null));
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setGoldShopEnabled(false);
+          }
+        });
+    }
+    loadGoldShopEnabled();
+    window.addEventListener("site-season-pass-refresh", loadGoldShopEnabled);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("site-season-pass-refresh", loadGoldShopEnabled);
     };
   }, []);
 
@@ -413,33 +440,39 @@ export default function HomePage() {
   }, []);
 
   const visibleNavLinks = useMemo(() => {
-    if (memberStudentLoggedIn) {
-      return activeNavLinks;
+    const links = memberStudentLoggedIn
+      ? activeNavLinks
+      : activeNavLinks.filter(
+          (link) =>
+            !isGiftInboxNavHref(link.href) &&
+            !isFrameInventoryNavHref(link.href) &&
+            !isSeasonPassNavItem(link) &&
+            !isGoldShopNavItem(link),
+        );
+    if (goldShopEnabled) {
+      return links;
     }
-    return activeNavLinks.filter(
-      (link) =>
-        !isGiftInboxNavHref(link.href) &&
-        !isFrameInventoryNavHref(link.href) &&
-        !isSeasonPassNavHref(link.href) &&
-        !isGoldShopNavHref(link.href),
-    );
-  }, [activeNavLinks, memberStudentLoggedIn]);
+    return links.filter((link) => !isGoldShopNavItem(link));
+  }, [activeNavLinks, goldShopEnabled, memberStudentLoggedIn]);
   const activeDropdownLinks = useMemo(
     () => getActiveSiteNavDropdownLinks(settings),
     [settings],
   );
   const visibleDropdownLinks = useMemo(() => {
-    if (memberStudentLoggedIn) {
-      return activeDropdownLinks;
+    const links = memberStudentLoggedIn
+      ? activeDropdownLinks
+      : activeDropdownLinks.filter(
+          (link) =>
+            !isGiftInboxNavHref(link.href) &&
+            !isFrameInventoryNavHref(link.href) &&
+            !isSeasonPassNavItem(link) &&
+            !isGoldShopNavItem(link),
+        );
+    if (goldShopEnabled) {
+      return links;
     }
-    return activeDropdownLinks.filter(
-      (link) =>
-        !isGiftInboxNavHref(link.href) &&
-        !isFrameInventoryNavHref(link.href) &&
-        !isSeasonPassNavHref(link.href) &&
-        !isGoldShopNavHref(link.href),
-    );
-  }, [activeDropdownLinks, memberStudentLoggedIn]);
+    return links.filter((link) => !isGoldShopNavItem(link));
+  }, [activeDropdownLinks, goldShopEnabled, memberStudentLoggedIn]);
   const navSearchPlaceholder = useMemo(
     () => getSiteNavSearchPlaceholder(settings),
     [settings.site_nav_search_placeholder],
@@ -1012,9 +1045,11 @@ export default function HomePage() {
       return;
     }
     if (isGoldShopNavHref(href)) {
-      window.dispatchEvent(new Event("site-gold-shop-open"));
+      if (goldShopEnabled) {
+        window.dispatchEvent(new Event("site-gold-shop-open"));
+      }
     }
-  }, []);
+  }, [goldShopEnabled]);
 
   const navHasGiftInbox = useMemo(
     () =>
@@ -1031,14 +1066,15 @@ export default function HomePage() {
   const navHasSeasonPass = useMemo(
     () =>
       memberStudentLoggedIn &&
-      activeNavLinks.some((link) => isSeasonPassNavHref(link.href)),
+      activeNavLinks.some((link) => isSeasonPassNavItem(link)),
     [activeNavLinks, memberStudentLoggedIn],
   );
   const navHasGoldShop = useMemo(
     () =>
       memberStudentLoggedIn &&
-      activeNavLinks.some((link) => isGoldShopNavHref(link.href)),
-    [activeNavLinks, memberStudentLoggedIn],
+      goldShopEnabled &&
+      activeNavLinks.some((link) => isGoldShopNavItem(link)),
+    [activeNavLinks, goldShopEnabled, memberStudentLoggedIn],
   );
 
   const closeBoardPopup = useCallback(() => {
@@ -1656,8 +1692,8 @@ export default function HomePage() {
                 cardFrames={studentCardFrames}
                 hideChip={navHasFrameInventory}
               />
-              <SeasonPassNavChip hideChip={navHasSeasonPass} />
-              <GoldShopNavChip hideChip={navHasGoldShop} />
+              <SeasonPassNavChip hideChip={!memberStudentLoggedIn || navHasSeasonPass} />
+              <GoldShopNavChip hideChip={!memberStudentLoggedIn || !goldShopEnabled || navHasGoldShop} />
             </>
           }
         />

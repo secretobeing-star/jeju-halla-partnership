@@ -18,6 +18,7 @@ create table if not exists public.seasons (
   attendance_exp integer not null default 50,
   attendance_gold integer not null default 5,
   premium_gold_price integer not null default 0,
+  gold_shop_enabled boolean not null default true,
   sort_order integer not null default 0,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -61,6 +62,9 @@ create table if not exists public.user_season_progress (
 
 alter table public.seasons
   add column if not exists premium_gold_price integer not null default 0;
+
+alter table public.seasons
+  add column if not exists gold_shop_enabled boolean not null default true;
 
 create table if not exists public.reward_claims (
   id uuid primary key default gen_random_uuid(),

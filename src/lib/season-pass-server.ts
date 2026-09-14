@@ -35,6 +35,7 @@ function mapSeason(row: Record<string, unknown>): Season {
     attendance_exp: Math.max(0, Number(row.attendance_exp) || 0),
     attendance_gold: Math.max(0, Number(row.attendance_gold) || 0),
     premium_gold_price: Math.max(0, Number(row.premium_gold_price) || 0),
+    gold_shop_enabled: row.gold_shop_enabled !== false,
     sort_order: Number(row.sort_order) || 0,
   };
 }
@@ -589,6 +590,9 @@ export async function purchasePremiumPass(userIdRaw: string) {
   const state = await getSeasonPassState(userId);
   if (!state.season) {
     throw new Error("진행 중인 시즌이 없습니다.");
+  }
+  if (state.season.gold_shop_enabled === false) {
+    throw new Error("골드 상점이 비활성화되어 있습니다.");
   }
   if (state.isPremium) {
     throw new Error("이미 프리미엄 패스를 보유 중입니다.");

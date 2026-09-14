@@ -89,6 +89,7 @@ export async function POST(request: NextRequest) {
           attendance_exp: Math.max(0, Number(body.attendance_exp) || 50),
           attendance_gold: Math.max(0, Number(body.attendance_gold) || 5),
           premium_gold_price: Math.max(0, Number(body.premium_gold_price) || 0),
+          gold_shop_enabled: body.gold_shop_enabled !== false,
           sort_order: Number(body.sort_order) || 0,
         })
         .select("*")
@@ -218,10 +219,11 @@ export async function PATCH(request: NextRequest) {
         "attendance_exp",
         "attendance_gold",
         "premium_gold_price",
+        "gold_shop_enabled",
         "sort_order",
       ]) {
         if (body[key] !== undefined) {
-          patch[key] = body[key];
+          patch[key] = key === "gold_shop_enabled" ? Boolean(body[key]) : body[key];
         }
       }
       const { error } = await admin.from("seasons").update(patch).eq("id", id);

@@ -39,11 +39,23 @@ export function isFrameInventoryNavHref(href: string) {
 }
 
 export function isSeasonPassNavHref(href: string) {
-  return href.trim().toLowerCase() === SEASON_PASS_NAV_HREF;
+  const normalized = href.trim().toLowerCase();
+  return normalized === SEASON_PASS_NAV_HREF || normalized.endsWith("#season-pass");
 }
 
 export function isGoldShopNavHref(href: string) {
-  return href.trim().toLowerCase() === GOLD_SHOP_NAV_HREF;
+  const normalized = href.trim().toLowerCase();
+  return normalized === GOLD_SHOP_NAV_HREF || normalized.endsWith("#gold-shop");
+}
+
+export function isSeasonPassNavItem(item: Pick<SiteNavLinkItem, "href" | "label">) {
+  const label = item.label.replace(/\s+/g, "");
+  return isSeasonPassNavHref(item.href) || label.includes("시즌패스");
+}
+
+export function isGoldShopNavItem(item: Pick<SiteNavLinkItem, "href" | "label">) {
+  const label = item.label.replace(/\s+/g, "");
+  return isGoldShopNavHref(item.href) || label.includes("골드상점");
 }
 
 /** 상단 메뉴 클릭 시 페이지 이동 대신 앱 액션(모달)을 여는 링크 */
