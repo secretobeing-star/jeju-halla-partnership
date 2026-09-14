@@ -52,6 +52,15 @@ create table if not exists public.season_pass_levels (
   unique (season_id, level)
 );
 
+create table if not exists public.user_gold_wallet (
+  user_id text primary key,
+  gold integer not null default 0,
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists user_gold_wallet_user_idx
+  on public.user_gold_wallet (user_id);
+
 create table if not exists public.user_season_progress (
   id uuid primary key default gen_random_uuid(),
   user_id text not null,
@@ -161,6 +170,7 @@ alter table public.seasons enable row level security;
 alter table public.reward_items enable row level security;
 alter table public.season_pass_levels enable row level security;
 alter table public.user_season_progress enable row level security;
+alter table public.user_gold_wallet enable row level security;
 alter table public.reward_claims enable row level security;
 alter table public.quests enable row level security;
 alter table public.user_quest_logs enable row level security;

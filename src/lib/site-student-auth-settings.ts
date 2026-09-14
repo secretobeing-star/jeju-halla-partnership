@@ -9,6 +9,7 @@ export const DEFAULT_STUDENT_PENDING_MESSAGE =
   "신청이 접수되었습니다. 관리자 승인 후 학생증을 이용할 수 있습니다.";
 export const DEFAULT_STUDENT_SHEETS_LOG_TAB = "사용자_로그";
 export const DEFAULT_STUDENT_SHEETS_APPROVAL_TAB = "승인";
+export const DEFAULT_SEASON_PASS_SHEETS_TAB = "시즌패스_로그";
 
 export const SITE_STUDENT_NEED_LOGIN_EVENT = "site-student-need-login";
 export const SITE_STUDENT_AUTH_INTENT_KEY = "site-student-auth-intent";

@@ -26,6 +26,7 @@ GOOGLE_SHEET_WEBHOOK_URL=https://script.google.com/macros/s/배포ID/exec
 | `POST /api/submit` | 웹훅만 중계 |
 | `POST /api/student/apply` | 신청 + 웹훅 (`sheetName: 사용자_로그`, `status: 대기`) |
 | `POST /api/admin/student-logs/review` | 승인 시 웹훅 (`sheetName: 승인`, `status: 승인`) |
+| 시즌패스 출석/방문/보상/프리미엄/퀘스트 | `sheetName: 시즌패스_로그` 웹훅 + 시트 API 행 추가 |
 
 서버는 Apps Script로 `Content-Type: text/plain` + `JSON.stringify(payload)` POST합니다.
 
@@ -50,3 +51,30 @@ GOOGLE_SHEET_WEBHOOK_URL=https://script.google.com/macros/s/배포ID/exec
 | status | `승인` | `대기` |
 | image_url | 학생증 이미지 URL | 신청 사진 URL (없으면 `""`) |
 | remarks | 비고 (없으면 `""`) | 비고/커스텀필드 (없으면 `""`) |
+
+## 시즌패스 로그
+
+같은 스프레드시트에 **`시즌패스_로그`** 탭을 자동 생성합니다. (서비스 계정 시트 편집 권한이 있어야 합니다.)
+
+남기는 활동: 제휴 방문, 출석, 퀘스트 완료, 레벨 보상 수령, 프리미엄 구매.
+
+```json
+{
+  "type": "season_pass_log",
+  "sheetName": "시즌패스_로그",
+  "student_id": "20241234",
+  "name": "홍길동",
+  "status": "출석",
+  "image_url": "",
+  "department": "컴퓨터정보과",
+  "remarks": "2026 봄 시즌 | 출석일 2026-09-14",
+  "created_at": "2026-09-14T17:00:00.000Z",
+  "action": "attendance",
+  "season_title": "2026 봄 시즌",
+  "detail": "출석일 2026-09-14"
+}
+```
+
+시트 서비스 계정이 있으면 **시트 API로만** 행을 추가합니다. API가 없을 때만 Apps Script 웹훅을 씁니다.
+
+Apps Script에서 `type === "event_log"`만 처리 중이라면, API를 쓰지 않는 환경에서는 `season_pass_log` 또는 `sheetName === "시즌패스_로그"` 분기를 추가해 주세요.

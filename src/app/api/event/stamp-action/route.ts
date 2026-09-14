@@ -373,7 +373,13 @@ export async function POST(request: NextRequest) {
       .join(" / "),
   };
   void postPlainJsonWebhook({ ...webhookPayload });
-  const seasonVisit = await completeVisit({ userId, partnerId: placeId });
+  const seasonVisit = await completeVisit({
+    userId,
+    partnerId: placeId,
+    partnerName: partner?.name || placeName,
+    studentName: name,
+    department,
+  });
 
   return NextResponse.json({
     ok: true,

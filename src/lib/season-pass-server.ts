@@ -18,6 +18,7 @@ import {
   type UserSeasonProgress,
 } from "@/lib/season-pass";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
+import { logSeasonPassToSheets } from "@/lib/google-sheets-student";
 
 type AdminClient = NonNullable<ReturnType<typeof createSupabaseAdmin>>;
 
@@ -167,6 +168,9 @@ export async function getSeasonPassState(userId: string): Promise<SeasonPassWidg
       ]);
 
     const levels = ((levelRows ?? []) as Record<string, unknown>[]).map((row) => mapLevel(row, itemsById));
+    const walletGold = userId ? await loadWalletGold(admin, userId) : 0;
+    const seasonGold = Number((progressRow as { gold?: number } | null)?.gold) || 0;
+    const gold = walletGold ?? seasonGold;
     const progress = progressRow
       ? ({
           id: String((progressRow as { id: string }).id),
@@ -174,10 +178,19 @@ export async function getSeasonPassState(userId: string): Promise<SeasonPassWidg
           season_id: season.id,
           level: Number((progressRow as { level: number }).level) || 1,
           exp: Number((progressRow as { exp: number }).exp) || 0,
-          gold: Number((progressRow as { gold: number }).gold) || 0,
+          gold,
           is_premium: Boolean((progressRow as { is_premium?: boolean }).is_premium),
         } satisfies UserSeasonProgress)
-      : null;
+      : userId
+        ? ({
+            user_id: userId,
+            season_id: season.id,
+            level: 1,
+            exp: 0,
+            gold,
+            is_premium: false,
+          } satisfies UserSeasonProgress)
+        : null;
 
     const exp = progress?.exp ?? 0;
     const computed = computeLevelFromExp(exp, levels, season.exp_per_level);
@@ -307,6 +320,83 @@ async function upsertProgress(
   return data;
 }
 
+function isMissingGoldWallet(message: string) {
+  return (
+    message.includes("user_gold_wallet") ||
+    message.includes("schema cache") ||
+    message.includes("does not exist")
+  );
+}
+
+async function loadWalletGold(admin: AdminClient, userId: string): Promise<number | null> {
+  if (!userId) return 0;
+  const { data, error } = await admin
+    .from("user_gold_wallet")
+    .select("gold")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) {
+    if (isMissingGoldWallet(error.message)) return null;
+    throw error;
+  }
+
+  if (data) {
+    return Math.max(0, Number((data as { gold?: number }).gold) || 0);
+  }
+
+  const { data: seasonRows } = await admin.from("user_season_progress").select("gold").eq("user_id", userId);
+  const migrated = ((seasonRows ?? []) as { gold?: number }[]).reduce(
+    (sum, row) => sum + (Number(row.gold) || 0),
+    0,
+  );
+  const { error: insertError } = await admin.from("user_gold_wallet").upsert(
+    {
+      user_id: userId,
+      gold: migrated,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id" },
+  );
+  if (insertError) {
+    if (isMissingGoldWallet(insertError.message)) return null;
+    if (insertError.code !== "23505") throw insertError;
+  }
+  return migrated;
+}
+
+async function adjustGold(
+  admin: AdminClient,
+  userId: string,
+  season: Season,
+  delta: number,
+) {
+  const wallet = await loadWalletGold(admin, userId);
+  if (wallet != null) {
+    const next = Math.max(0, wallet + delta);
+    const { error } = await admin.from("user_gold_wallet").upsert(
+      {
+        user_id: userId,
+        gold: next,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id" },
+    );
+    if (error) throw error;
+    return next;
+  }
+
+  const { data: existing } = await admin
+    .from("user_season_progress")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("season_id", season.id)
+    .maybeSingle();
+  const next = Math.max(0, Number(existing?.gold || 0) + delta);
+  await upsertProgress(admin, userId, season, { gold: next });
+  return next;
+}
+
 function kstDateString(now = new Date()) {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Seoul",
@@ -363,9 +453,18 @@ async function bumpQuestsByType(
         .eq("user_id", userId)
         .eq("season_id", season.id)
         .maybeSingle();
+      const rewardExp = Number((quest as { reward_exp: number }).reward_exp) || 0;
+      const rewardGold = Number((quest as { reward_gold: number }).reward_gold) || 0;
       await upsertProgress(admin, userId, season, {
-        exp: Number(afterQuest?.exp || 0) + (Number((quest as { reward_exp: number }).reward_exp) || 0),
-        gold: Number(afterQuest?.gold || 0) + (Number((quest as { reward_gold: number }).reward_gold) || 0),
+        exp: Number(afterQuest?.exp || 0) + rewardExp,
+      });
+      await adjustGold(admin, userId, season, rewardGold);
+      const questTitle = String((quest as { title?: string }).title ?? "").trim() || "퀘스트";
+      logSeasonPassToSheets({
+        studentId: userId,
+        action: "quest",
+        seasonTitle: season.title,
+        detail: `${questTitle} (EXP ${rewardExp} / 골드 ${rewardGold})`,
       });
     }
   }
@@ -374,6 +473,9 @@ async function bumpQuestsByType(
 export async function completeVisit(input: {
   userId: string;
   partnerId: string;
+  partnerName?: string;
+  studentName?: string;
+  department?: string;
 }): Promise<{ applied: boolean; reason?: string; state?: SeasonPassWidgetState }> {
   const userId = input.userId.trim();
   const partnerId = String(input.partnerId ?? "").trim();
@@ -421,10 +523,24 @@ export async function completeVisit(input: {
 
     await upsertProgress(admin, userId, season, {
       exp: Number(existing?.exp || 0) + season.visit_exp,
-      gold: Number(existing?.gold || 0) + season.visit_gold,
     });
+    await adjustGold(admin, userId, season, season.visit_gold);
 
     await bumpQuestsByType(admin, userId, season, "partner_visit");
+
+    let partnerName = input.partnerName?.trim() || "";
+    if (!partnerName) {
+      const { data: partner } = await admin.from("partners").select("name").eq("id", partnerId).maybeSingle();
+      partnerName = String(partner?.name ?? "").trim();
+    }
+    logSeasonPassToSheets({
+      studentId: userId,
+      action: "visit",
+      seasonTitle: season.title,
+      detail: partnerName || partnerId,
+      name: input.studentName,
+      department: input.department,
+    });
 
     return { applied: true, state: await getSeasonPassState(userId) };
   } catch (error) {
@@ -488,10 +604,17 @@ export async function completeAttendance(userIdRaw: string): Promise<{
 
     await upsertProgress(admin, userId, season, {
       exp: Number(existing?.exp || 0) + season.attendance_exp,
-      gold: Number(existing?.gold || 0) + season.attendance_gold,
     });
+    await adjustGold(admin, userId, season, season.attendance_gold);
 
     await bumpQuestsByType(admin, userId, season, "attendance");
+
+    logSeasonPassToSheets({
+      studentId: userId,
+      action: "attendance",
+      seasonTitle: season.title,
+      detail: `출석일 ${attendedOn} (EXP ${season.attendance_exp} / 골드 ${season.attendance_gold})`,
+    });
 
     return { applied: true, state: await getSeasonPassState(userId) };
   } catch (error) {
@@ -542,17 +665,9 @@ async function grantRewardItem(admin: AdminClient, userId: string, seasonId: str
 
   if (item.item_type === "gold") {
     const amount = Math.max(0, Number(meta.gold_amount ?? meta.amount ?? 0));
-    const { data: progress } = await admin
-      .from("user_season_progress")
-      .select("*")
-      .eq("user_id", userId)
-      .eq("season_id", seasonId)
-      .maybeSingle();
     const seasonRow = await admin.from("seasons").select("*").eq("id", seasonId).maybeSingle();
     if (seasonRow.data) {
-      await upsertProgress(admin, userId, mapSeason(seasonRow.data as Record<string, unknown>), {
-        gold: Number(progress?.gold || 0) + amount,
-      });
+      await adjustGold(admin, userId, mapSeason(seasonRow.data as Record<string, unknown>), amount);
     }
   }
 
@@ -661,6 +776,13 @@ export async function claimSeasonReward(input: {
   }
 
   const frameId = await grantRewardItem(admin, userId, state.season.id, item);
+  const trackLabel = track === "premium" ? "프리미엄" : "무료";
+  logSeasonPassToSheets({
+    studentId: userId,
+    action: "claim",
+    seasonTitle: state.season.title,
+    detail: `LV ${level} ${trackLabel} · ${item.name}`,
+  });
   return { state: await getSeasonPassState(userId), frameId };
 }
 
@@ -696,10 +818,17 @@ export async function purchasePremiumPass(userIdRaw: string) {
     throw new Error("골드가 부족합니다.");
   }
 
+  await adjustGold(admin, userId, state.season, -price);
   await upsertProgress(admin, userId, state.season, {
     exp: Number(state.progress?.exp ?? 0),
-    gold: gold - price,
     is_premium: true,
+  });
+
+  logSeasonPassToSheets({
+    studentId: userId,
+    action: "premium",
+    seasonTitle: state.season.title,
+    detail: `골드 ${price} 사용`,
   });
 
   return getSeasonPassState(userId);
