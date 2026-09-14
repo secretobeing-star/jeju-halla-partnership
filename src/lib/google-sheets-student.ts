@@ -1155,7 +1155,7 @@ async function logSeasonPassToSheetsAsync(input: SeasonPassLogInput) {
   }
 
   const webhookResult = await postPlainJsonWebhook(webhookBody);
-  if (!webhookResult.ok && !("skipped" in webhookResult && webhookResult.skipped)) {
+  if (!webhookResult.ok && "error" in webhookResult) {
     console.error("season pass webhook failed:", webhookResult.error);
   }
 }
