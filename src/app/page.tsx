@@ -380,6 +380,7 @@ export default function HomePage() {
   const activeNavLinks = useMemo(() => getActiveSiteNavLinks(settings), [settings]);
   const [memberStudentLoggedIn, setMemberStudentLoggedIn] = useState(false);
   const [goldShopEnabled, setGoldShopEnabled] = useState(false);
+  const [seasonPassEnabled, setSeasonPassEnabled] = useState(false);
   useEffect(() => {
     function syncMemberLogin() {
       setMemberStudentLoggedIn(
@@ -401,11 +402,14 @@ export default function HomePage() {
         .then((response) => response.json())
         .then((payload: { state?: SeasonPassWidgetState }) => {
           if (!cancelled) {
-            setGoldShopEnabled(isGoldShopEnabled(payload.state?.season ?? null));
+            const season = payload.state?.season ?? null;
+            setSeasonPassEnabled(Boolean(season));
+            setGoldShopEnabled(isGoldShopEnabled(season));
           }
         })
         .catch(() => {
           if (!cancelled) {
+            setSeasonPassEnabled(false);
             setGoldShopEnabled(false);
           }
         });
@@ -449,11 +453,15 @@ export default function HomePage() {
             !isSeasonPassNavItem(link) &&
             !isGoldShopNavItem(link),
         );
-    if (goldShopEnabled) {
-      return links;
+    let next = links;
+    if (!seasonPassEnabled) {
+      next = next.filter((link) => !isSeasonPassNavItem(link));
     }
-    return links.filter((link) => !isGoldShopNavItem(link));
-  }, [activeNavLinks, goldShopEnabled, memberStudentLoggedIn]);
+    if (!goldShopEnabled) {
+      next = next.filter((link) => !isGoldShopNavItem(link));
+    }
+    return next;
+  }, [activeNavLinks, goldShopEnabled, memberStudentLoggedIn, seasonPassEnabled]);
   const activeDropdownLinks = useMemo(
     () => getActiveSiteNavDropdownLinks(settings),
     [settings],
@@ -468,11 +476,15 @@ export default function HomePage() {
             !isSeasonPassNavItem(link) &&
             !isGoldShopNavItem(link),
         );
-    if (goldShopEnabled) {
-      return links;
+    let next = links;
+    if (!seasonPassEnabled) {
+      next = next.filter((link) => !isSeasonPassNavItem(link));
     }
-    return links.filter((link) => !isGoldShopNavItem(link));
-  }, [activeDropdownLinks, goldShopEnabled, memberStudentLoggedIn]);
+    if (!goldShopEnabled) {
+      next = next.filter((link) => !isGoldShopNavItem(link));
+    }
+    return next;
+  }, [activeDropdownLinks, goldShopEnabled, memberStudentLoggedIn, seasonPassEnabled]);
   const navSearchPlaceholder = useMemo(
     () => getSiteNavSearchPlaceholder(settings),
     [settings.site_nav_search_placeholder],
@@ -1041,7 +1053,9 @@ export default function HomePage() {
       return;
     }
     if (isSeasonPassNavHref(href)) {
-      window.dispatchEvent(new Event("site-season-pass-open"));
+      if (seasonPassEnabled) {
+        window.dispatchEvent(new Event("site-season-pass-open"));
+      }
       return;
     }
     if (isGoldShopNavHref(href)) {
@@ -1049,7 +1063,7 @@ export default function HomePage() {
         window.dispatchEvent(new Event("site-gold-shop-open"));
       }
     }
-  }, [goldShopEnabled]);
+  }, [goldShopEnabled, seasonPassEnabled]);
 
   const navHasGiftInbox = useMemo(
     () =>
@@ -1062,19 +1076,6 @@ export default function HomePage() {
       memberStudentLoggedIn &&
       activeNavLinks.some((link) => isFrameInventoryNavHref(link.href)),
     [activeNavLinks, memberStudentLoggedIn],
-  );
-  const navHasSeasonPass = useMemo(
-    () =>
-      memberStudentLoggedIn &&
-      activeNavLinks.some((link) => isSeasonPassNavItem(link)),
-    [activeNavLinks, memberStudentLoggedIn],
-  );
-  const navHasGoldShop = useMemo(
-    () =>
-      memberStudentLoggedIn &&
-      goldShopEnabled &&
-      activeNavLinks.some((link) => isGoldShopNavItem(link)),
-    [activeNavLinks, goldShopEnabled, memberStudentLoggedIn],
   );
 
   const closeBoardPopup = useCallback(() => {
@@ -1692,8 +1693,8 @@ export default function HomePage() {
                 cardFrames={studentCardFrames}
                 hideChip={navHasFrameInventory}
               />
-              <SeasonPassNavChip hideChip={!memberStudentLoggedIn || navHasSeasonPass} />
-              <GoldShopNavChip hideChip={!memberStudentLoggedIn || !goldShopEnabled || navHasGoldShop} />
+              <SeasonPassNavChip hideChip />
+              <GoldShopNavChip hideChip />
             </>
           }
         />
