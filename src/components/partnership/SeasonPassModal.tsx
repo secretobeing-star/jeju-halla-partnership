@@ -344,7 +344,7 @@ function TrackRow({
   hideText: boolean;
   goldIconUrl?: string | null;
   checkImageUrl?: string | null;
-  onClaim: (level: number, track: SeasonPassTrack) => void | Promise<void>;
+  onClaim: (level: number, track: SeasonPassTrack) => void | Promise<unknown>;
 }) {
   const lastId = state.levels[state.levels.length - 1]?.id;
   return (
