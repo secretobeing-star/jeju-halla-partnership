@@ -36,6 +36,8 @@ export type Season = {
   attendance_exp: number;
   attendance_gold: number;
   premium_gold_price: number;
+  premium_original_price_gold: number;
+  premium_badge_label: string;
   gold_shop_enabled: boolean;
   sort_order: number;
 };

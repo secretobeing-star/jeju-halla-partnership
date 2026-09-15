@@ -45,6 +45,11 @@ function mapSeason(row: Record<string, unknown>): Season {
     attendance_exp: Math.max(0, Number(row.attendance_exp) || 0),
     attendance_gold: Math.max(0, Number(row.attendance_gold) || 0),
     premium_gold_price: Math.max(0, Number(row.premium_gold_price) || 0),
+    premium_original_price_gold: Math.max(0, Number(row.premium_original_price_gold) || 0),
+    premium_badge_label:
+      row.premium_badge_label === undefined || row.premium_badge_label === null
+        ? "인기"
+        : String(row.premium_badge_label).trim(),
     gold_shop_enabled: row.gold_shop_enabled !== false,
     sort_order: Number(row.sort_order) || 0,
   };
@@ -131,8 +136,8 @@ async function loadGoldShopItems(
       name: "프리미엄 패스",
       item_kind: "premium",
       price_gold: season.premium_gold_price,
-      original_price_gold: 0,
-      badge_label: "인기",
+      original_price_gold: season.premium_original_price_gold,
+      badge_label: season.premium_badge_label,
       stock: null,
       per_user_limit: 1,
       is_active: true,

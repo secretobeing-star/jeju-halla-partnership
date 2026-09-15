@@ -24,7 +24,7 @@
   position: absolute;
   top: 0.35rem;
   right: 0.4rem;
-  z-index: 2;
+  z-index: 3;
   width: 2rem;
   height: 2rem;
   border: 0;
@@ -34,6 +34,18 @@
   font-size: 1.4rem;
   line-height: 1;
   cursor: pointer;
+}
+
+.season-pass-kart.is-chrome-top {
+  padding-top: 2.55rem;
+}
+
+.season-pass-kart.is-chrome-top .season-pass-kart__tabs {
+  margin-top: 0;
+}
+
+.season-pass-kart.is-chrome-top .season-pass-kart__remain {
+  margin-right: 0.1rem;
 }
 
 .season-pass-kart {
@@ -879,6 +891,10 @@
   .season-pass-kart {
     max-height: min(88dvh, calc(100dvh - 1.2rem));
     padding: 0.5rem 0.5rem 0.65rem;
+  }
+
+  .season-pass-kart.is-chrome-top {
+    padding-top: 2.4rem;
   }
 
   .season-pass-kart__tabs {

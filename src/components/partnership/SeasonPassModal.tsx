@@ -111,7 +111,7 @@ export default function SeasonPassModalBody({
 
   return (
     <div
-      className={`season-pass-kart ${hideSeasonText ? "has-images" : ""}`}
+      className={`season-pass-kart ${hideSeasonText ? "has-images" : ""} ${tab !== "pass" ? "is-chrome-top" : ""}`}
       style={
         season.bg_image_url
           ? {

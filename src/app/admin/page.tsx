@@ -33,6 +33,7 @@ import AdminPermissionsPanel from "@/components/admin/AdminPermissionsPanel";
 import AdminSidebar, { readStoredAdminNav } from "@/components/admin/AdminSidebar";
 import PartnerListSettingsPanel from "@/components/admin/PartnerListSettingsPanel";
 import MapEventAdminPanel from "@/components/admin/MapEventAdminPanel";
+import GoldShopAdminPanel from "@/components/admin/GoldShopAdminPanel";
 import SeasonPassAdminPanel from "@/components/admin/SeasonPassAdminPanel";
 import Pagination from "@/components/Pagination";
 import SiteFeaturesApplier from "@/components/SiteFeaturesApplier";
@@ -3233,6 +3234,15 @@ export default function AdminPage() {
               <p className="text-sm text-emerald-700">{settingsMessage}</p>
             ) : null}
             <SeasonPassAdminPanel onMessage={setSettingsMessage} />
+          </div>
+        )}
+
+        {hasAdminNavAccess(adminAccess, "gold-shop") && activeNav === "gold-shop" && (
+          <div className="space-y-4">
+            {settingsMessage ? (
+              <p className="text-sm text-emerald-700">{settingsMessage}</p>
+            ) : null}
+            <GoldShopAdminPanel onMessage={setSettingsMessage} />
           </div>
         )}
 

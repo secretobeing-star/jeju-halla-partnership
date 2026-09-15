@@ -314,6 +314,8 @@ export async function PATCH(request: NextRequest) {
         "attendance_exp",
         "attendance_gold",
         "premium_gold_price",
+        "premium_original_price_gold",
+        "premium_badge_label",
         "gold_shop_enabled",
         "sort_order",
       ]) {
@@ -324,10 +326,15 @@ export async function PATCH(request: NextRequest) {
       const { error } = await admin.from("seasons").update(patch).eq("id", id);
       if (error) {
         const missing =
-          error.message.includes("gold_icon_url") || error.message.includes("claimed_check_image_url");
+          error.message.includes("gold_icon_url") ||
+          error.message.includes("claimed_check_image_url") ||
+          error.message.includes("premium_original_price_gold") ||
+          error.message.includes("premium_badge_label");
         if (missing) {
           delete patch.gold_icon_url;
           delete patch.claimed_check_image_url;
+          delete patch.premium_original_price_gold;
+          delete patch.premium_badge_label;
           const retry = await admin.from("seasons").update(patch).eq("id", id);
           if (retry.error) throw retry.error;
         } else {

@@ -22,6 +22,8 @@ create table if not exists public.seasons (
   attendance_exp integer not null default 50,
   attendance_gold integer not null default 5,
   premium_gold_price integer not null default 0,
+  premium_original_price_gold integer not null default 0,
+  premium_badge_label text not null default '인기',
   gold_shop_enabled boolean not null default true,
   sort_order integer not null default 0,
   created_at timestamptz not null default now(),
@@ -78,6 +80,12 @@ alter table public.seasons
 
 alter table public.seasons
   add column if not exists gold_shop_enabled boolean not null default true;
+
+alter table public.seasons
+  add column if not exists premium_original_price_gold integer not null default 0;
+
+alter table public.seasons
+  add column if not exists premium_badge_label text not null default '인기';
 
 alter table public.seasons
   add column if not exists free_pass_image_url text;

@@ -132,6 +132,7 @@ export const ADMIN_NAV_GROUPS: ReadonlyArray<{
       { kind: "item", key: "partner-display", permission: "partners", label: "목록·지도·정렬" },
       { kind: "item", key: "map-events", permission: "partners", label: "지도 이벤트" },
       { kind: "item", key: "season-pass", permission: "partners", label: "시즌패스" },
+      { kind: "item", key: "gold-shop", permission: "partners", label: "골드상점" },
     ],
   },
   {
@@ -191,6 +192,7 @@ export type AdminNavKey =
   | "partner-display"
   | "map-events"
   | "season-pass"
+  | "gold-shop"
   | "boards"
   | "board-settings"
   | "posts"
