@@ -336,6 +336,30 @@ export default function GoldShopAdminPanel({ onMessage }: GoldShopAdminPanelProp
     }
   }
 
+  async function addShopItem() {
+    if (!selected) return;
+    setSavingKey("add");
+    try {
+      await adminApiFetch("/api/admin/season-pass", {
+        method: "POST",
+        body: JSON.stringify({
+          entity: "shop_item",
+          season_id: selected.id,
+          name: "새 상품",
+          price_gold: 0,
+          per_user_limit: 1,
+          is_active: true,
+        }),
+      });
+      onMessage("물품을 추가했습니다.");
+      await loadAll();
+    } catch (error) {
+      onMessage(error instanceof Error ? error.message : "추가에 실패했습니다.");
+    } finally {
+      setSavingKey(null);
+    }
+  }
+
   async function removeRow(row: CatalogRow) {
     if (!row.shopItemId) return;
     setSavingKey(row.key);
@@ -344,7 +368,7 @@ export default function GoldShopAdminPanel({ onMessage }: GoldShopAdminPanelProp
         `/api/admin/season-pass?entity=shop_item&id=${encodeURIComponent(row.shopItemId)}`,
         { method: "DELETE" },
       );
-      onMessage("상점에서 내렸습니다.");
+      onMessage("물품을 삭제했습니다.");
       await loadAll();
     } catch (error) {
       onMessage(error instanceof Error ? error.message : "삭제에 실패했습니다.");
@@ -355,10 +379,7 @@ export default function GoldShopAdminPanel({ onMessage }: GoldShopAdminPanelProp
 
   return (
     <div className="space-y-6">
-      <AdminCollapsibleSection
-        title="골드 상점"
-        description="시즌패스를 활성화하지 않아도 전체 코스튬·쿠폰을 등록하고 판매할 수 있습니다. 테이블이 없으면 supabase/season-pass.sql 을 실행하세요."
-      >
+      <AdminCollapsibleSection title="골드 상점">
         <div className="flex flex-wrap gap-2">
           {seasons.map((season) => (
             <button
@@ -407,7 +428,19 @@ export default function GoldShopAdminPanel({ onMessage }: GoldShopAdminPanelProp
       ) : null}
 
       {selected ? (
-        <AdminCollapsibleSection title="판매 상품" description="미등록 코스튬·쿠폰은 가격을 넣고 등록하면 상점에 올라갑니다.">
+        <AdminCollapsibleSection
+          title="판매 상품"
+          headerActions={
+            <button
+              type="button"
+              disabled={!selected || savingKey === "add"}
+              className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100"
+              onClick={() => void addShopItem()}
+            >
+              + 물품 추가
+            </button>
+          }
+        >
           <div className="mb-3 flex flex-wrap gap-2">
             {(
               [
@@ -441,6 +474,29 @@ export default function GoldShopAdminPanel({ onMessage }: GoldShopAdminPanelProp
                     disabled={row.source === "premium"}
                     onChange={(e) => updateRow(row.key, { name: e.target.value })}
                   />
+                  {row.source !== "premium" ? (
+                    <select
+                      className="mt-1 w-full rounded border px-2 py-1 text-sm text-gray-900"
+                      value={row.rewardItemId ?? ""}
+                      onChange={(e) => {
+                        const reward = items.find((item) => item.id === e.target.value);
+                        updateRow(row.key, {
+                          rewardItemId: e.target.value || null,
+                          kind: reward?.item_type === "coupon" ? "coupon" : "costume",
+                          name: row.name === "새 상품" && reward ? reward.name : row.name,
+                        });
+                      }}
+                    >
+                      <option value="">보상 아이템 선택</option>
+                      {items
+                        .filter((item) => item.item_type !== "gold")
+                        .map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {item.name} ({item.item_type === "coupon" ? "쿠폰" : "코스튬"})
+                          </option>
+                        ))}
+                    </select>
+                  ) : null}
                 </div>
                 <label className="text-xs text-gray-500">
                   판매가
@@ -524,7 +580,7 @@ export default function GoldShopAdminPanel({ onMessage }: GoldShopAdminPanelProp
                       className="text-sm text-red-600"
                       onClick={() => void removeRow(row)}
                     >
-                      내리기
+                      삭제
                     </button>
                   ) : null}
                 </div>
