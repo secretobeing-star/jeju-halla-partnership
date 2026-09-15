@@ -747,12 +747,6 @@
   cursor: default;
   opacity: 0.45;
 }
-  padding: 0 0.3rem 0.28rem;
-  color: #8a3b1d;
-  font-size: 0.68rem;
-  font-weight: 800;
-  text-align: center;
-}
 
 .season-pass-quest__detail {
   display: flex;
