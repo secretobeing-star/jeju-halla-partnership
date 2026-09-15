@@ -193,4 +193,48 @@ drop policy if exists "quests_public_read" on public.quests;
 create policy "quests_public_read"
   on public.quests for select to anon, authenticated using (true);
 
+create table if not exists public.gold_shop_items (
+  id uuid primary key default gen_random_uuid(),
+  season_id uuid not null references public.seasons(id) on delete cascade,
+  reward_item_id uuid references public.reward_items(id) on delete set null,
+  name text not null default '',
+  price_gold integer not null default 0,
+  original_price_gold integer not null default 0,
+  badge_label text not null default '',
+  stock integer,
+  per_user_limit integer not null default 1,
+  is_active boolean not null default true,
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.gold_shop_purchases (
+  id uuid primary key default gen_random_uuid(),
+  user_id text not null,
+  shop_item_id uuid not null references public.gold_shop_items(id) on delete cascade,
+  season_id uuid not null references public.seasons(id) on delete cascade,
+  gold_spent integer not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists gold_shop_items_season_idx
+  on public.gold_shop_items (season_id, is_active, sort_order);
+
+create index if not exists gold_shop_purchases_user_idx
+  on public.gold_shop_purchases (user_id, shop_item_id);
+
+alter table public.gold_shop_items
+  add column if not exists original_price_gold integer not null default 0;
+
+alter table public.gold_shop_items
+  add column if not exists badge_label text not null default '';
+
+alter table public.gold_shop_items enable row level security;
+alter table public.gold_shop_purchases enable row level security;
+
+drop policy if exists "gold_shop_items_public_read" on public.gold_shop_items;
+create policy "gold_shop_items_public_read"
+  on public.gold_shop_items for select to anon, authenticated using (true);
+
 notify pgrst, 'reload schema';

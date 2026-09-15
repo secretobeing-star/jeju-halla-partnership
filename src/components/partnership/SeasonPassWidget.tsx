@@ -22,6 +22,7 @@ const EMPTY: SeasonPassWidgetState = {
   expIntoLevel: 0,
   expForLevel: 1000,
   isPremium: false,
+  shopItems: [],
 };
 
 export default function SeasonPassWidget() {

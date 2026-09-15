@@ -51,6 +51,7 @@ export const EMPTY_SEASON_PASS_STATE: SeasonPassWidgetState = {
   expIntoLevel: 0,
   expForLevel: 1000,
   isPremium: false,
+  shopItems: [],
 };
 
 export function useSeasonPassClient() {
@@ -103,14 +104,27 @@ export function useSeasonPassClient() {
     return Math.min(100, Math.round((state.expIntoLevel / state.expForLevel) * 100));
   }, [state.expForLevel, state.expIntoLevel]);
 
+  function openClaimNotice(title: string, body: string) {
+    setMessage("");
+    setClaimPopup({
+      title,
+      body,
+      items: [],
+      gifted: false,
+    });
+  }
+
   async function claim(
     level: number,
     track: SeasonPassTrack,
     options?: { silent?: boolean; reward?: RewardItem | null },
-  ): Promise<SeasonPassClaimPopupItem | null> {
+  ): Promise<{ item: SeasonPassClaimPopupItem | null; error?: string }> {
     if (!userId) {
-      setMessage("로그인 후 보상을 받을 수 있습니다.");
-      return null;
+      const error = "로그인 후 보상을 받을 수 있습니다.";
+      if (!options?.silent) {
+        openClaimNotice("보상을 받을 수 없습니다", error);
+      }
+      return { item: null, error };
     }
     setBusy(`${level}-${track}`);
     setMessage("");
@@ -159,10 +173,13 @@ export function useSeasonPassClient() {
           gifted,
         });
       }
-      return preview;
+      return { item: preview };
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "수령에 실패했습니다.");
-      return null;
+      const text = error instanceof Error ? error.message : "수령에 실패했습니다.";
+      if (!options?.silent) {
+        openClaimNotice("보상을 받지 못했습니다", text);
+      }
+      return { item: null, error: text };
     } finally {
       setBusy(null);
     }
@@ -170,7 +187,7 @@ export function useSeasonPassClient() {
 
   async function claimAll(track: SeasonPassTrack) {
     if (!userId) {
-      setMessage("로그인 후 보상을 받을 수 있습니다.");
+      openClaimNotice("보상을 받을 수 없습니다", "로그인 후 보상을 받을 수 있습니다.");
       return;
     }
     const pending = state.levels.filter((level) => {
@@ -181,16 +198,27 @@ export function useSeasonPassClient() {
       return !state.claims.some((claim) => claim.level === level.level && claim.track === track);
     });
     if (pending.length === 0) {
-      setMessage("받을 보상이 없습니다.");
+      openClaimNotice(
+        "받을 수 있는 보상이 없습니다",
+        track === "premium" && !state.isPremium
+          ? "프리미엄 패스가 있어야 받을 수 있습니다."
+          : "아직 받을 수 있는 보상이 없거나 이미 모두 받았습니다.",
+      );
       return;
     }
     const collected: SeasonPassClaimPopupItem[] = [];
+    let lastError = "";
     for (const level of pending) {
       const reward = track === "premium" ? level.premium_reward : level.free_reward;
-      const item = await claim(level.level, track, { silent: true, reward });
-      if (item) collected.push(item);
+      const result = await claim(level.level, track, { silent: true, reward });
+      if (result.item) {
+        collected.push(result.item);
+      } else if (result.error) {
+        lastError = result.error;
+      }
     }
     if (collected.length === 0) {
+      openClaimNotice("보상을 받지 못했습니다", lastError || "보상을 수령하지 못했습니다.");
       return;
     }
     const gifted = collected.some((item) => item.gifted);
@@ -262,6 +290,60 @@ export function useSeasonPassClient() {
     }
   }
 
+  async function buyShopItem(shopItemId: string) {
+    if (!userId) {
+      openClaimNotice("구매할 수 없습니다", "로그인 후 구매할 수 있습니다.");
+      return;
+    }
+    setBusy(`shop-${shopItemId}`);
+    setMessage("");
+    try {
+      const response = await fetch("/api/season-pass/shop-buy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, shopItemId }),
+      });
+      const payload = (await response.json()) as {
+        state?: SeasonPassWidgetState;
+        error?: string;
+        gifted?: boolean;
+        name?: string;
+      };
+      if (!response.ok) {
+        throw new Error(payload.error || "구매에 실패했습니다.");
+      }
+      if (payload.state) {
+        setState(payload.state);
+      }
+      const gifted = Boolean(payload.gifted);
+      const name = payload.name?.trim() || "상품";
+      if (gifted) {
+        window.dispatchEvent(new Event("site-gift-inbox-refresh"));
+      }
+      window.dispatchEvent(new Event("site-season-pass-refresh"));
+      setClaimPopup({
+        title: "구매했습니다",
+        body: gifted
+          ? `${name}을(를) 선물함으로 보냈습니다. 선물함에서 받아 주세요.`
+          : `${name}을(를) 구매했습니다.`,
+        items: [
+          {
+            name,
+            imageUrl:
+              state.shopItems.find((item) => item.id === shopItemId)?.reward?.image_url ||
+              null,
+            gifted,
+          },
+        ],
+        gifted,
+      });
+    } catch (error) {
+      openClaimNotice("구매하지 못했습니다", error instanceof Error ? error.message : "구매에 실패했습니다.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return {
     userId,
     state,
@@ -274,6 +356,7 @@ export function useSeasonPassClient() {
     claimAll,
     checkIn,
     buyPremium,
+    buyShopItem,
     claimPopup,
     clearClaimPopup: () => setClaimPopup(null),
   };

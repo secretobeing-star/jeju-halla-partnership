@@ -258,7 +258,7 @@ export type EventLogWebhookPayload = {
   reward_name: string;
 };
 
-export type SeasonPassSheetAction = "visit" | "attendance" | "quest" | "claim" | "premium";
+export type SeasonPassSheetAction = "visit" | "attendance" | "quest" | "claim" | "premium" | "shop";
 
 const SEASON_PASS_ACTION_LABEL: Record<SeasonPassSheetAction, string> = {
   visit: "제휴 방문",
@@ -266,6 +266,7 @@ const SEASON_PASS_ACTION_LABEL: Record<SeasonPassSheetAction, string> = {
   quest: "퀘스트 완료",
   claim: "보상 수령",
   premium: "프리미엄 구매",
+  shop: "골드 상점",
 };
 
 export type SeasonPassLogInput = {

@@ -5,7 +5,7 @@ import AdminCollapsibleSection from "@/components/admin/AdminCollapsibleSection"
 import { adminApiFetch, getAdminAccessToken } from "@/lib/admin-api";
 import { fromDatetimeLocalValue, toDatetimeLocalValue } from "@/lib/site-events";
 import { getStorageErrorMessage } from "@/lib/storage";
-import type { RewardItem, Season, SeasonPassLevel, SeasonQuest } from "@/lib/season-pass";
+import type { GoldShopItem, RewardItem, Season, SeasonPassLevel, SeasonQuest } from "@/lib/season-pass";
 import { asSeasonPassQuestType, seasonPassQuestTypeLabel } from "@/lib/season-pass";
 import type { PublicCardFrameItem } from "@/lib/student-card-frames";
 
@@ -59,6 +59,7 @@ export default function SeasonPassAdminPanel({ onMessage }: SeasonPassAdminPanel
   const [items, setItems] = useState<RewardItem[]>([]);
   const [levels, setLevels] = useState<SeasonPassLevel[]>([]);
   const [quests, setQuests] = useState<SeasonQuest[]>([]);
+  const [shopItems, setShopItems] = useState<GoldShopItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploadingKey, setUploadingKey] = useState<string | null>(null);
@@ -77,6 +78,10 @@ export default function SeasonPassAdminPanel({ onMessage }: SeasonPassAdminPanel
     () => quests.filter((item) => item.season_id === selectedId),
     [quests, selectedId],
   );
+  const seasonShopItems = useMemo(
+    () => shopItems.filter((item) => item.season_id === selectedId).sort((a, b) => a.sort_order - b.sort_order),
+    [shopItems, selectedId],
+  );
 
   const loadAll = useCallback(async () => {
     try {
@@ -85,6 +90,7 @@ export default function SeasonPassAdminPanel({ onMessage }: SeasonPassAdminPanel
         items?: RewardItem[];
         levels?: SeasonPassLevel[];
         quests?: SeasonQuest[];
+        shopItems?: GoldShopItem[];
         error?: string;
       };
       if (payload.error) throw new Error(payload.error);
@@ -92,6 +98,7 @@ export default function SeasonPassAdminPanel({ onMessage }: SeasonPassAdminPanel
       setItems((payload.items ?? []) as RewardItem[]);
       setLevels(payload.levels ?? []);
       setQuests(payload.quests ?? []);
+      setShopItems((payload.shopItems ?? []) as GoldShopItem[]);
       setSelectedId((current) => current ?? payload.seasons?.[0]?.id ?? null);
       const framesPayload = (await fetch("/api/student/frames")
         .then((res) => res.json())
@@ -578,6 +585,188 @@ export default function SeasonPassAdminPanel({ onMessage }: SeasonPassAdminPanel
               }}
             >
               지급
+            </button>
+          </div>
+        </AdminCollapsibleSection>
+      ) : null}
+
+      {selected ? (
+        <AdminCollapsibleSection
+          title="골드 상점 물품"
+          description="시즌패스 골드 상점 탭에서 판매할 코스튬·쿠폰을 등록하세요. 프리미엄 패스는 위 시즌 설정 가격을 사용합니다. 테이블이 없으면 supabase/season-pass.sql 을 실행하세요."
+        >
+          <div className="space-y-3">
+            {seasonShopItems.map((item) => (
+              <div key={item.id} className="grid gap-2 rounded-xl border p-3 sm:grid-cols-7">
+                <input
+                  className="rounded border px-2 py-1 text-sm"
+                  placeholder="상품명"
+                  value={item.name}
+                  onChange={(e) =>
+                    setShopItems((prev) =>
+                      prev.map((row) => (row.id === item.id ? { ...row, name: e.target.value } : row)),
+                    )
+                  }
+                />
+                <select
+                  className="rounded border px-2 py-1 text-sm"
+                  value={item.reward_item_id ?? ""}
+                  onChange={(e) =>
+                    setShopItems((prev) =>
+                      prev.map((row) =>
+                        row.id === item.id ? { ...row, reward_item_id: e.target.value || null } : row,
+                      ),
+                    )
+                  }
+                >
+                  <option value="">보상 아이템 선택</option>
+                  {items
+                    .filter((reward) => reward.item_type !== "gold")
+                    .map((reward) => (
+                      <option key={reward.id} value={reward.id}>
+                        {reward.name} ({reward.item_type === "coupon" ? "쿠폰" : "코스튬"})
+                      </option>
+                    ))}
+                </select>
+                <label className="text-xs text-gray-500">
+                  판매가(골드)
+                  <input
+                    type="number"
+                    min={0}
+                    className="mt-1 w-full rounded border px-2 py-1 text-sm"
+                    value={item.price_gold}
+                    onChange={(e) =>
+                      setShopItems((prev) =>
+                        prev.map((row) =>
+                          row.id === item.id ? { ...row, price_gold: Number(e.target.value) || 0 } : row,
+                        ),
+                      )
+                    }
+                  />
+                </label>
+                <label className="text-xs text-gray-500">
+                  원가(할인 표시용)
+                  <input
+                    type="number"
+                    min={0}
+                    className="mt-1 w-full rounded border px-2 py-1 text-sm"
+                    value={item.original_price_gold ?? 0}
+                    onChange={(e) =>
+                      setShopItems((prev) =>
+                        prev.map((row) =>
+                          row.id === item.id
+                            ? { ...row, original_price_gold: Number(e.target.value) || 0 }
+                            : row,
+                        ),
+                      )
+                    }
+                  />
+                </label>
+                <label className="text-xs text-gray-500">
+                  뱃지(인기/NEW)
+                  <input
+                    className="mt-1 w-full rounded border px-2 py-1 text-sm"
+                    value={item.badge_label ?? ""}
+                    onChange={(e) =>
+                      setShopItems((prev) =>
+                        prev.map((row) => (row.id === item.id ? { ...row, badge_label: e.target.value } : row)),
+                      )
+                    }
+                  />
+                </label>
+                <label className="text-xs text-gray-500">
+                  재고(비우면 무제한)
+                  <input
+                    type="number"
+                    min={0}
+                    className="mt-1 w-full rounded border px-2 py-1 text-sm"
+                    value={item.stock ?? ""}
+                    onChange={(e) =>
+                      setShopItems((prev) =>
+                        prev.map((row) =>
+                          row.id === item.id
+                            ? { ...row, stock: e.target.value === "" ? null : Number(e.target.value) || 0 }
+                            : row,
+                        ),
+                      )
+                    }
+                  />
+                </label>
+                <label className="text-xs text-gray-500">
+                  1인 구매 한도(0=무제한)
+                  <input
+                    type="number"
+                    min={0}
+                    className="mt-1 w-full rounded border px-2 py-1 text-sm"
+                    value={item.per_user_limit}
+                    onChange={(e) =>
+                      setShopItems((prev) =>
+                        prev.map((row) =>
+                          row.id === item.id ? { ...row, per_user_limit: Number(e.target.value) || 0 } : row,
+                        ),
+                      )
+                    }
+                  />
+                </label>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    className="text-sm text-emerald-700"
+                    onClick={async () => {
+                      await adminApiFetch("/api/admin/season-pass", {
+                        method: "PATCH",
+                        body: JSON.stringify({
+                          entity: "shop_item",
+                          id: item.id,
+                          name: item.name,
+                          reward_item_id: item.reward_item_id,
+                          price_gold: item.price_gold,
+                          original_price_gold: item.original_price_gold ?? 0,
+                          badge_label: item.badge_label ?? "",
+                          stock: item.stock,
+                          per_user_limit: item.per_user_limit,
+                          is_active: item.is_active,
+                        }),
+                      });
+                      onMessage("상점 상품을 저장했습니다.");
+                    }}
+                  >
+                    저장
+                  </button>
+                  <button
+                    type="button"
+                    className="text-sm text-red-600"
+                    onClick={async () => {
+                      await adminApiFetch(
+                        `/api/admin/season-pass?entity=shop_item&id=${encodeURIComponent(item.id)}`,
+                        { method: "DELETE" },
+                      );
+                      await loadAll();
+                    }}
+                  >
+                    삭제
+                  </button>
+                </div>
+              </div>
+            ))}
+            <button
+              type="button"
+              className="rounded-lg border px-3 py-2 text-sm"
+              onClick={async () => {
+                await adminApiFetch("/api/admin/season-pass", {
+                  method: "POST",
+                  body: JSON.stringify({
+                    entity: "shop_item",
+                    season_id: selected.id,
+                    name: "새 상품",
+                    price_gold: 0,
+                    per_user_limit: 1,
+                  }),
+                });
+                await loadAll();
+              }}
+            >
+              + 상점 상품 추가
             </button>
           </div>
         </AdminCollapsibleSection>

@@ -1,8 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { createPortal } from "react-dom";
-import { useAppBackHandler } from "@/lib/app-back-stack";
 import { getSiteMemberSession } from "@/lib/site-member-session";
 import { requestStudentLoginModal } from "@/lib/site-student-auth-settings";
 import { isGoldShopEnabled } from "@/lib/season-pass";
@@ -33,16 +31,8 @@ type GoldShopNavChipProps = {
 };
 
 export default function GoldShopNavChip({ hideChip = false }: GoldShopNavChipProps) {
-  const [open, setOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
   const client = useSeasonPassClient();
-  const price = client.state.season?.premium_gold_price ?? 0;
-  const gold = client.state.progress?.gold ?? 0;
   const shopEnabled = isGoldShopEnabled(client.state.season);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const openModal = useCallback(() => {
     const id = getSiteMemberSession()?.student?.studentId?.trim() || "";
@@ -53,84 +43,32 @@ export default function GoldShopNavChip({ hideChip = false }: GoldShopNavChipPro
     if (!isGoldShopEnabled(client.state.season)) {
       return;
     }
-    setOpen(true);
-    void client.load();
-  }, [client]);
+    window.dispatchEvent(new Event("site-gold-shop-open"));
+  }, [client.state.season]);
 
   useEffect(() => {
-    function onOpen() {
-      openModal();
-    }
-    window.addEventListener("site-gold-shop-open", onOpen);
-    return () => window.removeEventListener("site-gold-shop-open", onOpen);
-  }, [openModal]);
+    void client.load();
+  }, [client.load]);
 
-  const close = useCallback(() => setOpen(false), []);
-  useAppBackHandler(open, close, "gold-shop-modal");
-
-  const modal =
-    mounted && open
-      ? createPortal(
-          <div className="site-event-overlay" onClick={close}>
-            <div
-              className="site-event-dialog gold-shop-dialog"
-              role="dialog"
-              aria-modal="true"
-              aria-label="골드 상점"
-              onClick={(event) => event.stopPropagation()}
-            >
-              <div className="site-event-dialog__header">
-                <h2 className="site-event-dialog__title">골드 상점</h2>
-                <button type="button" className="site-event-close" onClick={close} aria-label="닫기">
-                  ×
-                </button>
-              </div>
-              <div className="site-event-tab-body">
-                <p className="gold-shop__balance">보유 골드 {gold}</p>
-                <div className="gold-shop__card">
-                  <p className="gold-shop__name">프리미엄 패스</p>
-                  <p className="gold-shop__price">{price > 0 ? `${price} 골드` : "판매가가 아직 없습니다"}</p>
-                  {client.state.isPremium ? (
-                    <p className="gold-shop__owned">보유 중</p>
-                  ) : (
-                    <button
-                      type="button"
-                      className="gold-shop__buy"
-                      disabled={client.busy !== null || price <= 0}
-                      onClick={() => void client.buyPremium()}
-                    >
-                      구입
-                    </button>
-                  )}
-                </div>
-                {client.message ? <p className="gold-shop__msg">{client.message}</p> : null}
-              </div>
-            </div>
-          </div>,
-          document.body,
-        )
-      : null;
+  if (hideChip || !shopEnabled) {
+    return null;
+  }
 
   return (
-    <>
-      {hideChip || !shopEnabled ? null : (
-        <div className="site-top-nav__link-item group relative site-top-nav__link-item--custom-visual">
-          <button
-            type="button"
-            className="site-top-nav__link site-events-nav-chip inline-flex items-center gap-2.5"
-            onClick={openModal}
-            aria-label="골드상점"
-          >
-            <span className="site-top-nav__link-icon-wrap">
-              <span className="site-top-nav__link-icon-fallback text-amber-700">
-                <CoinIcon />
-              </span>
-            </span>
-            <span className="site-top-nav__link-label site-top-nav__link-label--sr-only">골드상점</span>
-          </button>
-        </div>
-      )}
-      {modal}
-    </>
+    <div className="site-top-nav__link-item group relative site-top-nav__link-item--custom-visual">
+      <button
+        type="button"
+        className="site-top-nav__link site-events-nav-chip inline-flex items-center gap-2.5"
+        onClick={openModal}
+        aria-label="골드상점"
+      >
+        <span className="site-top-nav__link-icon-wrap">
+          <span className="site-top-nav__link-icon-fallback text-amber-700">
+            <CoinIcon />
+          </span>
+        </span>
+        <span className="site-top-nav__link-label site-top-nav__link-label--sr-only">골드상점</span>
+      </button>
+    </div>
   );
 }

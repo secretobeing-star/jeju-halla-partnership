@@ -34,35 +34,40 @@ type SeasonPassNavChipProps = {
 export default function SeasonPassNavChip({ hideChip = false }: SeasonPassNavChipProps) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [tab, setTab] = useState<"pass" | "quest">("pass");
+  const [tab, setTab] = useState<"pass" | "quest" | "shop">("pass");
   const client = useSeasonPassClient();
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  const openModal = useCallback(() => {
+  const openModal = useCallback((nextTab: "pass" | "quest" | "shop" = "pass") => {
     const id = getSiteMemberSession()?.student?.studentId?.trim() || "";
     if (!id) {
       requestStudentLoginModal();
       return;
     }
-    setTab("pass");
+    setTab(nextTab);
     setOpen(true);
     void client.load();
   }, [client]);
 
   useEffect(() => {
     function onOpen() {
-      openModal();
+      openModal("pass");
+    }
+    function onShopOpen() {
+      openModal("shop");
     }
     function onClose() {
       setOpen(false);
     }
     window.addEventListener("site-season-pass-open", onOpen);
+    window.addEventListener("site-gold-shop-open", onShopOpen);
     window.addEventListener("site-season-pass-close", onClose);
     return () => {
       window.removeEventListener("site-season-pass-open", onOpen);
+      window.removeEventListener("site-gold-shop-open", onShopOpen);
       window.removeEventListener("site-season-pass-close", onClose);
     };
   }, [openModal]);
@@ -98,7 +103,7 @@ export default function SeasonPassNavChip({ hideChip = false }: SeasonPassNavChi
           <button
             type="button"
             className="site-top-nav__link site-events-nav-chip inline-flex items-center gap-2.5"
-            onClick={openModal}
+            onClick={() => openModal("pass")}
             aria-label="시즌패스"
           >
             <span className="site-top-nav__link-icon-wrap">

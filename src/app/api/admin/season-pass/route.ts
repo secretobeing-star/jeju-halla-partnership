@@ -73,14 +73,15 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const [items, levels, quests] = await withTimeout(
+    const [items, levels, quests, shopItems] = await withTimeout(
       Promise.all([
         rowsOrEmpty(admin.from("reward_items").select("*").order("sort_order", { ascending: true })),
         rowsOrEmpty(admin.from("season_pass_levels").select("*").order("level", { ascending: true })),
         rowsOrEmpty(admin.from("quests").select("*").order("sort_order", { ascending: true }).limit(500)),
+        rowsOrEmpty(admin.from("gold_shop_items").select("*").order("sort_order", { ascending: true })),
       ]),
       8_000,
-      [[], [], []] as [unknown[], unknown[], unknown[]],
+      [[], [], [], []] as [unknown[], unknown[], unknown[], unknown[]],
     );
 
     return NextResponse.json({
@@ -88,6 +89,7 @@ export async function GET(request: NextRequest) {
       items,
       levels,
       quests,
+      shopItems,
     });
   } catch (error) {
     return NextResponse.json(
@@ -194,6 +196,41 @@ export async function POST(request: NextRequest) {
       }
       if (inserted.error) throw inserted.error;
       return NextResponse.json({ quest: inserted.data });
+    }
+
+    if (entity === "shop_item") {
+      const seasonId = String(body.season_id ?? "").trim();
+      if (!seasonId) {
+        return NextResponse.json({ error: "시즌이 필요합니다." }, { status: 400 });
+      }
+      const payload = {
+          season_id: seasonId,
+          reward_item_id: String(body.reward_item_id ?? "").trim() || null,
+          name: String(body.name ?? "").trim() || "새 상품",
+          price_gold: Math.max(0, Number(body.price_gold) || 0),
+          original_price_gold: Math.max(0, Number(body.original_price_gold) || 0),
+          badge_label: String(body.badge_label ?? "").trim(),
+          stock: body.stock === "" || body.stock == null ? null : Math.max(0, Number(body.stock) || 0),
+          per_user_limit: Math.max(0, Number(body.per_user_limit) || 1),
+          is_active: body.is_active !== false,
+          sort_order: Number(body.sort_order) || 0,
+        };
+      let inserted = await admin.from("gold_shop_items").insert(payload).select("*").maybeSingle();
+      if (
+        inserted.error &&
+        (inserted.error.message.includes("original_price_gold") || inserted.error.message.includes("badge_label"))
+      ) {
+        const { original_price_gold: _original, badge_label: _badge, ...withoutPromo } = payload;
+        inserted = await admin.from("gold_shop_items").insert(withoutPromo).select("*").maybeSingle();
+      }
+      if (inserted.error) {
+        throw new Error(
+          inserted.error.message.includes("gold_shop_items")
+            ? "골드 상점 테이블이 없습니다. supabase/season-pass.sql 을 실행해 주세요."
+            : inserted.error.message,
+        );
+      }
+      return NextResponse.json({ shopItem: inserted.data });
     }
 
     if (entity === "premium") {
@@ -350,6 +387,37 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
+    if (entity === "shop_item") {
+      const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+      if (body.name !== undefined) patch.name = String(body.name ?? "").trim() || "새 상품";
+      if (body.reward_item_id !== undefined) {
+        patch.reward_item_id = String(body.reward_item_id || "").trim() || null;
+      }
+      if (body.price_gold !== undefined) patch.price_gold = Math.max(0, Number(body.price_gold) || 0);
+      if (body.original_price_gold !== undefined) {
+        patch.original_price_gold = Math.max(0, Number(body.original_price_gold) || 0);
+      }
+      if (body.badge_label !== undefined) patch.badge_label = String(body.badge_label ?? "").trim();
+      if (body.stock !== undefined) {
+        patch.stock = body.stock === "" || body.stock == null ? null : Math.max(0, Number(body.stock) || 0);
+      }
+      if (body.per_user_limit !== undefined) patch.per_user_limit = Math.max(0, Number(body.per_user_limit) || 0);
+      if (body.is_active !== undefined) patch.is_active = Boolean(body.is_active);
+      if (body.sort_order !== undefined) patch.sort_order = Number(body.sort_order) || 0;
+      const { error } = await admin.from("gold_shop_items").update(patch).eq("id", id);
+      if (error) {
+        if (error.message.includes("original_price_gold") || error.message.includes("badge_label")) {
+          delete patch.original_price_gold;
+          delete patch.badge_label;
+          const retry = await admin.from("gold_shop_items").update(patch).eq("id", id);
+          if (retry.error) throw retry.error;
+        } else {
+          throw error;
+        }
+      }
+      return NextResponse.json({ ok: true });
+    }
+
     return NextResponse.json({ error: "알 수 없는 entity 입니다." }, { status: 400 });
   } catch (error) {
     return NextResponse.json(
@@ -385,7 +453,9 @@ export async function DELETE(request: NextRequest) {
           ? "season_pass_levels"
           : entity === "quest"
             ? "quests"
-            : null;
+            : entity === "shop_item"
+              ? "gold_shop_items"
+              : null;
   if (!table) {
     return NextResponse.json({ error: "알 수 없는 entity 입니다." }, { status: 400 });
   }

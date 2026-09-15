@@ -14,6 +14,7 @@ import {
   type SeasonPassTrack,
   type SeasonPassWidgetState,
   type SeasonQuest,
+  type GoldShopItem,
   type UserSeasonProgress,
 } from "@/lib/season-pass";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
@@ -114,6 +115,82 @@ async function loadItemsMap(admin: AdminClient) {
   return new Map(items.map((item) => [item.id, item]));
 }
 
+async function loadGoldShopItems(
+  admin: AdminClient,
+  season: Season,
+  userId: string,
+  itemsById: Map<string, RewardItem>,
+  isPremium: boolean,
+): Promise<GoldShopItem[]> {
+  const shopItems: GoldShopItem[] = [];
+  if (season.gold_shop_enabled !== false && season.premium_gold_price > 0) {
+    shopItems.push({
+      id: "premium",
+      season_id: season.id,
+      reward_item_id: null,
+      name: "프리미엄 패스",
+      item_kind: "premium",
+      price_gold: season.premium_gold_price,
+      original_price_gold: 0,
+      badge_label: "인기",
+      stock: null,
+      per_user_limit: 1,
+      is_active: true,
+      sort_order: -1,
+      reward: null,
+      purchased_count: isPremium ? 1 : 0,
+    });
+  }
+
+  const { data, error } = await admin
+    .from("gold_shop_items")
+    .select("*")
+    .eq("season_id", season.id)
+    .eq("is_active", true)
+    .order("sort_order", { ascending: true });
+  if (error) {
+    return shopItems;
+  }
+
+  const rows = (data ?? []) as Record<string, unknown>[];
+  const ids = rows.map((row) => String(row.id));
+  const counts = new Map<string, number>();
+  if (userId && ids.length > 0) {
+    const { data: purchaseRows } = await admin
+      .from("gold_shop_purchases")
+      .select("shop_item_id")
+      .eq("user_id", userId)
+      .in("shop_item_id", ids);
+    for (const row of purchaseRows ?? []) {
+      const id = String((row as { shop_item_id: string }).shop_item_id);
+      counts.set(id, (counts.get(id) || 0) + 1);
+    }
+  }
+
+  for (const row of rows) {
+    const rewardId = (row.reward_item_id as string | null) ?? null;
+    const stockRaw = row.stock;
+    shopItems.push({
+      id: String(row.id),
+      season_id: String(row.season_id),
+      reward_item_id: rewardId,
+      name: String(row.name ?? "").trim() || itemsById.get(rewardId || "")?.name || "상점 상품",
+      item_kind: "reward",
+      price_gold: Math.max(0, Number(row.price_gold) || 0),
+      original_price_gold: Math.max(0, Number(row.original_price_gold) || 0),
+      badge_label: String(row.badge_label ?? "").trim(),
+      stock: stockRaw == null || stockRaw === "" ? null : Math.max(0, Number(stockRaw) || 0),
+      per_user_limit: Math.max(0, Number(row.per_user_limit) || 0),
+      is_active: row.is_active !== false,
+      sort_order: Number(row.sort_order) || 0,
+      reward: rewardId ? itemsById.get(rewardId) ?? null : null,
+      purchased_count: counts.get(String(row.id)) || 0,
+    });
+  }
+
+  return shopItems;
+}
+
 export async function getSeasonPassState(userId: string): Promise<SeasonPassWidgetState> {
   const empty: SeasonPassWidgetState = {
     season: null,
@@ -128,6 +205,7 @@ export async function getSeasonPassState(userId: string): Promise<SeasonPassWidg
     expIntoLevel: 0,
     expForLevel: 1000,
     isPremium: false,
+    shopItems: [],
   };
 
   const admin = createSupabaseAdmin();
@@ -261,6 +339,13 @@ export async function getSeasonPassState(userId: string): Promise<SeasonPassWidg
       expIntoLevel: computed.expIntoLevel,
       expForLevel: computed.expForLevel,
       isPremium: Boolean(progress?.is_premium),
+      shopItems: await loadGoldShopItems(
+        admin,
+        season,
+        userId,
+        itemsById,
+        Boolean(progress?.is_premium),
+      ),
     };
     } catch {
       return seasonOnly;
@@ -895,4 +980,108 @@ export async function purchasePremiumPass(userIdRaw: string) {
   });
 
   return getSeasonPassState(userId);
+}
+
+export async function purchaseGoldShopItem(userIdRaw: string, shopItemIdRaw: string) {
+  const userId = userIdRaw.trim();
+  const shopItemId = shopItemIdRaw.trim();
+  if (!userId) {
+    throw new Error("로그인이 필요합니다.");
+  }
+  if (!shopItemId) {
+    throw new Error("상품이 필요합니다.");
+  }
+
+  if (shopItemId === "premium") {
+    const state = await purchasePremiumPass(userId);
+    return { state, gifted: false, name: "프리미엄 패스" };
+  }
+
+  const admin = createSupabaseAdmin();
+  if (!admin) {
+    throw new Error("Supabase 서버 설정이 없습니다.");
+  }
+
+  const state = await getSeasonPassState(userId);
+  if (!state.season) {
+    throw new Error("진행 중인 시즌이 없습니다.");
+  }
+  if (state.season.gold_shop_enabled === false) {
+    throw new Error("골드 상점이 비활성화되어 있습니다.");
+  }
+
+  const shopItem = state.shopItems.find((item) => item.id === shopItemId);
+  if (!shopItem || !shopItem.is_active) {
+    throw new Error("판매 중인 상품이 아닙니다.");
+  }
+  if (shopItem.item_kind === "premium") {
+    const next = await purchasePremiumPass(userId);
+    return { state: next, gifted: false, name: shopItem.name };
+  }
+  if (shopItem.price_gold <= 0) {
+    throw new Error("판매가가 아직 없습니다.");
+  }
+  if (shopItem.stock != null && shopItem.stock <= 0) {
+    throw new Error("재고가 없습니다.");
+  }
+  if (shopItem.per_user_limit > 0 && shopItem.purchased_count >= shopItem.per_user_limit) {
+    throw new Error("이미 구매한 상품입니다.");
+  }
+  const gold = Number(state.progress?.gold ?? 0);
+  if (gold < shopItem.price_gold) {
+    throw new Error("골드가 부족합니다.");
+  }
+
+  const reward = shopItem.reward;
+  if (!reward) {
+    throw new Error("지급할 상품이 없습니다. 관리자에서 보상 아이템을 연결해 주세요.");
+  }
+
+  await adjustGold(admin, userId, state.season, -shopItem.price_gold);
+
+  let gifted = false;
+  if (reward.item_type === "costume" || reward.item_type === "coupon") {
+    await sendSeasonPassInboxGift(admin, userId, state.season.title, reward);
+    gifted = true;
+  } else if (reward.item_type === "gold") {
+    const amount = Math.max(0, Number(reward.metadata.gold_amount ?? reward.metadata.amount ?? 0));
+    await adjustGold(admin, userId, state.season, amount);
+  }
+
+  const { error: purchaseError } = await admin.from("gold_shop_purchases").insert({
+    user_id: userId,
+    shop_item_id: shopItem.id,
+    season_id: state.season.id,
+    gold_spent: shopItem.price_gold,
+  });
+  if (purchaseError) {
+    throw new Error(
+      purchaseError.message.includes("gold_shop_purchases")
+        ? "상점 구매 테이블이 없습니다. supabase/season-pass.sql 을 실행해 주세요."
+        : purchaseError.message,
+    );
+  }
+
+  if (shopItem.stock != null) {
+    await admin
+      .from("gold_shop_items")
+      .update({
+        stock: Math.max(0, shopItem.stock - 1),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", shopItem.id);
+  }
+
+  logSeasonPassToSheets({
+    studentId: userId,
+    action: "shop",
+    seasonTitle: state.season.title,
+    detail: `${shopItem.name} · 골드 ${shopItem.price_gold}`,
+  });
+
+  return {
+    state: await getSeasonPassState(userId),
+    gifted,
+    name: shopItem.name,
+  };
 }

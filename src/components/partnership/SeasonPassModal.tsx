@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import type { RewardItem, SeasonPassTrack, SeasonPassWidgetState } from "@/lib/season-pass";
-import { seasonPassQuestTypeLabel } from "@/lib/season-pass";
+import { isGoldShopEnabled, seasonPassQuestTypeLabel } from "@/lib/season-pass";
 import { useSeasonPassClient } from "@/hooks/useSeasonPassClient";
 
 function remainingDays(endsAt: string | null) {
@@ -92,11 +92,12 @@ export default function SeasonPassModalBody({
   onTabChange,
 }: {
   client: ReturnType<typeof useSeasonPassClient>;
-  tab: "pass" | "quest";
-  onTabChange: (tab: "pass" | "quest") => void;
+  tab: "pass" | "quest" | "shop";
+  onTabChange: (tab: "pass" | "quest" | "shop") => void;
 }) {
   const { userId, state, busy, message, percent, claim, claimAll, claimPopup, clearClaimPopup } = client;
   const season = state.season;
+  const shopEnabled = isGoldShopEnabled(season);
   const hideSeasonText = Boolean(season?.ui_image_url || season?.bg_image_url || season?.track_image_url);
   const days = remainingDays(season?.ends_at ?? null);
   const lastLevel = state.levels[state.levels.length - 1] ?? null;
@@ -137,6 +138,11 @@ export default function SeasonPassModalBody({
         <button type="button" className={tab === "quest" ? "is-active" : ""} onClick={() => onTabChange("quest")}>
           제휴 퀘스트
         </button>
+        {shopEnabled ? (
+          <button type="button" className={tab === "shop" ? "is-active" : ""} onClick={() => onTabChange("shop")}>
+            골드 상점
+          </button>
+        ) : null}
         {days != null ? (
           <span className="season-pass-kart__remain">
             남은 기간
@@ -153,6 +159,8 @@ export default function SeasonPassModalBody({
           client={client}
           onGoPass={() => onTabChange("pass")}
         />
+      ) : tab === "shop" && shopEnabled ? (
+        <GoldShopBoard client={client} />
       ) : (
         <>
           <div className="season-pass-kart__progress">
@@ -273,14 +281,16 @@ export default function SeasonPassModalBody({
               >
                 <h3>{claimPopup.title}</h3>
                 <p>{claimPopup.body}</p>
-                <ul>
-                  {claimPopup.items.map((item, index) => (
-                    <li key={`${item.name}-${index}`}>
-                      {item.imageUrl ? <img src={item.imageUrl} alt="" /> : null}
-                      <span>{item.name}</span>
-                    </li>
-                  ))}
-                </ul>
+                {claimPopup.items.length > 0 ? (
+                  <ul>
+                    {claimPopup.items.map((item, index) => (
+                      <li key={`${item.name}-${index}`}>
+                        {item.imageUrl ? <img src={item.imageUrl} alt="" /> : null}
+                        <span>{item.name}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
                 <div className="season-pass-claim-dialog__actions">
                   {claimPopup.gifted ? (
                     <button
@@ -371,6 +381,98 @@ function TrackRow({
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function GoldShopBoard({ client }: { client: ReturnType<typeof useSeasonPassClient> }) {
+  const { state, busy, buyShopItem } = client;
+  const gold = state.progress?.gold ?? 0;
+  const goldIcon = state.season?.gold_icon_url;
+  const [filter, setFilter] = useState<"all" | "pass" | "costume" | "coupon">("all");
+  const items = state.shopItems.filter((item) => {
+    if (!item.is_active) return false;
+    if (filter === "pass") return item.item_kind === "premium";
+    if (filter === "costume") return item.reward?.item_type === "costume";
+    if (filter === "coupon") return item.reward?.item_type === "coupon";
+    return true;
+  });
+  const slots = Math.max(6, Math.ceil(Math.max(items.length, 1) / 3) * 3);
+
+  return (
+    <div className="season-pass-shop">
+      <div className="season-pass-shop__nav">
+        {(
+          [
+            ["all", "추천"],
+            ["pass", "패스"],
+            ["costume", "코스튬"],
+            ["coupon", "쿠폰"],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            className={filter === id ? "is-active" : ""}
+            onClick={() => setFilter(id)}
+          >
+            {label}
+          </button>
+        ))}
+        <span className="season-pass-shop__balance">
+          {goldIcon ? <img src={goldIcon} alt="" /> : <span className="season-pass-shop__coin" aria-hidden />}
+          {gold.toLocaleString("ko-KR")}
+        </span>
+      </div>
+      <div className="season-pass-shop__panel">
+        <ul className="season-pass-shop__grid">
+          {Array.from({ length: slots }, (_, index) => {
+            const item = items[index];
+            if (!item) {
+              return <li key={`empty-${index}`} className="season-pass-shop__slot" />;
+            }
+            const soldOut = item.stock != null && item.stock <= 0;
+            const owned =
+              (item.item_kind === "premium" && state.isPremium) ||
+              (item.per_user_limit > 0 && item.purchased_count >= item.per_user_limit);
+            const imageUrl =
+              item.reward?.image_url ||
+              (item.item_kind === "premium" ? state.season?.premium_pass_image_url : null);
+            const discount =
+              item.original_price_gold > item.price_gold && item.price_gold > 0
+                ? Math.round((1 - item.price_gold / item.original_price_gold) * 100)
+                : 0;
+            const badge = item.badge_label.trim();
+            const disabled = busy !== null || owned || soldOut || item.price_gold <= 0 || gold < item.price_gold;
+            const status = owned ? "보유 중" : soldOut ? "품절" : gold < item.price_gold ? "골드 부족" : "";
+            return (
+              <li key={item.id}>
+                <button
+                  type="button"
+                  className={`season-pass-shop__card ${owned || soldOut ? "is-disabled" : ""}`}
+                  disabled={disabled}
+                  onClick={() => void buyShopItem(item.id)}
+                >
+                  <span className="season-pass-shop__title">{item.name}</span>
+                  <span className="season-pass-shop__art">
+                    {discount > 0 ? <b>{discount}%</b> : null}
+                    {badge ? <em className={discount > 0 ? "is-secondary" : ""}>{badge}</em> : null}
+                    {imageUrl ? <img src={imageUrl} alt="" /> : <span />}
+                  </span>
+                  <span className="season-pass-shop__cost">
+                    {goldIcon ? <img src={goldIcon} alt="" /> : <span className="season-pass-shop__coin" aria-hidden />}
+                    {discount > 0 ? (
+                      <s>{item.original_price_gold.toLocaleString("ko-KR")}</s>
+                    ) : null}
+                    {item.price_gold > 0 ? item.price_gold.toLocaleString("ko-KR") : "-"}
+                  </span>
+                  {status ? <span className="season-pass-shop__status">{status}</span> : null}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
     </div>
   );
 }

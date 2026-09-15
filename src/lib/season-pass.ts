@@ -95,6 +95,23 @@ export type SeasonPassClaim = {
   claimed_at: string;
 };
 
+export type GoldShopItem = {
+  id: string;
+  season_id: string;
+  reward_item_id: string | null;
+  name: string;
+  item_kind: "reward" | "premium";
+  price_gold: number;
+  original_price_gold: number;
+  badge_label: string;
+  stock: number | null;
+  per_user_limit: number;
+  is_active: boolean;
+  sort_order: number;
+  reward?: RewardItem | null;
+  purchased_count: number;
+};
+
 export type SeasonPassWidgetState = {
   season: Season | null;
   progress: UserSeasonProgress | null;
@@ -108,6 +125,7 @@ export type SeasonPassWidgetState = {
   expIntoLevel: number;
   expForLevel: number;
   isPremium: boolean;
+  shopItems: GoldShopItem[];
 };
 
 export function isSeasonLive(season: Pick<Season, "starts_at" | "ends_at">, now = Date.now()) {
