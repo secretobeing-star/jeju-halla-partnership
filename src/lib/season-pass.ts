@@ -127,6 +127,7 @@ export type SeasonPassWidgetState = {
   expIntoLevel: number;
   expForLevel: number;
   isPremium: boolean;
+  passEnabled: boolean;
   shopItems: GoldShopItem[];
 };
 

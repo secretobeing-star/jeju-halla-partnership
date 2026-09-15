@@ -97,9 +97,10 @@ export default function SeasonPassModalBody({
 }) {
   const { userId, state, busy, message, percent, claim, claimAll, claimPopup, clearClaimPopup } = client;
   const season = state.season;
-  const shopEnabled = isGoldShopEnabled(season);
+  const passEnabled = Boolean(state.passEnabled);
+  const shopEnabled = isGoldShopEnabled(season) || state.shopItems.length > 0;
   const hideSeasonText = Boolean(season?.ui_image_url || season?.bg_image_url || season?.track_image_url);
-  const days = remainingDays(season?.ends_at ?? null);
+  const days = passEnabled ? remainingDays(season?.ends_at ?? null) : null;
   const lastLevel = state.levels[state.levels.length - 1] ?? null;
   const nextLevel = Math.min(lastLevel?.level ?? state.currentLevel, state.currentLevel + 1);
 
@@ -120,7 +121,7 @@ export default function SeasonPassModalBody({
           : undefined
       }
     >
-      {tab === "pass" ? (
+      {tab === "pass" && passEnabled ? (
       <div className="season-pass-kart__banners">
         {season.ui_image_url ? <img src={season.ui_image_url} alt="" /> : null}
         {season.premium_badge_url ? <img src={season.premium_badge_url} alt="" /> : null}
@@ -155,13 +156,17 @@ export default function SeasonPassModalBody({
       </div>
 
       {tab === "quest" ? (
-        <QuestBoard
-          client={client}
-          onGoPass={() => onTabChange("pass")}
-        />
+        passEnabled ? (
+          <QuestBoard
+            client={client}
+            onGoPass={() => onTabChange("pass")}
+          />
+        ) : (
+          <p className="season-pass-kart__empty">진행 중인 시즌패스가 없습니다.</p>
+        )
       ) : tab === "shop" && shopEnabled ? (
         <GoldShopBoard client={client} />
-      ) : (
+      ) : passEnabled ? (
         <>
           <div className="season-pass-kart__progress">
             <span className="season-pass-kart__lv season-pass-kart__lv--from">
@@ -263,6 +268,8 @@ export default function SeasonPassModalBody({
             </div>
           </div>
         </>
+      ) : (
+        <p className="season-pass-kart__empty">진행 중인 시즌패스가 없습니다.</p>
       )}
       {message ? <p className="season-pass-kart__msg">{message}</p> : null}
       {claimPopup
@@ -404,7 +411,7 @@ function GoldShopBoard({ client }: { client: ReturnType<typeof useSeasonPassClie
       <div className="season-pass-shop__nav">
         {(
           [
-            ["all", "추천"],
+            ["all", "전체"],
             ["pass", "패스"],
             ["costume", "코스튬"],
             ["coupon", "쿠폰"],

@@ -32,7 +32,8 @@ type GoldShopNavChipProps = {
 
 export default function GoldShopNavChip({ hideChip = false }: GoldShopNavChipProps) {
   const client = useSeasonPassClient();
-  const shopEnabled = isGoldShopEnabled(client.state.season);
+  const shopEnabled =
+    isGoldShopEnabled(client.state.season) || client.state.shopItems.length > 0;
 
   const openModal = useCallback(() => {
     const id = getSiteMemberSession()?.student?.studentId?.trim() || "";
@@ -40,11 +41,11 @@ export default function GoldShopNavChip({ hideChip = false }: GoldShopNavChipPro
       requestStudentLoginModal();
       return;
     }
-    if (!isGoldShopEnabled(client.state.season)) {
+    if (!(isGoldShopEnabled(client.state.season) || client.state.shopItems.length > 0)) {
       return;
     }
     window.dispatchEvent(new Event("site-gold-shop-open"));
-  }, [client.state.season]);
+  }, [client.state.season, client.state.shopItems.length]);
 
   useEffect(() => {
     void client.load();

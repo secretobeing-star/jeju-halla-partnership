@@ -403,8 +403,8 @@ export default function HomePage() {
         .then((payload: { state?: SeasonPassWidgetState }) => {
           if (!cancelled) {
             const season = payload.state?.season ?? null;
-            setSeasonPassEnabled(Boolean(season));
-            setGoldShopEnabled(isGoldShopEnabled(season));
+            setSeasonPassEnabled(Boolean(payload.state?.passEnabled));
+            setGoldShopEnabled(isGoldShopEnabled(season) || (payload.state?.shopItems?.length ?? 0) > 0);
           }
         })
         .catch(() => {

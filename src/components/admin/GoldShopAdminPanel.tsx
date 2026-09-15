@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import AdminCollapsibleSection from "@/components/admin/AdminCollapsibleSection";
 import { adminApiFetch } from "@/lib/admin-api";
 import type { GoldShopItem, RewardItem, Season } from "@/lib/season-pass";
+import type { PublicCardFrameItem } from "@/lib/student-card-frames";
 
 type GoldShopAdminPanelProps = {
   onMessage: (message: string) => void;
@@ -16,6 +17,7 @@ type CatalogRow = {
   source: "premium" | "shop" | "unlisted";
   shopItemId: string | null;
   rewardItemId: string | null;
+  frameId: string | null;
   kind: "premium" | "costume" | "coupon";
   name: string;
   price_gold: number;
@@ -51,10 +53,16 @@ function asShopItem(row: Record<string, unknown>): GoldShopItem {
   };
 }
 
+function frameIdOf(item: RewardItem) {
+  const value = item.metadata.frame_id ?? item.metadata.frameId;
+  return typeof value === "string" ? value.trim() : "";
+}
+
 export default function GoldShopAdminPanel({ onMessage }: GoldShopAdminPanelProps) {
   const [seasons, setSeasons] = useState<Season[]>([]);
   const [items, setItems] = useState<RewardItem[]>([]);
   const [shopItems, setShopItems] = useState<GoldShopItem[]>([]);
+  const [costumes, setCostumes] = useState<PublicCardFrameItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filter, setFilter] = useState<ShopFilter>("all");
   const [rows, setRows] = useState<CatalogRow[]>([]);
@@ -84,6 +92,10 @@ export default function GoldShopAdminPanel({ onMessage }: GoldShopAdminPanelProp
         if (current && nextSeasons.some((season) => season.id === current)) return current;
         return nextSeasons.find((season) => season.is_active)?.id ?? nextSeasons[0]?.id ?? null;
       });
+      const framesPayload = (await fetch("/api/student/frames")
+        .then((res) => res.json())
+        .catch(() => ({ frames: [] }))) as { frames?: PublicCardFrameItem[] };
+      setCostumes((framesPayload.frames ?? []).filter((frame) => frame.id?.trim() && frame.name?.trim()));
     } catch (error) {
       onMessage(error instanceof Error ? error.message : "골드 상점을 불러오지 못했습니다.");
     }
@@ -112,6 +124,7 @@ export default function GoldShopAdminPanel({ onMessage }: GoldShopAdminPanelProp
       source: "premium",
       shopItemId: null,
       rewardItemId: null,
+      frameId: null,
       kind: "premium",
       name: "프리미엄 패스",
       price_gold: season.premium_gold_price ?? 0,
@@ -129,6 +142,7 @@ export default function GoldShopAdminPanel({ onMessage }: GoldShopAdminPanelProp
         source: "shop",
         shopItemId: item.id,
         rewardItemId: item.reward_item_id,
+        frameId: reward ? frameIdOf(reward) || null : null,
         kind: reward?.item_type === "coupon" ? "coupon" : "costume",
         name: item.name || reward?.name || "상점 상품",
         price_gold: item.price_gold,
@@ -140,13 +154,14 @@ export default function GoldShopAdminPanel({ onMessage }: GoldShopAdminPanelProp
         sort_order: item.sort_order,
       };
     });
-    const unlisted: CatalogRow[] = items
+    const unlistedRewards: CatalogRow[] = items
       .filter((item) => item.item_type !== "gold" && !listedRewardIds.has(item.id))
       .map((item) => ({
         key: `unlisted-${item.id}`,
         source: "unlisted" as const,
         shopItemId: null,
         rewardItemId: item.id,
+        frameId: frameIdOf(item) || null,
         kind: item.item_type === "coupon" ? "coupon" : "costume",
         name: item.name || "보상 아이템",
         price_gold: 0,
@@ -157,8 +172,36 @@ export default function GoldShopAdminPanel({ onMessage }: GoldShopAdminPanelProp
         is_active: true,
         sort_order: 100,
       }));
-    setRows([premium, ...shopRows, ...unlisted]);
+    const listedFrameIds = new Set(
+      [
+        ...shopRows.map((row) => row.frameId || ""),
+        ...unlistedRewards.map((row) => row.frameId || ""),
+      ].filter(Boolean),
+    );
+    const unlistedFrames: CatalogRow[] = costumes
+      .filter((frame) => {
+        const id = frame.id.trim();
+        return Boolean(id) && !listedFrameIds.has(id);
+      })
+      .map((frame) => ({
+        key: `frame-${frame.id}`,
+        source: "unlisted" as const,
+        shopItemId: null,
+        rewardItemId: null,
+        frameId: frame.id,
+        kind: "costume" as const,
+        name: frame.name,
+        price_gold: 0,
+        original_price_gold: 0,
+        badge_label: "",
+        stock: null,
+        per_user_limit: 1,
+        is_active: true,
+        sort_order: 110,
+      }));
+    setRows([premium, ...shopRows, ...unlistedRewards, ...unlistedFrames]);
   }, [
+    costumes,
     items,
     selectedId,
     shopItems,
@@ -230,13 +273,31 @@ export default function GoldShopAdminPanel({ onMessage }: GoldShopAdminPanelProp
         return;
       }
       if (row.source === "unlisted") {
-        if (!row.rewardItemId) throw new Error("보상 아이템이 없습니다.");
+        let rewardItemId = row.rewardItemId;
+        if (!rewardItemId && row.frameId) {
+          const costume = costumes.find((frame) => frame.id === row.frameId);
+          const created = (await adminApiFetch("/api/admin/season-pass", {
+            method: "POST",
+            body: JSON.stringify({
+              entity: "item",
+              name: row.name || costume?.name || "코스튬",
+              item_type: "costume",
+              image_url: costume?.imageUrl || null,
+              metadata: {
+                frame_id: row.frameId,
+                frame_name: costume?.name || row.name,
+              },
+            }),
+          })) as { item?: RewardItem };
+          rewardItemId = created.item?.id ?? null;
+        }
+        if (!rewardItemId) throw new Error("보상 아이템이 없습니다.");
         await adminApiFetch("/api/admin/season-pass", {
           method: "POST",
           body: JSON.stringify({
             entity: "shop_item",
             season_id: selected.id,
-            reward_item_id: row.rewardItemId,
+            reward_item_id: rewardItemId,
             name: row.name,
             price_gold: row.price_gold,
             original_price_gold: row.original_price_gold,
@@ -296,7 +357,7 @@ export default function GoldShopAdminPanel({ onMessage }: GoldShopAdminPanelProp
     <div className="space-y-6">
       <AdminCollapsibleSection
         title="골드 상점"
-        description="시즌패스와 따로, 여기서 패스·코스튬·쿠폰 판매가와 할인을 수정합니다. 테이블이 없으면 supabase/season-pass.sql 을 실행하세요."
+        description="시즌패스를 활성화하지 않아도 전체 코스튬·쿠폰을 등록하고 판매할 수 있습니다. 테이블이 없으면 supabase/season-pass.sql 을 실행하세요."
       >
         <div className="flex flex-wrap gap-2">
           {seasons.map((season) => (
@@ -470,7 +531,7 @@ export default function GoldShopAdminPanel({ onMessage }: GoldShopAdminPanelProp
               </div>
             ))}
             {visibleRows.length === 0 ? (
-              <p className="text-sm text-gray-500">이 분류에 상품이 없습니다. 시즌패스에서 보상 아이템을 먼저 만드세요.</p>
+              <p className="text-sm text-gray-500">이 분류에 상품이 없습니다.</p>
             ) : null}
           </div>
         </AdminCollapsibleSection>

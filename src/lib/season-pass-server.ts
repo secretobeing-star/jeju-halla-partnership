@@ -120,24 +120,41 @@ async function loadItemsMap(admin: AdminClient) {
   return new Map(items.map((item) => [item.id, item]));
 }
 
+async function listShopSeasons(admin: AdminClient): Promise<Season[]> {
+  const { data, error } = await admin
+    .from("seasons")
+    .select("*")
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: false });
+  if (error) {
+    return [];
+  }
+  return ((data ?? []) as Record<string, unknown>[])
+    .map(mapSeason)
+    .filter((season) => season.gold_shop_enabled !== false)
+    .sort((a, b) => Number(b.is_active) - Number(a.is_active));
+}
+
 async function loadGoldShopItems(
   admin: AdminClient,
-  season: Season,
+  shopSeasons: Season[],
+  passSeason: Season | null,
   userId: string,
   itemsById: Map<string, RewardItem>,
   isPremium: boolean,
 ): Promise<GoldShopItem[]> {
   const shopItems: GoldShopItem[] = [];
-  if (season.gold_shop_enabled !== false && season.premium_gold_price > 0) {
+  const shopIds = new Set(shopSeasons.map((season) => season.id));
+  if (passSeason && passSeason.gold_shop_enabled !== false && passSeason.premium_gold_price > 0) {
     shopItems.push({
       id: "premium",
-      season_id: season.id,
+      season_id: passSeason.id,
       reward_item_id: null,
       name: "프리미엄 패스",
       item_kind: "premium",
-      price_gold: season.premium_gold_price,
-      original_price_gold: season.premium_original_price_gold,
-      badge_label: season.premium_badge_label,
+      price_gold: passSeason.premium_gold_price,
+      original_price_gold: passSeason.premium_original_price_gold,
+      badge_label: passSeason.premium_badge_label,
       stock: null,
       per_user_limit: 1,
       is_active: true,
@@ -147,10 +164,13 @@ async function loadGoldShopItems(
     });
   }
 
+  if (shopIds.size === 0) {
+    return shopItems;
+  }
+
   const { data, error } = await admin
     .from("gold_shop_items")
     .select("*")
-    .eq("season_id", season.id)
     .eq("is_active", true)
     .order("sort_order", { ascending: true });
   if (error) {
@@ -173,6 +193,8 @@ async function loadGoldShopItems(
   }
 
   for (const row of rows) {
+    const seasonId = String(row.season_id ?? "");
+    if (!shopIds.has(seasonId)) continue;
     const rewardId = (row.reward_item_id as string | null) ?? null;
     const stockRaw = row.stock;
     shopItems.push({
@@ -210,6 +232,7 @@ export async function getSeasonPassState(userId: string): Promise<SeasonPassWidg
     expIntoLevel: 0,
     expForLevel: 1000,
     isPremium: false,
+    passEnabled: false,
     shopItems: [],
   };
 
@@ -219,7 +242,13 @@ export async function getSeasonPassState(userId: string): Promise<SeasonPassWidg
   }
 
   try {
-    const season = await getActiveSeason(admin);
+    const passSeason = await getActiveSeason(admin);
+    const shopSeasons = await listShopSeasons(admin);
+    const shopSeason =
+      passSeason && passSeason.gold_shop_enabled !== false
+        ? passSeason
+        : shopSeasons[0] ?? null;
+    const season = passSeason ?? shopSeason;
     if (!season) {
       return empty;
     }
@@ -227,12 +256,31 @@ export async function getSeasonPassState(userId: string): Promise<SeasonPassWidg
     const seasonOnly: SeasonPassWidgetState = {
       ...empty,
       season,
+      passEnabled: Boolean(passSeason),
       nextLevelExp: season.exp_per_level,
       expForLevel: season.exp_per_level,
     };
 
     try {
       const itemsById = await loadItemsMap(admin);
+      if (!passSeason) {
+        const walletGold = userId ? await loadWalletGold(admin, userId) : 0;
+        const gold = walletGold ?? 0;
+        return {
+          ...seasonOnly,
+          progress: userId
+            ? {
+                user_id: userId,
+                season_id: season.id,
+                level: 1,
+                exp: 0,
+                gold,
+                is_premium: false,
+              }
+            : null,
+          shopItems: await loadGoldShopItems(admin, shopSeasons, null, userId, itemsById, false),
+        };
+      }
     const [{ data: levelRows }, { data: progressRow }, { data: claimRows }, { data: questRows }] =
       await Promise.all([
         admin.from("season_pass_levels").select("*").eq("season_id", season.id).order("level", { ascending: true }),
@@ -344,9 +392,11 @@ export async function getSeasonPassState(userId: string): Promise<SeasonPassWidg
       expIntoLevel: computed.expIntoLevel,
       expForLevel: computed.expForLevel,
       isPremium: Boolean(progress?.is_premium),
+      passEnabled: true,
       shopItems: await loadGoldShopItems(
         admin,
-        season,
+        shopSeasons.length > 0 ? shopSeasons : passSeason.gold_shop_enabled !== false ? [passSeason] : [],
+        passSeason,
         userId,
         itemsById,
         Boolean(progress?.is_premium),
@@ -951,7 +1001,7 @@ export async function purchasePremiumPass(userIdRaw: string) {
   }
 
   const state = await getSeasonPassState(userId);
-  if (!state.season) {
+  if (!state.passEnabled || !state.season) {
     throw new Error("진행 중인 시즌이 없습니다.");
   }
   if (state.season.gold_shop_enabled === false) {
@@ -1009,10 +1059,7 @@ export async function purchaseGoldShopItem(userIdRaw: string, shopItemIdRaw: str
 
   const state = await getSeasonPassState(userId);
   if (!state.season) {
-    throw new Error("진행 중인 시즌이 없습니다.");
-  }
-  if (state.season.gold_shop_enabled === false) {
-    throw new Error("골드 상점이 비활성화되어 있습니다.");
+    throw new Error("골드 상점을 열 수 없습니다.");
   }
 
   const shopItem = state.shopItems.find((item) => item.id === shopItemId);
@@ -1042,7 +1089,13 @@ export async function purchaseGoldShopItem(userIdRaw: string, shopItemIdRaw: str
     throw new Error("지급할 상품이 없습니다. 관리자에서 보상 아이템을 연결해 주세요.");
   }
 
-  await adjustGold(admin, userId, state.season, -shopItem.price_gold);
+  const purchaseSeasonId = shopItem.season_id || state.season.id;
+  const purchaseSeason =
+    shopItem.season_id && shopItem.season_id !== state.season.id
+      ? { ...state.season, id: shopItem.season_id }
+      : state.season;
+
+  await adjustGold(admin, userId, purchaseSeason, -shopItem.price_gold);
 
   let gifted = false;
   if (reward.item_type === "costume" || reward.item_type === "coupon") {
@@ -1056,7 +1109,7 @@ export async function purchaseGoldShopItem(userIdRaw: string, shopItemIdRaw: str
   const { error: purchaseError } = await admin.from("gold_shop_purchases").insert({
     user_id: userId,
     shop_item_id: shopItem.id,
-    season_id: state.season.id,
+    season_id: purchaseSeasonId,
     gold_spent: shopItem.price_gold,
   });
   if (purchaseError) {
