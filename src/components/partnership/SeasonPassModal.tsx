@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import type { RewardItem, SeasonPassTrack, SeasonPassWidgetState } from "@/lib/season-pass";
 import { seasonPassQuestTypeLabel } from "@/lib/season-pass";
 import { useSeasonPassClient } from "@/hooks/useSeasonPassClient";
@@ -94,7 +95,7 @@ export default function SeasonPassModalBody({
   tab: "pass" | "quest";
   onTabChange: (tab: "pass" | "quest") => void;
 }) {
-  const { userId, state, busy, message, percent, claim, claimAll } = client;
+  const { userId, state, busy, message, percent, claim, claimAll, claimPopup, clearClaimPopup } = client;
   const season = state.season;
   const hideSeasonText = Boolean(season?.ui_image_url || season?.bg_image_url || season?.track_image_url);
   const days = remainingDays(season?.ends_at ?? null);
@@ -256,6 +257,53 @@ export default function SeasonPassModalBody({
         </>
       )}
       {message ? <p className="season-pass-kart__msg">{message}</p> : null}
+      {claimPopup
+        ? createPortal(
+            <div
+              className="season-pass-claim-overlay"
+              role="presentation"
+              onClick={clearClaimPopup}
+            >
+              <div
+                className="season-pass-claim-dialog"
+                role="dialog"
+                aria-modal="true"
+                aria-label={claimPopup.title}
+                onClick={(event) => event.stopPropagation()}
+              >
+                <h3>{claimPopup.title}</h3>
+                <p>{claimPopup.body}</p>
+                <ul>
+                  {claimPopup.items.map((item, index) => (
+                    <li key={`${item.name}-${index}`}>
+                      {item.imageUrl ? <img src={item.imageUrl} alt="" /> : null}
+                      <span>{item.name}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="season-pass-claim-dialog__actions">
+                  {claimPopup.gifted ? (
+                    <button
+                      type="button"
+                      className="is-primary"
+                      onClick={() => {
+                        clearClaimPopup();
+                        window.dispatchEvent(new Event("site-season-pass-close"));
+                        window.dispatchEvent(new Event("site-gift-inbox-open"));
+                      }}
+                    >
+                      선물함 열기
+                    </button>
+                  ) : null}
+                  <button type="button" onClick={clearClaimPopup}>
+                    확인
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }

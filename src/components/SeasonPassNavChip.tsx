@@ -56,8 +56,15 @@ export default function SeasonPassNavChip({ hideChip = false }: SeasonPassNavChi
     function onOpen() {
       openModal();
     }
+    function onClose() {
+      setOpen(false);
+    }
     window.addEventListener("site-season-pass-open", onOpen);
-    return () => window.removeEventListener("site-season-pass-open", onOpen);
+    window.addEventListener("site-season-pass-close", onClose);
+    return () => {
+      window.removeEventListener("site-season-pass-open", onOpen);
+      window.removeEventListener("site-season-pass-close", onClose);
+    };
   }, [openModal]);
 
   const close = useCallback(() => setOpen(false), []);

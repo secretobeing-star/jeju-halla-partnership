@@ -762,6 +762,89 @@
   font-size: 0.82rem;
 }
 
+.season-pass-claim-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 420;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
+}
+
+.season-pass-claim-dialog {
+  width: min(90vw, 21rem);
+  border-radius: 1rem;
+  background: #fff;
+  padding: 1.25rem 1.15rem 1.1rem;
+  text-align: center;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+}
+
+.season-pass-claim-dialog h3 {
+  margin: 0 0 0.4rem;
+  font-size: 1.12rem;
+  font-weight: 800;
+  color: #111827;
+}
+
+.season-pass-claim-dialog p {
+  margin: 0 0 0.85rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: #4b5563;
+  white-space: pre-line;
+}
+
+.season-pass-claim-dialog ul {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+  max-height: 12rem;
+  overflow: auto;
+}
+
+.season-pass-claim-dialog li {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #059669;
+}
+
+.season-pass-claim-dialog img {
+  width: 3.4rem;
+  height: 3.4rem;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.season-pass-claim-dialog__actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.season-pass-claim-dialog__actions button {
+  flex: 1;
+  border: 0;
+  border-radius: 0.55rem;
+  padding: 0.65rem 0.5rem;
+  background: #6b7280;
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.season-pass-claim-dialog__actions button.is-primary {
+  background: #059669;
+}
+
 .gold-shop-dialog {
   width: min(92vw, 28rem);
 }
