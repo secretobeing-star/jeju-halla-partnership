@@ -73,16 +73,37 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const [items, levels, quests, shopItems] = await withTimeout(
-      Promise.all([
-        rowsOrEmpty(admin.from("reward_items").select("*").order("sort_order", { ascending: true })),
-        rowsOrEmpty(admin.from("season_pass_levels").select("*").order("level", { ascending: true })),
-        rowsOrEmpty(admin.from("quests").select("*").order("sort_order", { ascending: true }).limit(500)),
-        rowsOrEmpty(admin.from("gold_shop_items").select("*").order("sort_order", { ascending: true })),
-      ]),
-      8_000,
-      [[], [], [], []] as [unknown[], unknown[], unknown[], unknown[]],
-    );
+    const shopOnly = request.nextUrl.searchParams.get("view") === "shop";
+    const extra = shopOnly
+      ? await withTimeout(
+          Promise.all([
+            rowsOrEmpty(admin.from("reward_items").select("id,name,item_type,image_url,metadata,is_active,sort_order").order("sort_order", { ascending: true })),
+            rowsOrEmpty(admin.from("gold_shop_items").select("*").order("sort_order", { ascending: true })),
+          ]),
+          6_000,
+          [[], []] as [unknown[], unknown[]],
+        )
+      : await withTimeout(
+          Promise.all([
+            rowsOrEmpty(admin.from("reward_items").select("*").order("sort_order", { ascending: true })),
+            rowsOrEmpty(admin.from("season_pass_levels").select("*").order("level", { ascending: true })),
+            rowsOrEmpty(admin.from("quests").select("*").order("sort_order", { ascending: true }).limit(500)),
+            rowsOrEmpty(admin.from("gold_shop_items").select("*").order("sort_order", { ascending: true })),
+          ]),
+          8_000,
+          [[], [], [], []] as [unknown[], unknown[], unknown[], unknown[]],
+        );
+
+    if (shopOnly) {
+      const [items, shopItems] = extra as [unknown[], unknown[]];
+      return NextResponse.json({
+        seasons: seasonsQuery.data ?? [],
+        items,
+        shopItems,
+      });
+    }
+
+    const [items, levels, quests, shopItems] = extra as [unknown[], unknown[], unknown[], unknown[]];
 
     return NextResponse.json({
       seasons: seasonsQuery.data ?? [],

@@ -723,6 +723,30 @@
 }
 
 .season-pass-shop__status {
+  display: block;
+  padding: 0 0.35rem 0.2rem;
+  color: #8b3a1a;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.season-pass-shop__buy {
+  margin: 0 0.35rem 0.35rem;
+  border: 1px solid #c48a1a;
+  border-radius: 0.22rem;
+  padding: 0.28rem 0.4rem;
+  background: linear-gradient(180deg, #ffe27a, #f0c43a);
+  color: #5a3a10;
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.season-pass-shop__buy:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
   padding: 0 0.3rem 0.28rem;
   color: #8a3b1d;
   font-size: 0.68rem;
