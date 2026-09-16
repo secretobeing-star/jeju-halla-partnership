@@ -430,11 +430,8 @@ export default function HomePage() {
 
     const registerServiceWorker = async () => {
       try {
-        const existingRegistration = await navigator.serviceWorker.getRegistration();
-        if (!existingRegistration) {
-          const registration = await navigator.serviceWorker.register("/sw.js");
-          await navigator.serviceWorker.ready;
-        }
+        await navigator.serviceWorker.register("/sw.js");
+        await navigator.serviceWorker.ready;
       } catch (error) {
         console.error("Service Worker 등록 실패:", error);
       }

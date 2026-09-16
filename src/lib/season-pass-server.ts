@@ -802,7 +802,7 @@ async function resolveCostumeFrameId(item: RewardItem): Promise<string> {
 async function sendSeasonPassInboxGift(
   admin: AdminClient,
   userId: string,
-  seasonTitle: string,
+  sourceLabel: string,
   item: RewardItem,
 ) {
   let giftValue = "";
@@ -815,17 +815,20 @@ async function sendSeasonPassInboxGift(
       throw new Error("쿠폰 코드가 없습니다. 보상 아이템에 코드를 입력해 주세요.");
     }
     giftValue = encodeGiftCouponValue(code);
-    displayName = displayName || "시즌패스 쿠폰";
+    displayName = displayName || (sourceLabel.trim() === "상점 구매" ? "상점 쿠폰" : "시즌패스 쿠폰");
   } else {
     const frameId = await resolveCostumeFrameId(item);
     const catalog = await loadCardFrameCatalogFromDb().catch(() => []);
     const frame = findCardFrameByRef(catalog, frameId);
     giftValue = frameId;
-    displayName = displayName || frame?.name?.trim() || "시즌패스 코스튬";
+    displayName =
+      displayName ||
+      frame?.name?.trim() ||
+      (sourceLabel.trim() === "상점 구매" ? "상점 코스튬" : "시즌패스 코스튬");
     imageUrl = item.image_url || frame?.imageUrl || null;
   }
 
-  const rewardName = seasonTitle.trim() ? `${seasonTitle.trim()} · ${displayName}` : displayName;
+  const rewardName = sourceLabel.trim() ? `${sourceLabel.trim()} · ${displayName}` : displayName;
 
   const { data: pending } = await admin
     .from("user_gifts")
@@ -1099,7 +1102,7 @@ export async function purchaseGoldShopItem(userIdRaw: string, shopItemIdRaw: str
 
   let gifted = false;
   if (reward.item_type === "costume" || reward.item_type === "coupon") {
-    await sendSeasonPassInboxGift(admin, userId, state.season.title, reward);
+    await sendSeasonPassInboxGift(admin, userId, "상점 구매", reward);
     gifted = true;
   } else if (reward.item_type === "gold") {
     const amount = Math.max(0, Number(reward.metadata.gold_amount ?? reward.metadata.amount ?? 0));

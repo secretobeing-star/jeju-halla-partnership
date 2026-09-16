@@ -443,7 +443,11 @@ export default function GiftInboxNavChip({ hideChip = false }: GiftInboxNavChipP
                                         ? `쿠폰 코드: ${parsed.couponCode}`
                                         : "쿠폰이 포함되어 있습니다. 받으면 코드가 표시됩니다."}
                                     </p>
-                                    <p className="gift-inbox__msg">시즌패스·이벤트 쿠폰</p>
+                                    <p className="gift-inbox__msg">
+                                      {gift.reward_name.includes("상점 구매")
+                                        ? "상점 구매"
+                                        : "시즌패스·이벤트 쿠폰"}
+                                    </p>
                                   </>
                                 );
                               }
