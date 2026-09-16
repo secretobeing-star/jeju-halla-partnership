@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import SiteFooterSocialLinks from "@/components/SiteFooterSocialLinks";
 import { useAppBackHandler } from "@/lib/app-back-stack";
 import { getOptionalTextColor, renderTextWithOptionalLink } from "@/lib/footer-text";
+import { tapDeveloperEasterEgg } from "@/components/DeveloperEasterEgg";
 import { prepareRichHtmlForDisplay } from "@/lib/rich-text";
 import { getSiteFooterDisplay, type SiteFooterPolicy } from "@/lib/site-footer";
 import type { SiteSettings } from "@/lib/supabase";
@@ -204,15 +205,21 @@ export default function SiteFooter({
               ].join(" ")}
             >
               {imageUrls.length > 0 ? (
-                <div className="site-footer-image-wrap flex shrink-0 flex-wrap items-center justify-center gap-3 sm:justify-start">
-                  {imageUrls.map((url, index) => (
-                    <img
-                      key={`${url}-${index}`}
-                      alt=""
-                      src={url}
-                      className="site-footer-image mx-auto h-16 w-auto max-w-[140px] object-contain sm:mx-0 sm:h-20 sm:max-w-[160px]"
-                    />
-                  ))}
+                <div className="site-footer-image-wrap flex shrink-0 flex-col items-center sm:items-start">
+                  <div className="flex flex-wrap items-center justify-center gap-3 sm:justify-start">
+                    {imageUrls.map((url, index) => (
+                      <img
+                        key={`${url}-${index}`}
+                        alt=""
+                        src={url}
+                        className="site-footer-image mx-auto h-16 w-auto max-w-[140px] object-contain sm:mx-0 sm:h-20 sm:max-w-[160px]"
+                      />
+                    ))}
+                  </div>
+                  <div
+                    className="mt-1 h-8 w-full min-w-[7rem] max-w-[160px] select-none"
+                    onClick={tapDeveloperEasterEgg}
+                  />
                 </div>
               ) : null}
 

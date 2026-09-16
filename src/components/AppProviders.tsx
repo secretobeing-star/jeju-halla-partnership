@@ -2,6 +2,7 @@
 
 import React, { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import DeveloperEasterEgg, { logDeveloperCredit } from "@/components/DeveloperEasterEgg";
 import PromptModalProvider from "@/components/PromptModalProvider";
 import SitePwaFoldViewportApplier from "@/components/SitePwaFoldViewportApplier";
 import { SiteAppBackProvider } from "@/lib/app-back-stack";
@@ -43,10 +44,15 @@ function useSessionCheck(intervalMs = 1000) {
 export default function AppProviders({ children }: { children: React.ReactNode }) {
   useSessionCheck(1000);
 
+  useEffect(() => {
+    logDeveloperCredit();
+  }, []);
+
   return (
     <SiteAppBackProvider>
       <PromptModalProvider>
         <SitePwaFoldViewportApplier />
+        <DeveloperEasterEgg />
         {children}
       </PromptModalProvider>
     </SiteAppBackProvider>
