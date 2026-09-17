@@ -466,7 +466,7 @@ function GoldShopBoard({ client }: { client: ReturnType<typeof useSeasonPassClie
                 : 0;
             const badge = item.badge_label.trim();
             const disabled = busy !== null || owned || soldOut;
-            const status = owned ? "보유 중" : soldOut ? "품절" : "";
+            const status = soldOut && !owned ? "품절" : "";
             return (
               <li key={item.id}>
                 <div className={`season-pass-shop__card ${owned || soldOut ? "is-disabled" : ""}`}>
