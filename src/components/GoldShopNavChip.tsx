@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect } from "react";
 import { getSiteMemberSession } from "@/lib/site-member-session";
 import { requestStudentLoginModal } from "@/lib/site-student-auth-settings";
-import { isGoldShopEnabled } from "@/lib/season-pass";
+import { isGoldShopOpen } from "@/lib/season-pass";
 import { useSeasonPassClient } from "@/hooks/useSeasonPassClient";
 
 function CoinIcon({ className = "h-5 w-5" }: { className?: string }) {
@@ -32,8 +32,7 @@ type GoldShopNavChipProps = {
 
 export default function GoldShopNavChip({ hideChip = false }: GoldShopNavChipProps) {
   const client = useSeasonPassClient();
-  const shopEnabled =
-    isGoldShopEnabled(client.state.season) || client.state.shopItems.length > 0;
+  const shopEnabled = isGoldShopOpen(client.state);
 
   const openModal = useCallback(() => {
     const id = getSiteMemberSession()?.student?.studentId?.trim() || "";
@@ -41,11 +40,11 @@ export default function GoldShopNavChip({ hideChip = false }: GoldShopNavChipPro
       requestStudentLoginModal();
       return;
     }
-    if (!(isGoldShopEnabled(client.state.season) || client.state.shopItems.length > 0)) {
+    if (!isGoldShopOpen(client.state)) {
       return;
     }
     window.dispatchEvent(new Event("site-gold-shop-open"));
-  }, [client.state.season, client.state.shopItems.length]);
+  }, [client.state]);
 
   useEffect(() => {
     void client.load();

@@ -1086,8 +1086,183 @@
   background: #059669;
 }
 
-.gold-shop-dialog {
-  width: min(92vw, 28rem);
+.season-pass-shop-receipt {
+  width: min(92vw, 24.5rem);
+  overflow: hidden;
+  border: 1px solid #6f93c6;
+  border-radius: 0.55rem;
+  background: #eef4fb;
+  box-shadow: 0 16px 32px rgba(15, 35, 70, 0.28);
+}
+
+.season-pass-shop-receipt__head {
+  padding: 0.55rem 0.8rem;
+  background: linear-gradient(180deg, #6ea4ea 0%, #3d78c7 100%);
+  color: #fff;
+  text-align: center;
+  font-size: 0.98rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.18);
+}
+
+.season-pass-shop-receipt.is-short .season-pass-shop-receipt__head {
+  background: linear-gradient(180deg, #e98a8a 0%, #c24b4b 100%);
+}
+
+.season-pass-shop-receipt__body {
+  padding: 0.85rem 0.9rem 0.35rem;
+}
+
+.season-pass-shop-receipt__row {
+  display: grid;
+  grid-template-columns: 7.2rem minmax(0, 1fr);
+  gap: 0.7rem;
+  align-items: start;
+}
+
+.season-pass-shop-receipt__art {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 7.2rem;
+  border: 1px solid #c7b37a;
+  border-radius: 0.2rem;
+  background: linear-gradient(180deg, #f6e7a8, #ead37a);
+}
+
+.season-pass-shop-receipt__art img,
+.season-pass-shop-receipt__art span {
+  width: 6.2rem;
+  height: 6.2rem;
+  object-fit: contain;
+}
+
+.season-pass-shop-receipt__fields {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.season-pass-shop-receipt__fields label {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.season-pass-shop-receipt__fields span {
+  color: #35527a;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.season-pass-shop-receipt__fields strong {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  min-height: 2rem;
+  border: 1px solid #b7c7de;
+  border-radius: 0.2rem;
+  padding: 0.28rem 0.5rem;
+  background: #fff;
+  color: #163a6b;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.season-pass-shop-receipt__fields img {
+  width: 1rem;
+  height: 1rem;
+  object-fit: contain;
+}
+
+.season-pass-shop-receipt__gold {
+  display: grid;
+  gap: 0.2rem;
+  margin: 0.75rem 0 0;
+  border: 1px solid #b7c7de;
+  border-radius: 0.2rem;
+  background: #fff;
+}
+
+.season-pass-shop-receipt__gold > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.42rem 0.65rem;
+}
+
+.season-pass-shop-receipt__gold > div + div {
+  border-top: 1px solid #d5e0ef;
+}
+
+.season-pass-shop-receipt__gold dt {
+  color: #35527a;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.season-pass-shop-receipt__gold dd {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  margin: 0;
+  color: #163a6b;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.season-pass-shop-receipt__gold dd.is-ok {
+  color: #2563eb;
+}
+
+.season-pass-shop-receipt__gold dd.is-short {
+  color: #dc2626;
+}
+
+.season-pass-shop-receipt__gold img {
+  width: 0.95rem;
+  height: 0.95rem;
+  object-fit: contain;
+}
+
+.season-pass-shop-receipt__note {
+  margin: 0.7rem 0 0;
+  color: #35527a;
+  font-size: 0.74rem;
+  font-weight: 700;
+  line-height: 1.45;
+  white-space: pre-line;
+}
+
+.season-pass-shop-receipt__actions {
+  display: flex;
+  justify-content: center;
+  gap: 0.55rem;
+  padding: 0.75rem 0.9rem 0.95rem;
+}
+
+.season-pass-shop-receipt__actions button {
+  min-width: 5.4rem;
+  border: 1px solid #8aa6c8;
+  border-radius: 0.28rem;
+  padding: 0.42rem 0.85rem;
+  background: linear-gradient(180deg, #fff, #dce7f6);
+  color: #163a6b;
+  font-size: 0.82rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.season-pass-shop-receipt__actions button.is-primary {
+  border-color: #3d78c7;
+  background: linear-gradient(180deg, #6ea4ea, #3d78c7);
+  color: #fff;
+}
+
+.season-pass-shop-receipt.is-short .season-pass-shop-receipt__actions button.is-primary {
+  border-color: #c24b4b;
+  background: linear-gradient(180deg, #e98a8a, #c24b4b);
 }
 
 .gold-shop__balance {

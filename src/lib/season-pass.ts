@@ -128,8 +128,16 @@ export type SeasonPassWidgetState = {
   expForLevel: number;
   isPremium: boolean;
   passEnabled: boolean;
+  goldShopEnabled: boolean;
   shopItems: GoldShopItem[];
 };
+
+export function isGoldShopOpen(
+  state: Pick<SeasonPassWidgetState, "goldShopEnabled" | "season" | "shopItems"> | null | undefined,
+) {
+  if (!state) return false;
+  return Boolean(state.goldShopEnabled) || isGoldShopEnabled(state.season) || state.shopItems.length > 0;
+}
 
 export function isSeasonLive(season: Pick<Season, "starts_at" | "ends_at">, now = Date.now()) {
   const start = season.starts_at ? Date.parse(season.starts_at) : Number.NaN;

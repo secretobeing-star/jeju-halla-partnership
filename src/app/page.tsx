@@ -25,7 +25,7 @@ import GiftInboxNavChip from "@/components/GiftInboxNavChip";
 import FrameInventoryNavChip from "@/components/FrameInventoryNavChip";
 import SeasonPassNavChip from "@/components/SeasonPassNavChip";
 import GoldShopNavChip from "@/components/GoldShopNavChip";
-import { isGoldShopEnabled, type SeasonPassWidgetState } from "@/lib/season-pass";
+import { isGoldShopOpen, type SeasonPassWidgetState } from "@/lib/season-pass";
 import SiteBrowserGuideBanner from "@/components/SiteBrowserGuideBanner";
 import SiteAppBackSettingsSync from "@/components/SiteAppBackSettingsSync";
 import SiteAppBackLoadingSplashSync from "@/components/SiteAppBackLoadingSplashSync";
@@ -402,9 +402,8 @@ export default function HomePage() {
         .then((response) => response.json())
         .then((payload: { state?: SeasonPassWidgetState }) => {
           if (!cancelled) {
-            const season = payload.state?.season ?? null;
             setSeasonPassEnabled(Boolean(payload.state?.passEnabled));
-            setGoldShopEnabled(isGoldShopEnabled(season) || (payload.state?.shopItems?.length ?? 0) > 0);
+            setGoldShopEnabled(isGoldShopOpen(payload.state));
           }
         })
         .catch(() => {

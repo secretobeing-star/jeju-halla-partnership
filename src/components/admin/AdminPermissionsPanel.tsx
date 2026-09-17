@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import AdminCollapsibleSection from "@/components/admin/AdminCollapsibleSection";
+import { usePromptModal } from "@/components/PromptModalProvider";
 import { adminApiFetch } from "@/lib/admin-api";
 import {
   AdminAuthUser,
@@ -52,6 +53,7 @@ type ManageApiResponse = {
 };
 
 export default function AdminPermissionsPanel({ currentAccess }: AdminPermissionsPanelProps) {
+  const { alert, confirm } = usePromptModal();
   const [loading, setLoading] = useState(true);
   const [savingUserId, setSavingUserId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
@@ -122,7 +124,20 @@ export default function AdminPermissionsPanel({ currentAccess }: AdminPermission
     e.preventDefault();
 
     if (!selectedUserId) {
-      setMessage("권한을 부여할 Supabase 사용자를 선택해 주세요.");
+      await alert({
+        title: "권한 등록",
+        message: "권한을 부여할 Supabase 사용자를 선택해 주세요.",
+      });
+      return;
+    }
+
+    const selectedEmail = unregisteredUsers.find((user) => user.id === selectedUserId)?.email;
+    const granted = await confirm({
+      title: "권한 계정 추가",
+      message: `${selectedEmail ?? "선택한 계정"}에 관리자 권한을 부여할까요?`,
+      confirmLabel: "추가",
+    });
+    if (!granted) {
       return;
     }
 
@@ -142,18 +157,33 @@ export default function AdminPermissionsPanel({ currentAccess }: AdminPermission
 
       setSelectedUserId("");
       setNewUserPermissions(EMPTY_ADMIN_PERMISSIONS);
-      setMessage("관리자 권한 계정이 등록되었습니다.");
       await loadPermissions();
+      await alert({
+        title: "등록 완료",
+        message: "관리자 권한 계정이 등록되었습니다.",
+      });
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "권한 등록에 실패했습니다.");
+      await alert({
+        title: "등록 실패",
+        message: error instanceof Error ? error.message : "권한 등록에 실패했습니다.",
+      });
     } finally {
       setSavingUserId(null);
     }
   }
 
-  async function handleSaveRecord(userId: string) {
+  async function handleSaveRecord(userId: string, email: string) {
     const draft = drafts[userId];
     if (!draft) {
+      return;
+    }
+
+    const confirmed = await confirm({
+      title: "권한 저장",
+      message: `${email} 계정의 권한 설정을 저장할까요?`,
+      confirmLabel: "저장",
+    });
+    if (!confirmed) {
       return;
     }
 
@@ -171,17 +201,29 @@ export default function AdminPermissionsPanel({ currentAccess }: AdminPermission
         }),
       });
 
-      setMessage("권한 설정이 저장되었습니다.");
       await loadPermissions();
+      await alert({
+        title: "저장 완료",
+        message: "권한 설정이 저장되었습니다.",
+      });
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "권한 저장에 실패했습니다.");
+      await alert({
+        title: "저장 실패",
+        message: error instanceof Error ? error.message : "권한 저장에 실패했습니다.",
+      });
     } finally {
       setSavingUserId(null);
     }
   }
 
   async function handleDeleteRecord(userId: string, email: string) {
-    if (!window.confirm(`${email} 계정의 관리자 권한을 삭제하시겠습니까?`)) {
+    const confirmed = await confirm({
+      title: "권한 삭제",
+      message: `${email} 계정의 관리자 권한을 삭제할까요?`,
+      confirmLabel: "삭제",
+      destructive: true,
+    });
+    if (!confirmed) {
       return;
     }
 
@@ -189,14 +231,21 @@ export default function AdminPermissionsPanel({ currentAccess }: AdminPermission
     setMessage("");
 
     try {
-      await adminApiFetch(`/api/admin/permissions?userId=${encodeURIComponent(userId)}`, {
+      await adminApiFetch("/api/admin/permissions", {
         method: "DELETE",
+        body: JSON.stringify({ user_id: userId }),
       });
 
-      setMessage("관리자 권한이 삭제되었습니다.");
       await loadPermissions();
+      await alert({
+        title: "삭제 완료",
+        message: "관리자 권한이 삭제되었습니다.",
+      });
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "권한 삭제에 실패했습니다.");
+      await alert({
+        title: "삭제 실패",
+        message: error instanceof Error ? error.message : "권한 삭제에 실패했습니다.",
+      });
     } finally {
       setSavingUserId(null);
     }
@@ -336,7 +385,7 @@ export default function AdminPermissionsPanel({ currentAccess }: AdminPermission
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
-                        onClick={() => void handleSaveRecord(record.user_id)}
+                        onClick={() => void handleSaveRecord(record.user_id, record.email)}
                         disabled={savingUserId === record.user_id}
                         className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-60"
                       >

@@ -76,6 +76,8 @@ export default function GoldShopAdminPanel({ onMessage }: GoldShopAdminPanelProp
   const [addPrice, setAddPrice] = useState(0);
   const [addOriginal, setAddOriginal] = useState(0);
   const [addBadge, setAddBadge] = useState("");
+  const shopOn = seasons.some((item) => item.gold_shop_enabled !== false);
+  const [togglingShop, setTogglingShop] = useState(false);
 
   const selected = useMemo(
     () => seasons.find((item) => item.id === seasonId) ?? seasons[0] ?? null,
@@ -199,7 +201,7 @@ export default function GoldShopAdminPanel({ onMessage }: GoldShopAdminPanelProp
             premium_gold_price: row.price_gold,
             premium_original_price_gold: row.original_price_gold,
             premium_badge_label: row.badge_label,
-            gold_shop_enabled: true,
+            gold_shop_enabled: selected.gold_shop_enabled !== false,
           }),
         });
         setSeasons((prev) =>
@@ -210,7 +212,7 @@ export default function GoldShopAdminPanel({ onMessage }: GoldShopAdminPanelProp
                   premium_gold_price: row.price_gold,
                   premium_original_price_gold: row.original_price_gold,
                   premium_badge_label: row.badge_label,
-                  gold_shop_enabled: true,
+                  gold_shop_enabled: selected.gold_shop_enabled !== false,
                 }
               : item,
           ),
@@ -259,7 +261,7 @@ export default function GoldShopAdminPanel({ onMessage }: GoldShopAdminPanelProp
             premium_gold_price: addPrice,
             premium_original_price_gold: addOriginal,
             premium_badge_label: addBadge || "인기",
-            gold_shop_enabled: true,
+            gold_shop_enabled: selected.gold_shop_enabled !== false,
           }),
         });
         onMessage("시즌패스를 상점에 등록했습니다.");
@@ -359,8 +361,51 @@ export default function GoldShopAdminPanel({ onMessage }: GoldShopAdminPanelProp
     }
   }
 
+  async function toggleGoldShop(enabled: boolean) {
+    if (seasons.length === 0) {
+      onMessage("시즌이 없습니다. 시즌패스 메뉴에서 시즌만 만들어 주세요.");
+      return;
+    }
+    setTogglingShop(true);
+    try {
+      await Promise.all(
+        seasons.map((season) =>
+          adminApiFetch("/api/admin/season-pass", {
+            method: "PATCH",
+            body: JSON.stringify({
+              entity: "season",
+              id: season.id,
+              gold_shop_enabled: enabled,
+            }),
+          }),
+        ),
+      );
+      setSeasons((prev) => prev.map((item) => ({ ...item, gold_shop_enabled: enabled })));
+      onMessage(enabled ? "골드상점을 켰습니다. 시즌패스 활성화와는 별개입니다." : "골드상점을 껐습니다.");
+    } catch (error) {
+      onMessage(error instanceof Error ? error.message : "저장에 실패했습니다.");
+    } finally {
+      setTogglingShop(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
+      <label className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+        <span>
+          골드상점 활성화
+          <span className="mt-0.5 block text-xs font-normal text-amber-800">
+            시즌패스를 켜지 않아도 상점만 따로 켤 수 있습니다.
+          </span>
+        </span>
+        <input
+          type="checkbox"
+          className="h-4 w-4"
+          checked={shopOn}
+          disabled={togglingShop || seasons.length === 0}
+          onChange={(event) => void toggleGoldShop(event.target.checked)}
+        />
+      </label>
       <AdminCollapsibleSection title="물품 등록">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <label className="text-xs text-gray-500">

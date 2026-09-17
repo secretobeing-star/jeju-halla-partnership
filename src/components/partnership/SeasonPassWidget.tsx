@@ -25,6 +25,7 @@ const EMPTY: SeasonPassWidgetState = {
   isPremium: false,
   shopItems: [],
   passEnabled: false,
+  goldShopEnabled: false,
 };
 
 export default function SeasonPassWidget() {

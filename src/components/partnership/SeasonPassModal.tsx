@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import type { GoldShopItem, RewardItem, SeasonPassTrack, SeasonPassWidgetState } from "@/lib/season-pass";
-import { isGoldShopEnabled, seasonPassQuestTypeLabel } from "@/lib/season-pass";
+import { isGoldShopOpen, seasonPassQuestTypeLabel } from "@/lib/season-pass";
 import { useSeasonPassClient } from "@/hooks/useSeasonPassClient";
 
 function remainingDays(endsAt: string | null) {
@@ -98,7 +98,7 @@ export default function SeasonPassModalBody({
   const { userId, state, busy, message, percent, claim, claimAll, claimPopup, clearClaimPopup } = client;
   const season = state.season;
   const passEnabled = Boolean(state.passEnabled);
-  const shopEnabled = isGoldShopEnabled(season) || state.shopItems.length > 0;
+  const shopEnabled = isGoldShopOpen(state);
   const hideSeasonText = Boolean(season?.ui_image_url || season?.bg_image_url || season?.track_image_url);
   const days = passEnabled ? remainingDays(season?.ends_at ?? null) : null;
   const lastLevel = state.levels[state.levels.length - 1] ?? null;
@@ -409,10 +409,17 @@ function GoldShopBoard({ client }: { client: ReturnType<typeof useSeasonPassClie
 
   async function confirmBuy() {
     if (!pending) return;
+    if (gold < pending.price_gold) return;
     const id = pending.id;
     setPending(null);
     await buyShopItem(id);
   }
+
+  const pendingImage =
+    pending?.reward?.image_url ||
+    (pending?.item_kind === "premium" ? state.season?.premium_pass_image_url : null);
+  const canAfford = pending ? gold >= pending.price_gold : false;
+  const goldAfter = pending ? gold - pending.price_gold : gold;
 
   return (
     <div className="season-pass-shop">
@@ -458,8 +465,8 @@ function GoldShopBoard({ client }: { client: ReturnType<typeof useSeasonPassClie
                 ? Math.round((1 - item.price_gold / item.original_price_gold) * 100)
                 : 0;
             const badge = item.badge_label.trim();
-            const disabled = busy !== null || owned || soldOut || item.price_gold <= 0 || gold < item.price_gold;
-            const status = owned ? "보유 중" : soldOut ? "품절" : gold < item.price_gold ? "골드 부족" : "";
+            const disabled = busy !== null || owned || soldOut;
+            const status = owned ? "보유 중" : soldOut ? "품절" : "";
             return (
               <li key={item.id}>
                 <div className={`season-pass-shop__card ${owned || soldOut ? "is-disabled" : ""}`}>
@@ -481,9 +488,12 @@ function GoldShopBoard({ client }: { client: ReturnType<typeof useSeasonPassClie
                     type="button"
                     className="season-pass-shop__buy"
                     disabled={disabled}
-                    onClick={() => setPending(item)}
+                    onClick={() => {
+                      if (owned || soldOut) return;
+                      setPending(item);
+                    }}
                   >
-                    구입하기
+                    {owned ? "보유 중" : "구입하기"}
                   </button>
                 </div>
               </li>
@@ -499,46 +509,76 @@ function GoldShopBoard({ client }: { client: ReturnType<typeof useSeasonPassClie
               onClick={() => setPending(null)}
             >
               <div
-                className="season-pass-claim-dialog season-pass-shop-buy"
+                className={`season-pass-shop-receipt ${canAfford ? "" : "is-short"}`}
                 role="dialog"
                 aria-modal="true"
-                aria-label="구입하기"
+                aria-label={canAfford ? "아이템 구입" : "골드 부족"}
                 onClick={(event) => event.stopPropagation()}
               >
-                <h3>구입하시겠습니까?</h3>
-                <p>
-                  {pending.name}
-                  {"\n"}
-                  {pending.price_gold.toLocaleString("ko-KR")} 골드
-                </p>
-                {pending.reward?.image_url ||
-                (pending.item_kind === "premium" && state.season?.premium_pass_image_url) ? (
-                  <ul>
-                    <li>
-                      <img
-                        src={
-                          pending.reward?.image_url ||
-                          state.season?.premium_pass_image_url ||
-                          ""
-                        }
-                        alt=""
-                      />
-                      <span>{pending.name}</span>
-                    </li>
-                  </ul>
-                ) : null}
-                <div className="season-pass-claim-dialog__actions">
-                  <button type="button" onClick={() => setPending(null)}>
-                    취소
-                  </button>
-                  <button
-                    type="button"
-                    className="is-primary"
-                    disabled={busy !== null}
-                    onClick={() => void confirmBuy()}
-                  >
-                    구입하기
-                  </button>
+                <div className="season-pass-shop-receipt__head">
+                  {canAfford ? "아이템 구입" : "골드 부족"}
+                </div>
+                <div className="season-pass-shop-receipt__body">
+                  <div className="season-pass-shop-receipt__row">
+                    <div className="season-pass-shop-receipt__art">
+                      {pendingImage ? <img src={pendingImage} alt="" /> : <span />}
+                    </div>
+                    <div className="season-pass-shop-receipt__fields">
+                      <label>
+                        <span>* 아이템 이름</span>
+                        <strong>{pending.name}</strong>
+                      </label>
+                      <label>
+                        <span>* 아이템 가격</span>
+                        <strong>
+                          {pending.price_gold.toLocaleString("ko-KR")}
+                          {goldIcon ? <img src={goldIcon} alt="" /> : " 골드"}
+                        </strong>
+                      </label>
+                    </div>
+                  </div>
+                  <dl className="season-pass-shop-receipt__gold">
+                    <div>
+                      <dt>현재 골드</dt>
+                      <dd>
+                        {gold.toLocaleString("ko-KR")}
+                        {goldIcon ? <img src={goldIcon} alt="" /> : " 골드"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>구입 후 골드</dt>
+                      <dd className={canAfford ? "is-ok" : "is-short"}>
+                        {goldAfter.toLocaleString("ko-KR")}
+                        {goldIcon ? <img src={goldIcon} alt="" /> : " 골드"}
+                      </dd>
+                    </div>
+                  </dl>
+                  <p className="season-pass-shop-receipt__note">
+                    {canAfford
+                      ? "* 상점에서 구매한 상품은 취소가 되지 않습니다.\n내용을 신중히 확인하신 후 구매해 주세요."
+                      : "* 골드가 부족하여 구입할 수 없습니다.\n필요한 골드를 모은 뒤 다시 시도해 주세요."}
+                  </p>
+                </div>
+                <div className="season-pass-shop-receipt__actions">
+                  {canAfford ? (
+                    <>
+                      <button
+                        type="button"
+                        className="is-primary"
+                        disabled={busy !== null}
+                        onClick={() => void confirmBuy()}
+                      >
+                        확인
+                      </button>
+                      <button type="button" onClick={() => setPending(null)}>
+                        취소
+                      </button>
+                    </>
+                  ) : (
+                    <button type="button" className="is-primary" onClick={() => setPending(null)}>
+                      확인
+                    </button>
+                  )}
                 </div>
               </div>
             </div>,

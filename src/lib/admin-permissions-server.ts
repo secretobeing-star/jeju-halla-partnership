@@ -90,13 +90,15 @@ export async function isDeveloperFreePass(userId: string, email: string) {
     return false;
   }
 
-  const { error: claimError } = await admin
+  const { data: claimed, error: claimError } = await admin
     .from("site_settings")
     .update({ developer_user_id: userId })
     .eq("id", 1)
-    .is("developer_user_id", null);
+    .is("developer_user_id", null)
+    .select("developer_user_id")
+    .maybeSingle();
 
-  if (!claimError) {
+  if (!claimError && claimed?.developer_user_id === userId) {
     return true;
   }
 

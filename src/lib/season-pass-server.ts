@@ -233,6 +233,7 @@ export async function getSeasonPassState(userId: string): Promise<SeasonPassWidg
     expForLevel: 1000,
     isPremium: false,
     passEnabled: false,
+    goldShopEnabled: false,
     shopItems: [],
   };
 
@@ -244,19 +245,21 @@ export async function getSeasonPassState(userId: string): Promise<SeasonPassWidg
   try {
     const passSeason = await getActiveSeason(admin);
     const shopSeasons = await listShopSeasons(admin);
+    const goldShopEnabled = shopSeasons.length > 0;
     const shopSeason =
       passSeason && passSeason.gold_shop_enabled !== false
         ? passSeason
         : shopSeasons[0] ?? null;
     const season = passSeason ?? shopSeason;
     if (!season) {
-      return empty;
+      return { ...empty, goldShopEnabled };
     }
 
     const seasonOnly: SeasonPassWidgetState = {
       ...empty,
       season,
       passEnabled: Boolean(passSeason),
+      goldShopEnabled,
       nextLevelExp: season.exp_per_level,
       expForLevel: season.exp_per_level,
     };
@@ -393,6 +396,7 @@ export async function getSeasonPassState(userId: string): Promise<SeasonPassWidg
       expForLevel: computed.expForLevel,
       isPremium: Boolean(progress?.is_premium),
       passEnabled: true,
+      goldShopEnabled,
       shopItems: await loadGoldShopItems(
         admin,
         shopSeasons.length > 0 ? shopSeasons : passSeason.gold_shop_enabled !== false ? [passSeason] : [],
@@ -1007,7 +1011,7 @@ export async function purchasePremiumPass(userIdRaw: string) {
   if (!state.passEnabled || !state.season) {
     throw new Error("진행 중인 시즌이 없습니다.");
   }
-  if (state.season.gold_shop_enabled === false) {
+  if (state.season.gold_shop_enabled === false && !state.goldShopEnabled) {
     throw new Error("골드 상점이 비활성화되어 있습니다.");
   }
   if (state.isPremium) {
@@ -1061,8 +1065,8 @@ export async function purchaseGoldShopItem(userIdRaw: string, shopItemIdRaw: str
   }
 
   const state = await getSeasonPassState(userId);
-  if (!state.season) {
-    throw new Error("골드 상점을 열 수 없습니다.");
+  if (!state.goldShopEnabled || !state.season) {
+    throw new Error("골드 상점이 비활성화되어 있습니다.");
   }
 
   const shopItem = state.shopItems.find((item) => item.id === shopItemId);

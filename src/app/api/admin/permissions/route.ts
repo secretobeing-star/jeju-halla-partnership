@@ -9,9 +9,7 @@ import {
   getRequestUser,
   canManageAdminPermissions,
   hasDeveloperPrivilege,
-  isDeveloperFreePass,
   listAuthUsers,
-  listPermissionRows,
   resolveAdminAccess,
   toAccessResponse,
 } from "@/lib/admin-permissions-server";
@@ -232,13 +230,29 @@ export async function PATCH(request: NextRequest) {
   return NextResponse.json({ record: data });
 }
 
+async function readDeleteUserId(request: NextRequest) {
+  const fromQuery =
+    request.nextUrl.searchParams.get("userId")?.trim() ||
+    request.nextUrl.searchParams.get("user_id")?.trim();
+  if (fromQuery) {
+    return fromQuery;
+  }
+
+  try {
+    const body = (await request.json()) as SavePermissionBody & { userId?: string };
+    return body.user_id?.trim() || body.userId?.trim() || "";
+  } catch {
+    return "";
+  }
+}
+
 export async function DELETE(request: NextRequest) {
   const auth = await requirePermissionManager(request);
   if (auth.error) {
     return auth.error;
   }
 
-  const userId = request.nextUrl.searchParams.get("userId")?.trim();
+  const userId = await readDeleteUserId(request);
   if (!userId) {
     return NextResponse.json({ error: "userId가 필요합니다." }, { status: 400 });
   }
@@ -255,21 +269,33 @@ export async function DELETE(request: NextRequest) {
     );
   }
 
-  const { data: existing } = await admin
+  const { data: existing, error: existingError } = await admin
     .from("admin_user_permissions")
-    .select("email")
+    .select("user_id, email")
     .eq("user_id", userId)
     .maybeSingle();
 
-  const targetEmail = existing?.email ?? "";
-  if (targetEmail && (await isDeveloperFreePass(userId, targetEmail))) {
-    return NextResponse.json({ error: "프리패스 개발자 계정은 삭제할 수 없습니다." }, { status: 400 });
+  if (existingError) {
+    return NextResponse.json({ error: existingError.message }, { status: 500 });
   }
 
-  const { error } = await admin.from("admin_user_permissions").delete().eq("user_id", userId);
+  if (!existing) {
+    return NextResponse.json({ error: "권한 정보를 찾을 수 없습니다." }, { status: 404 });
+  }
+
+  const { data: deleted, error } = await admin
+    .from("admin_user_permissions")
+    .delete()
+    .eq("user_id", userId)
+    .select("user_id")
+    .maybeSingle();
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  if (!deleted) {
+    return NextResponse.json({ error: "권한 계정을 삭제하지 못했습니다." }, { status: 500 });
   }
 
   return NextResponse.json({ success: true });

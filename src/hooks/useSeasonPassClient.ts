@@ -54,6 +54,7 @@ export const EMPTY_SEASON_PASS_STATE: SeasonPassWidgetState = {
   isPremium: false,
   shopItems: [],
   passEnabled: false,
+  goldShopEnabled: false,
 };
 
 export function useSeasonPassClient() {
@@ -285,6 +286,7 @@ export function useSeasonPassClient() {
       }
       setMessage("프리미엄 패스를 구매했습니다.");
       window.dispatchEvent(new Event("site-season-pass-refresh"));
+      window.location.reload();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "구매에 실패했습니다.");
     } finally {
@@ -317,28 +319,11 @@ export function useSeasonPassClient() {
       if (payload.state) {
         setState(payload.state);
       }
-      const gifted = Boolean(payload.gifted);
-      const name = payload.name?.trim() || "상품";
-      if (gifted) {
+      if (Boolean(payload.gifted)) {
         window.dispatchEvent(new Event("site-gift-inbox-refresh"));
       }
       window.dispatchEvent(new Event("site-season-pass-refresh"));
-      setClaimPopup({
-        title: "구매했습니다",
-        body: gifted
-          ? `${name}을(를) 선물함으로 보냈습니다. 선물함에서 받아 주세요.`
-          : `${name}을(를) 구매했습니다.`,
-        items: [
-          {
-            name,
-            imageUrl:
-              state.shopItems.find((item) => item.id === shopItemId)?.reward?.image_url ||
-              null,
-            gifted,
-          },
-        ],
-        gifted,
-      });
+      window.location.reload();
     } catch (error) {
       openClaimNotice("구매하지 못했습니다", error instanceof Error ? error.message : "구매에 실패했습니다.");
     } finally {
