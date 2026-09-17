@@ -6,6 +6,7 @@ import {
   SITE_MEMBER_SESSION_EVENT,
 } from "@/lib/site-member-session";
 import { grantCardFrameUnlock } from "@/lib/student-card-frames";
+import { studentAuthFetch } from "@/lib/student-session";
 import type { RewardItem, SeasonPassTrack, SeasonPassWidgetState } from "@/lib/season-pass";
 
 export type SeasonPassClaimPopupItem = {
@@ -77,7 +78,7 @@ export function useSeasonPassClient() {
   }, [refreshUser]);
 
   const load = useCallback(async () => {
-    const response = await fetch(`/api/season-pass?userId=${encodeURIComponent(userId)}`);
+    const response = await studentAuthFetch(`/api/season-pass?userId=${encodeURIComponent(userId)}`);
     const payload = (await response.json()) as { state?: SeasonPassWidgetState; error?: string };
     if (payload.state) {
       setState(payload.state);
@@ -136,7 +137,7 @@ export function useSeasonPassClient() {
         : state.levels.find((item) => item.level === level)?.free_reward) ??
       null;
     try {
-      const response = await fetch("/api/season-pass/claim", {
+      const response = await studentAuthFetch("/api/season-pass/claim", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, level, track }),
@@ -241,7 +242,7 @@ export function useSeasonPassClient() {
     setBusy("attendance");
     setMessage("");
     try {
-      const response = await fetch("/api/season-pass/attendance", {
+      const response = await studentAuthFetch("/api/season-pass/attendance", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId }),
@@ -270,7 +271,7 @@ export function useSeasonPassClient() {
     setBusy("premium");
     setMessage("");
     try {
-      const response = await fetch("/api/season-pass/buy-premium", {
+      const response = await studentAuthFetch("/api/season-pass/buy-premium", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId }),
@@ -299,7 +300,7 @@ export function useSeasonPassClient() {
     setBusy(`shop-${shopItemId}`);
     setMessage("");
     try {
-      const response = await fetch("/api/season-pass/shop-buy", {
+      const response = await studentAuthFetch("/api/season-pass/shop-buy", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, shopItemId }),

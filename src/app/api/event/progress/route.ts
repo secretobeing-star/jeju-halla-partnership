@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 import { asStringArray, emptyProgress } from "@/lib/map-events";
+import { requireStudentSession } from "@/lib/student-session-server";
 
 export async function GET(request: NextRequest) {
   const admin = createSupabaseAdmin();
@@ -8,10 +9,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Supabase 서버 설정이 없습니다." }, { status: 503 });
   }
 
-  const userId = request.nextUrl.searchParams.get("userId")?.trim() || "";
+  const requestedUserId = request.nextUrl.searchParams.get("userId")?.trim() || "";
   const eventId = request.nextUrl.searchParams.get("eventId")?.trim() || "";
-  if (!userId || !eventId) {
-    return NextResponse.json({ error: "userId와 eventId가 필요합니다." }, { status: 400 });
+  const auth = await requireStudentSession(request, [requestedUserId]);
+  if (!auth.ok) {
+    return auth.response;
+  }
+  const userId = auth.studentId;
+  if (!eventId) {
+    return NextResponse.json({ error: "eventId가 필요합니다." }, { status: 400 });
   }
 
   const { data, error } = await admin

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireStudentSession } from "@/lib/student-session-server";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 
 export async function GET(request: NextRequest) {
@@ -6,15 +7,16 @@ export async function GET(request: NextRequest) {
   if (!admin) {
     return NextResponse.json({ error: "Supabase 서버 설정이 없습니다." }, { status: 503 });
   }
-  const userId = request.nextUrl.searchParams.get("userId")?.trim() || "";
-  if (!userId) {
-    return NextResponse.json({ error: "userId가 필요합니다." }, { status: 400 });
+  const requestedUserId = request.nextUrl.searchParams.get("userId")?.trim() || "";
+  const auth = await requireStudentSession(request, [requestedUserId]);
+  if (!auth.ok) {
+    return auth.response;
   }
 
   const { data, error } = await admin
     .from("user_favorites")
     .select("place_id")
-    .eq("user_id", userId);
+    .eq("user_id", auth.studentId);
 
   if (error) {
     return NextResponse.json({ placeIds: [] as string[] });
@@ -38,10 +40,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
 
-  const userId = body.userId?.trim() || "";
+  const auth = await requireStudentSession(request, [body.userId]);
+  if (!auth.ok) {
+    return auth.response;
+  }
+  const userId = auth.studentId;
   const placeId = body.placeId?.trim() || "";
-  if (!userId || !placeId) {
-    return NextResponse.json({ error: "userId와 placeId가 필요합니다." }, { status: 400 });
+  if (!placeId) {
+    return NextResponse.json({ error: "placeId가 필요합니다." }, { status: 400 });
   }
 
   if (body.favorited === false) {

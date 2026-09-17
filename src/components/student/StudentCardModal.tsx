@@ -13,6 +13,7 @@ import {
   type CardFrameUserState,
   type PublicCardFrameItem,
 } from "@/lib/student-card-frames";
+import { studentAuthFetch } from "@/lib/student-session";
 
 const DISMISS_THRESHOLD_PX = 110;
 /** 스와이프 속도 +250% (기존 대비 3.5배) */
@@ -198,7 +199,7 @@ export default function StudentCardModal({
     setFrameUnlockBusy(true);
     setFrameMessage(null);
     try {
-      const response = await fetch("/api/student/frames/unlock", {
+      const response = await studentAuthFetch("/api/student/frames/unlock", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code, studentId: student.studentId }),

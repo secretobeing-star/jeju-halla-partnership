@@ -7,6 +7,7 @@ import {
   toPublicCardFrame,
 } from "@/lib/student-card-frames";
 import type { StudentRewardRow } from "@/lib/student-rewards";
+import { requireStudentSession } from "@/lib/student-session-server";
 
 export async function POST(request: NextRequest) {
   let body: { studentId?: string; rewardId?: string };
@@ -16,11 +17,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid body." }, { status: 400 });
   }
 
-  const studentId = body.studentId?.trim() ?? "";
+  const auth = await requireStudentSession(request, [body.studentId]);
+  if (!auth.ok) {
+    return auth.response;
+  }
+  const studentId = auth.studentId;
   const rewardId = body.rewardId?.trim() ?? "";
-  if (!studentId || !rewardId) {
+  if (!rewardId) {
     return NextResponse.json(
-      { error: "studentId와 rewardId가 필요합니다." },
+      { error: "rewardId가 필요합니다." },
       { status: 400 },
     );
   }

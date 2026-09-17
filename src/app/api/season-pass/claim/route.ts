@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { claimSeasonReward } from "@/lib/season-pass-server";
+import { requireStudentSession } from "@/lib/student-session-server";
 
 export async function POST(request: NextRequest) {
   try {
@@ -9,9 +10,12 @@ export async function POST(request: NextRequest) {
       level?: number;
       track?: "free" | "premium";
     };
-    const userId = body.userId?.trim() || body.studentId?.trim() || "";
+    const auth = await requireStudentSession(request, [body.userId, body.studentId]);
+    if (!auth.ok) {
+      return auth.response;
+    }
     const { state, frameId, gifted } = await claimSeasonReward({
-      userId,
+      userId: auth.studentId,
       level: Number(body.level) || 0,
       track: body.track === "premium" ? "premium" : "free",
     });

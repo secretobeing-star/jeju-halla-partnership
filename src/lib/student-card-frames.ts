@@ -5,6 +5,7 @@ import {
   type CardFrameItem,
   type PublicCardFrameItem,
 } from "@/data/cardFrames";
+import { studentAuthFetch } from "@/lib/student-session";
 
 export type ExtendedCardFrameItem = CardFrameItem & {
   inboxTitle?: string;
@@ -309,7 +310,7 @@ export async function syncCardFrameUserStateFromRemote(
   const local = readCardFrameUserState(studentId);
 
   try {
-    const response = await fetch(
+    const response = await studentAuthFetch(
       `/api/student/frames/state?studentId=${encodeURIComponent(studentId.trim())}`,
       { cache: "no-store" },
     );
@@ -384,7 +385,7 @@ export async function persistCardFrameUserStateRemote(
     return false;
   }
   try {
-    const response = await fetch("/api/student/frames/state", {
+    const response = await studentAuthFetch("/api/student/frames/state", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

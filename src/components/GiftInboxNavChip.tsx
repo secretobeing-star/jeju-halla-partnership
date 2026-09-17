@@ -10,6 +10,7 @@ import type { UserGift } from "@/lib/map-events";
 import { parseGiftPayload } from "@/lib/map-events";
 import type { PublicCardFrameItem } from "@/data/cardFrames";
 import { requestStudentLoginModal } from "@/lib/site-student-auth-settings";
+import { studentAuthFetch } from "@/lib/student-session";
 
 function GiftIcon({ className = "h-5 w-5" }: { className?: string }) {
   return (
@@ -93,7 +94,7 @@ export default function GiftInboxNavChip({ hideChip = false }: GiftInboxNavChipP
     }
     setLoading(true);
     try {
-      const adminRes = await fetch(`/api/student/rewards?studentId=${encodeURIComponent(id)}`);
+      const adminRes = await studentAuthFetch(`/api/student/rewards?studentId=${encodeURIComponent(id)}`);
       const adminPayload = (await adminRes.json()) as {
         rewards?: StudentRewardPublic[];
         pendingCount?: number;
@@ -104,7 +105,7 @@ export default function GiftInboxNavChip({ hideChip = false }: GiftInboxNavChipP
       let gifts: UserGift[] = [];
       let giftPending = 0;
       try {
-        const giftRes = await fetch(`/api/gift?userId=${encodeURIComponent(id)}`);
+        const giftRes = await studentAuthFetch(`/api/gift?userId=${encodeURIComponent(id)}`);
         const giftPayload = (await giftRes.json()) as {
           gifts?: UserGift[];
           pendingCount?: number;
@@ -174,7 +175,7 @@ export default function GiftInboxNavChip({ hideChip = false }: GiftInboxNavChipP
     setBusyId(gift.id);
     setMessage(null);
     try {
-      const response = await fetch("/api/gift/claim", {
+      const response = await studentAuthFetch("/api/gift/claim", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: studentId, studentId, giftId: gift.id }),
@@ -226,7 +227,7 @@ export default function GiftInboxNavChip({ hideChip = false }: GiftInboxNavChipP
     setBusyId(reward.id);
     setMessage(null);
     try {
-      const response = await fetch("/api/student/rewards/claim", {
+      const response = await studentAuthFetch("/api/student/rewards/claim", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ studentId, rewardId: reward.id }),
@@ -266,7 +267,7 @@ export default function GiftInboxNavChip({ hideChip = false }: GiftInboxNavChipP
     setDeletingId(rewardId);
     setMessage(null);
     try {
-      const response = await fetch(`/api/student/rewards?studentId=${encodeURIComponent(studentId)}&rewardId=${encodeURIComponent(rewardId)}`, {
+      const response = await studentAuthFetch(`/api/student/rewards?studentId=${encodeURIComponent(studentId)}&rewardId=${encodeURIComponent(rewardId)}`, {
         method: "DELETE",
       });
       const payload = (await response.json()) as {
@@ -294,7 +295,7 @@ export default function GiftInboxNavChip({ hideChip = false }: GiftInboxNavChipP
     setDeletingId(giftId);
     setMessage(null);
     try {
-      const response = await fetch(`/api/gift?userId=${encodeURIComponent(studentId)}&giftId=${encodeURIComponent(giftId)}`, {
+      const response = await studentAuthFetch(`/api/gift?userId=${encodeURIComponent(studentId)}&giftId=${encodeURIComponent(giftId)}`, {
         method: "DELETE",
       });
       const payload = (await response.json()) as {

@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { completeAttendance } from "@/lib/season-pass-server";
+import { requireStudentSession } from "@/lib/student-session-server";
 
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as { userId?: string; studentId?: string };
-    const userId = body.userId?.trim() || body.studentId?.trim() || "";
-    const result = await completeAttendance(userId);
+    const auth = await requireStudentSession(request, [body.userId, body.studentId]);
+    if (!auth.ok) {
+      return auth.response;
+    }
+    const result = await completeAttendance(auth.studentId);
     if (!result.applied) {
       const status =
         result.reason === "로그인이 필요합니다."

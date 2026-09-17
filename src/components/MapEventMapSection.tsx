@@ -19,6 +19,7 @@ import { getCurrentGeolocation } from "@/lib/geolocation";
 import { getSiteMemberSession } from "@/lib/site-member-session";
 import { getBoardVoterKey } from "@/lib/board-voter";
 import { SITE_STUDENT_NEED_LOGIN_EVENT } from "@/lib/site-student-auth-settings";
+import { studentAuthFetch } from "@/lib/student-session";
 import { supabase } from "@/lib/supabase";
 
 const DEFAULT_TAB_ID = "__default_partners__";
@@ -481,7 +482,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       return;
     }
     try {
-      const response = await fetch(
+      const response = await studentAuthFetch(
         `/api/event/progress?userId=${encodeURIComponent(userId)}&eventId=${encodeURIComponent(activeEvent.id)}`,
         { cache: "no-store" },
       );
@@ -599,7 +600,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     setMessage(null);
 
     try {
-      const response = await fetch("/api/event/stamp-action", {
+      const response = await studentAuthFetch("/api/event/stamp-action", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

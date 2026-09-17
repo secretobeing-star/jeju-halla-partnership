@@ -30,6 +30,7 @@ import {
   type SiteStudentAuthDisplay,
 } from "@/lib/site-student-auth-settings";
 import type { PublicCardFrameItem } from "@/lib/student-card-frames";
+import { studentAuthFetch } from "@/lib/student-session";
 
 type FlowStep = "idle" | "guide" | "form" | "card";
 
@@ -266,7 +267,7 @@ export default function StudentIdProvider({
             patchSiteMemberStudentProfile(next);
 
             try {
-              const response = await fetch("/api/student/photo", {
+              const response = await studentAuthFetch("/api/student/photo", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({

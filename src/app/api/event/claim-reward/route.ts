@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { grantStudentCardFrameOnServer } from "@/lib/student-card-settings-server";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 import type { MapEventReward } from "@/lib/map-events";
+import { requireStudentSession } from "@/lib/student-session-server";
 
 type ClaimBody = {
   eventId?: string;
@@ -25,11 +26,15 @@ export async function POST(request: NextRequest) {
 
   const eventId = body.eventId?.trim() || "";
   const rewardId = body.rewardId?.trim() || "";
-  const userId = body.userId?.trim() || body.studentId?.trim() || "";
-  const studentId = body.studentId?.trim() || userId;
+  const auth = await requireStudentSession(request, [body.userId, body.studentId]);
+  if (!auth.ok) {
+    return auth.response;
+  }
+  const userId = auth.studentId;
+  const studentId = auth.studentId;
 
-  if (!eventId || !rewardId || !userId) {
-    return NextResponse.json({ error: "eventId, rewardId, userId가 필요합니다." }, { status: 400 });
+  if (!eventId || !rewardId) {
+    return NextResponse.json({ error: "eventId, rewardId가 필요합니다." }, { status: 400 });
   }
 
   const { data: progress } = await admin

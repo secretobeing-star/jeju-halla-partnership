@@ -7,6 +7,7 @@ import {
   type CardFrameUnlockSource,
   type CardFrameUserState,
 } from "@/lib/student-card-frames";
+import { requireStudentSession } from "@/lib/student-session-server";
 
 function parseStateBody(body: unknown): CardFrameUserState | null {
   if (!body || typeof body !== "object") {
@@ -45,10 +46,12 @@ function parseStateBody(body: unknown): CardFrameUserState | null {
 }
 
 export async function GET(request: NextRequest) {
-  const studentId = request.nextUrl.searchParams.get("studentId")?.trim() || "";
-  if (!studentId) {
-    return NextResponse.json({ error: "studentId가 필요합니다." }, { status: 400 });
+  const requestedStudentId = request.nextUrl.searchParams.get("studentId")?.trim() || "";
+  const auth = await requireStudentSession(request, [requestedStudentId]);
+  if (!auth.ok) {
+    return auth.response;
   }
+  const studentId = auth.studentId;
 
   try {
     const loaded = await loadStudentCardFrameState(studentId);
@@ -81,11 +84,13 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: "Invalid body." }, { status: 400 });
   }
 
-  const studentId =
-    typeof body.studentId === "string" ? body.studentId.trim() : "";
-  if (!studentId) {
-    return NextResponse.json({ error: "studentId가 필요합니다." }, { status: 400 });
+  const auth = await requireStudentSession(request, [
+    typeof body.studentId === "string" ? body.studentId : "",
+  ]);
+  if (!auth.ok) {
+    return auth.response;
   }
+  const studentId = auth.studentId;
 
   const parsed = parseStateBody(body);
   if (!parsed) {
@@ -93,18 +98,18 @@ export async function PUT(request: NextRequest) {
   }
 
   try {
-    // 서버에 이미 있는 해금 목록과 병합 (다른 기기 해금분 보존)
     const loaded = await loadStudentCardFrameState(studentId);
     const remote = loaded?.state;
-    const unlocked = new Set([
-      ...(remote?.unlockedIds ?? []),
-      ...parsed.unlockedIds,
-    ]);
-    const sources = { ...(remote?.sources ?? {}), ...parsed.sources };
+    const unlockedIds = remote?.unlockedIds ?? [];
+    const unlocked = new Set(unlockedIds);
+    const activeFrameId =
+      parsed.activeFrameId && unlocked.has(parsed.activeFrameId)
+        ? parsed.activeFrameId
+        : remote?.activeFrameId ?? null;
     const next: CardFrameUserState = {
-      unlockedIds: Array.from(unlocked),
-      activeFrameId: parsed.activeFrameId,
-      sources,
+      unlockedIds,
+      activeFrameId,
+      sources: remote?.sources ?? {},
     };
     const saved = await saveStudentCardFrameState(studentId, next);
     return NextResponse.json({ ok: true, state: saved });

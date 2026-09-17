@@ -3,6 +3,7 @@ import {
   loadStudentSheetsConfigFromDb,
   updateStudentApprovalPhoto,
 } from "@/lib/google-sheets-student";
+import { requireStudentSession } from "@/lib/student-session-server";
 
 type PhotoBody = {
   studentId?: string;
@@ -17,7 +18,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const studentId = body.studentId?.trim() ?? "";
+  const auth = await requireStudentSession(request, [body.studentId]);
+  if (!auth.ok) {
+    return auth.response;
+  }
+  const studentId = auth.studentId;
   const photoUrl = body.photoUrl?.trim() ?? "";
 
   if (!studentId || !photoUrl) {

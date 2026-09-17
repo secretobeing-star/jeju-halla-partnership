@@ -5,6 +5,7 @@ import {
   toPublicCardFrame,
 } from "@/lib/student-card-frames";
 import { grantStudentCardFrameOnServer } from "@/lib/student-card-settings-server";
+import { requireStudentSession } from "@/lib/student-session-server";
 
 type UnlockBody = {
   code?: string;
@@ -24,15 +25,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
+  const auth = await requireStudentSession(request, [body.studentId]);
+  if (!auth.ok) {
+    return auth.response;
+  }
   const code = body.code?.trim() ?? "";
-  const studentId = body.studentId?.trim() ?? "";
+  const studentId = auth.studentId;
 
   if (!code) {
     return NextResponse.json({ error: "코드를 입력해 주세요." }, { status: 400 });
-  }
-
-  if (!studentId) {
-    return NextResponse.json({ error: "학번 정보가 필요합니다." }, { status: 400 });
   }
 
   try {

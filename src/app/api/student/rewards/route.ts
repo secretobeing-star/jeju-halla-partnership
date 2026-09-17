@@ -6,12 +6,15 @@ import {
   toPublicCardFrame,
 } from "@/lib/student-card-frames";
 import type { StudentRewardPublic, StudentRewardRow } from "@/lib/student-rewards";
+import { requireStudentSession } from "@/lib/student-session-server";
 
 export async function GET(request: NextRequest) {
-  const studentId = new URL(request.url).searchParams.get("studentId")?.trim() ?? "";
-  if (!studentId) {
-    return NextResponse.json({ error: "studentId가 필요합니다." }, { status: 400 });
+  const requestedStudentId = new URL(request.url).searchParams.get("studentId")?.trim() ?? "";
+  const auth = await requireStudentSession(request, [requestedStudentId]);
+  if (!auth.ok) {
+    return auth.response;
   }
+  const studentId = auth.studentId;
 
   const supabase = createSupabaseServer();
   if (!supabase) {
@@ -68,11 +71,16 @@ export async function GET(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const studentId = new URL(request.url).searchParams.get("studentId")?.trim() ?? "";
+  const requestedStudentId = new URL(request.url).searchParams.get("studentId")?.trim() ?? "";
   const rewardId = new URL(request.url).searchParams.get("rewardId")?.trim() ?? "";
+  const auth = await requireStudentSession(request, [requestedStudentId]);
+  if (!auth.ok) {
+    return auth.response;
+  }
+  const studentId = auth.studentId;
 
-  if (!studentId || !rewardId) {
-    return NextResponse.json({ error: "studentId와 rewardId가 필요합니다." }, { status: 400 });
+  if (!rewardId) {
+    return NextResponse.json({ error: "rewardId가 필요합니다." }, { status: 400 });
   }
 
   const supabase = createSupabaseServer();

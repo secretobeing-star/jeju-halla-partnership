@@ -1,21 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireStudentSession } from "@/lib/student-session-server";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 
 export async function GET(request: NextRequest) {
+  const requestedUserId = request.nextUrl.searchParams.get("userId")?.trim() || "";
+  const auth = await requireStudentSession(request, [requestedUserId]);
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   const admin = createSupabaseAdmin();
   if (!admin) {
     return NextResponse.json({ error: "Supabase 서버 설정이 없습니다." }, { status: 503 });
   }
 
-  const userId = request.nextUrl.searchParams.get("userId")?.trim() || "";
-  if (!userId) {
-    return NextResponse.json({ error: "userId가 필요합니다." }, { status: 400 });
-  }
-
   const { data, error } = await admin
     .from("user_gifts")
     .select("*")
-    .eq("user_id", userId)
+    .eq("user_id", auth.studentId)
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -37,22 +39,26 @@ export async function GET(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const requestedUserId = request.nextUrl.searchParams.get("userId")?.trim() || "";
+  const giftId = request.nextUrl.searchParams.get("giftId")?.trim() || "";
+  const auth = await requireStudentSession(request, [requestedUserId]);
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   const admin = createSupabaseAdmin();
   if (!admin) {
     return NextResponse.json({ error: "Supabase 서버 설정이 없습니다." }, { status: 503 });
   }
 
-  const userId = request.nextUrl.searchParams.get("userId")?.trim() || "";
-  const giftId = request.nextUrl.searchParams.get("giftId")?.trim() || "";
-  
-  if (!userId || !giftId) {
-    return NextResponse.json({ error: "userId와 giftId가 필요합니다." }, { status: 400 });
+  if (!giftId) {
+    return NextResponse.json({ error: "giftId가 필요합니다." }, { status: 400 });
   }
 
   const { error } = await admin
     .from("user_gifts")
     .delete()
-    .eq("user_id", userId)
+    .eq("user_id", auth.studentId)
     .eq("id", giftId);
 
   if (error) {
@@ -61,4 +67,3 @@ export async function DELETE(request: NextRequest) {
 
   return NextResponse.json({ ok: true });
 }
-

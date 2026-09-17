@@ -18,6 +18,7 @@ import {
 import { scheduleStampReadyPush } from "@/lib/stamp-ready-push";
 import { completeVisit } from "@/lib/season-pass-server";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
+import { requireStudentSession } from "@/lib/student-session-server";
 
 type StampBody = {
   eventId?: string;
@@ -105,17 +106,21 @@ export async function POST(request: NextRequest) {
   const eventId = body.eventId?.trim() || "";
   const placeId = body.placeId?.trim() || "";
   const placeName = body.placeName?.trim() || placeId;
-  const userId = body.userId?.trim() || body.studentId?.trim() || "";
-  const studentId = body.studentId?.trim() || userId;
+  const auth = await requireStudentSession(request, [body.userId, body.studentId]);
+  if (!auth.ok) {
+    return auth.response;
+  }
+  const userId = auth.studentId;
+  const studentId = auth.studentId;
   const name = body.name?.trim() || "";
   const department = body.department?.trim() || "";
   const userLat = Number(body.latitude);
   const userLng = Number(body.longitude);
   const clientKey = body.clientKey?.trim() || "";
 
-  if (!eventId || !placeId || !userId || !studentId || !name) {
+  if (!eventId || !placeId || !name) {
     return NextResponse.json(
-      { error: "로그인 세션(학번, 이름)과 eventId, placeId가 필요합니다." },
+      { error: "로그인 세션(이름)과 eventId, placeId가 필요합니다." },
       { status: 401 },
     );
   }

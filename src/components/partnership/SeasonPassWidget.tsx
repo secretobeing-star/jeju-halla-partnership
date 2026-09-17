@@ -8,6 +8,7 @@ import {
 import type { SeasonPassTrack, SeasonPassWidgetState } from "@/lib/season-pass";
 import { seasonPassQuestTypeLabel } from "@/lib/season-pass";
 import { grantCardFrameUnlock } from "@/lib/student-card-frames";
+import { studentAuthFetch } from "@/lib/student-session";
 
 const EMPTY: SeasonPassWidgetState = {
   season: null,
@@ -47,7 +48,7 @@ export default function SeasonPassWidget() {
   }, [refreshUser]);
 
   const load = useCallback(async () => {
-    const response = await fetch(`/api/season-pass?userId=${encodeURIComponent(userId)}`);
+    const response = await studentAuthFetch(`/api/season-pass?userId=${encodeURIComponent(userId)}`);
     const payload = (await response.json()) as { state?: SeasonPassWidgetState; error?: string };
     if (payload.state) {
       setState(payload.state);
@@ -79,7 +80,7 @@ export default function SeasonPassWidget() {
     setBusy(`${level}-${track}`);
     setMessage("");
     try {
-      const response = await fetch("/api/season-pass/claim", {
+      const response = await studentAuthFetch("/api/season-pass/claim", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, level, track }),
@@ -115,7 +116,7 @@ export default function SeasonPassWidget() {
     setBusy("attendance");
     setMessage("");
     try {
-      const response = await fetch("/api/season-pass/attendance", {
+      const response = await studentAuthFetch("/api/season-pass/attendance", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId }),

@@ -8,6 +8,7 @@ import {
   togglePartnerFavorite,
 } from "@/lib/partner-favorites";
 import { getSiteMemberSession, SITE_MEMBER_SESSION_EVENT } from "@/lib/site-member-session";
+import { studentAuthFetch } from "@/lib/student-session";
 
 export function usePartnerFavorites() {
   const [favoriteIds, setFavoriteIds] = useState<ReadonlySet<string>>(() => new Set());
@@ -29,7 +30,7 @@ export function usePartnerFavorites() {
         return;
       }
       try {
-        const response = await fetch(`/api/favorites?userId=${encodeURIComponent(userId)}`);
+        const response = await studentAuthFetch(`/api/favorites?userId=${encodeURIComponent(userId)}`);
         const payload = (await response.json()) as { placeIds?: string[] };
         if (Array.isArray(payload.placeIds)) {
           replacePartnerFavoriteIds([...loadPartnerFavoriteIds(), ...payload.placeIds]);
@@ -49,7 +50,7 @@ export function usePartnerFavorites() {
     setFavoriteIds(loadPartnerFavoriteIds());
     const userId = getSiteMemberSession()?.student?.studentId?.trim();
     if (userId) {
-      void fetch("/api/favorites", {
+      void studentAuthFetch("/api/favorites", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, placeId: partnerId, favorited: nextFavorited }),
@@ -61,7 +62,7 @@ export function usePartnerFavorites() {
             | string
             | undefined;
         if (activeEventId) {
-          void fetch("/api/event/favorite-stamp", {
+          void studentAuthFetch("/api/event/favorite-stamp", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ userId, placeId: partnerId, eventId: activeEventId }),

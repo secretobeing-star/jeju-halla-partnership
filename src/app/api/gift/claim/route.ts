@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { parseGiftPayload } from "@/lib/map-events";
 import { grantStudentCardFrameOnServer } from "@/lib/student-card-settings-server";
+import { requireStudentSession } from "@/lib/student-session-server";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 
 export async function POST(request: NextRequest) {
@@ -16,10 +17,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
 
-  const userId = body.userId?.trim() || body.studentId?.trim() || "";
+  const auth = await requireStudentSession(request, [body.userId, body.studentId]);
+  if (!auth.ok) {
+    return auth.response;
+  }
+  const userId = auth.studentId;
   const giftId = body.giftId?.trim() || "";
-  if (!userId || !giftId) {
-    return NextResponse.json({ error: "userId와 giftId가 필요합니다." }, { status: 400 });
+  if (!giftId) {
+    return NextResponse.json({ error: "giftId가 필요합니다." }, { status: 400 });
   }
 
   const { data: gift, error } = await admin

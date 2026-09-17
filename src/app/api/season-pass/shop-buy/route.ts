@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { purchaseGoldShopItem } from "@/lib/season-pass-server";
+import { requireStudentSession } from "@/lib/student-session-server";
 
 export async function POST(request: NextRequest) {
   try {
@@ -8,8 +9,11 @@ export async function POST(request: NextRequest) {
       studentId?: string;
       shopItemId?: string;
     };
-    const userId = body.userId?.trim() || body.studentId?.trim() || "";
-    const result = await purchaseGoldShopItem(userId, body.shopItemId?.trim() || "");
+    const auth = await requireStudentSession(request, [body.userId, body.studentId]);
+    if (!auth.ok) {
+      return auth.response;
+    }
+    const result = await purchaseGoldShopItem(auth.studentId, body.shopItemId?.trim() || "");
     return NextResponse.json({
       ok: true,
       state: result.state,
