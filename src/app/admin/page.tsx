@@ -39,7 +39,7 @@ import Pagination from "@/components/Pagination";
 import SiteFeaturesApplier from "@/components/SiteFeaturesApplier";
 import SiteFaviconApplier from "@/components/SiteFaviconApplier";
 import SiteTitleApplier from "@/components/SiteTitleApplier";
-import { adminApiFetch } from "@/lib/admin-api";
+import { adminApiFetch, reloadAfterAdminSave } from "@/lib/admin-api";
 import {
   AdminNavKey,
   getAdminNavLabel,
@@ -1704,6 +1704,7 @@ export default function AdminPage() {
         );
         cancelEditPartner();
         await loadPartners();
+        reloadAfterAdminSave();
       }
     } else {
       setPartnerMessage("저장에 실패했습니다.");

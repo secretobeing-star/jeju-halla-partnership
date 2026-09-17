@@ -11,6 +11,7 @@ import {
 } from "@/lib/site-events";
 import { getStorageErrorMessage, uploadPartnershipImage } from "@/lib/storage";
 import { richTextHasVisibleContent } from "@/lib/rich-text";
+import { reloadAfterAdminSave } from "@/lib/admin-api";
 import {
   SiteEvent,
   SiteEventListType,
@@ -262,6 +263,7 @@ export default function EventAdminPanel({
     resetEventForm();
     await loadEvents();
     setSaving(false);
+    reloadAfterAdminSave();
   }
 
   async function handleTabSubmit(event: FormEvent) {

@@ -6,6 +6,7 @@ import DeveloperEasterEgg from "@/components/DeveloperEasterEgg";
 import PromptModalProvider from "@/components/PromptModalProvider";
 import SitePwaFoldViewportApplier from "@/components/SitePwaFoldViewportApplier";
 import { SiteAppBackProvider } from "@/lib/app-back-stack";
+import { subscribePublicSiteReload } from "@/lib/public-site-reload";
 import { ensureStudentApiSession } from "@/lib/student-session";
 
 function useSessionCheck(intervalMs = 1000) {
@@ -51,6 +52,12 @@ export default function AppProviders({ children }: { children: React.ReactNode }
 
   useEffect(() => {
     void ensureStudentApiSession();
+  }, []);
+
+  useEffect(() => {
+    return subscribePublicSiteReload(() => {
+      window.location.reload();
+    });
   }, []);
 
   return (

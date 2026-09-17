@@ -1,3 +1,4 @@
+import { notifyPublicSiteReload } from "@/lib/public-site-reload";
 import { supabase } from "@/lib/supabase";
 
 const ADMIN_API_TIMEOUT_MS = 25_000;
@@ -5,6 +6,10 @@ const ADMIN_API_TIMEOUT_MS = 25_000;
 export async function getAdminAccessToken() {
   const { data } = await supabase.auth.getSession();
   return data.session?.access_token ?? null;
+}
+
+export function reloadAfterAdminSave() {
+  notifyPublicSiteReload();
 }
 
 export async function adminApiFetch(

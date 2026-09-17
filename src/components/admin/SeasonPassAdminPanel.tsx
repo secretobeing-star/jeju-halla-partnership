@@ -2,7 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import AdminCollapsibleSection from "@/components/admin/AdminCollapsibleSection";
-import { adminApiFetch, getAdminAccessToken } from "@/lib/admin-api";
+import { adminApiFetch, getAdminAccessToken, reloadAfterAdminSave } from "@/lib/admin-api";
 import { fromDatetimeLocalValue, toDatetimeLocalValue } from "@/lib/site-events";
 import { getStorageErrorMessage } from "@/lib/storage";
 import type { RewardItem, Season, SeasonPassLevel, SeasonQuest } from "@/lib/season-pass";
@@ -142,8 +142,8 @@ export default function SeasonPassAdminPanel({ onMessage }: SeasonPassAdminPanel
         method: "PATCH",
         body: JSON.stringify({ entity: "season", id: selected.id, ...patch }),
       });
-      onMessage("시즌을 저장했습니다.");
-      await loadAll();
+        onMessage("시즌을 저장했습니다.");
+        await loadAll();
     } catch (error) {
       onMessage(error instanceof Error ? error.message : "저장 실패");
     } finally {
@@ -162,6 +162,7 @@ export default function SeasonPassAdminPanel({ onMessage }: SeasonPassAdminPanel
       if (result.season?.id) setSelectedId(result.season.id);
       onMessage("시즌을 만들었습니다.");
       await loadAll();
+      reloadAfterAdminSave();
     } catch (error) {
       onMessage(error instanceof Error ? error.message : "생성 실패");
     } finally {

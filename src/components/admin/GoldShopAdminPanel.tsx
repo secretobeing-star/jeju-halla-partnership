@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import AdminCollapsibleSection from "@/components/admin/AdminCollapsibleSection";
-import { adminApiFetch } from "@/lib/admin-api";
+import { adminApiFetch, reloadAfterAdminSave } from "@/lib/admin-api";
 import type { GoldShopItem, RewardItem, Season } from "@/lib/season-pass";
 import type { PublicCardFrameItem } from "@/lib/student-card-frames";
 
@@ -276,6 +276,7 @@ export default function GoldShopAdminPanel({ onMessage }: GoldShopAdminPanelProp
         });
         onMessage("시즌패스를 상점에 등록했습니다.");
         await loadAll();
+        reloadAfterAdminSave();
         return;
       }
 
@@ -347,6 +348,7 @@ export default function GoldShopAdminPanel({ onMessage }: GoldShopAdminPanelProp
       setAddBadge("");
       onMessage("물품을 등록했습니다.");
       await loadAll();
+      reloadAfterAdminSave();
     } catch (error) {
       onMessage(error instanceof Error ? error.message : "등록에 실패했습니다.");
     } finally {

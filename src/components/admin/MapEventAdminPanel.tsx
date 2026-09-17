@@ -3,7 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import AdminCollapsibleSection from "@/components/admin/AdminCollapsibleSection";
 import RichTextEditor from "@/components/RichTextEditor";
-import { adminApiFetch } from "@/lib/admin-api";
+import { adminApiFetch, reloadAfterAdminSave } from "@/lib/admin-api";
 import {
   DEFAULT_BENEFIT_BTN_LABEL,
   DEFAULT_MAP_TAB_NAME,
@@ -384,6 +384,7 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
       if (savedEvent) {
         setForm(eventToForm(savedEvent));
       }
+      reloadAfterAdminSave();
     } catch (error) {
       onMessage(error instanceof Error ? error.message : "이벤트 저장에 실패했습니다.");
     } finally {
