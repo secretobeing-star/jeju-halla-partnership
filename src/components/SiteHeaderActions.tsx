@@ -14,6 +14,7 @@ import {
   type SiteMemberStudentProfile,
 } from "@/lib/site-member-session";
 import { SITE_STUDENT_NEED_LOGIN_EVENT } from "@/lib/site-student-auth-settings";
+import { storeStudentApiSession } from "@/lib/student-session";
 import {
   getSitePushSubscription,
   isSitePushSubscribed,
@@ -342,10 +343,14 @@ export default function SiteHeaderActions({
           displayName: string;
           loggedInAt: string;
           student?: SiteMemberStudentProfile | null;
+          sessionToken?: string;
         };
       };
 
       if (body.status === "student" && body.session?.student) {
+        if (body.session.sessionToken) {
+          storeStudentApiSession(body.session.student.studentId, body.session.sessionToken);
+        }
         setSiteMemberSession({
           provider: body.session.provider,
           displayName: body.session.displayName,

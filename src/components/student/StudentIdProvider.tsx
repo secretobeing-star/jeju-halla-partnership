@@ -30,7 +30,7 @@ import {
   type SiteStudentAuthDisplay,
 } from "@/lib/site-student-auth-settings";
 import type { PublicCardFrameItem } from "@/lib/student-card-frames";
-import { studentAuthFetch } from "@/lib/student-session";
+import { studentAuthFetch, storeStudentApiSession } from "@/lib/student-session";
 
 type FlowStep = "idle" | "guide" | "form" | "card";
 
@@ -239,8 +239,7 @@ export default function StudentIdProvider({
             const data = await res.json();
 
             if (res.ok && data.ok) {
-              localStorage.setItem("studentId", data.session.studentId);
-              localStorage.setItem("sessionToken", data.session.sessionToken);
+              storeStudentApiSession(data.session.studentId, data.session.sessionToken);
             }
           } catch (err) {
             console.error("로그인 토큰 저장 오류:", err);

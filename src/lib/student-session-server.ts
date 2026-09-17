@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { SESSION_TOKEN_HEADER, STUDENT_ID_HEADER } from "@/lib/student-session";
+import { randomUUID } from "crypto";
+import { SESSION_TOKEN_HEADER, STUDENT_ID_HEADER } from "@/lib/student-session-headers";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 
 export type StudentSessionOk = { ok: true; studentId: string };
@@ -51,4 +52,28 @@ export async function requireStudentSession(
   }
 
   return { ok: true, studentId };
+}
+
+export async function issueStudentApiSession(studentIdRaw: string): Promise<string | null> {
+  const studentId = studentIdRaw.trim();
+  if (!studentId) {
+    return null;
+  }
+  const admin = createSupabaseAdmin();
+  if (!admin) {
+    return null;
+  }
+  const sessionToken = randomUUID();
+  const { error } = await admin.from("site_user_sessions").upsert(
+    {
+      student_id: studentId,
+      session_token: sessionToken,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "student_id" },
+  );
+  if (error) {
+    return null;
+  }
+  return sessionToken;
 }

@@ -5,6 +5,7 @@ import {
 } from "@/lib/google-sheets-student";
 import { createSupabaseServer } from "@/lib/supabase-server";
 import type { SiteMemberStudentProfile } from "@/lib/site-member-session";
+import { issueStudentApiSession } from "@/lib/student-session-server";
 
 type LoginBody = {
   preview_name?: string;
@@ -75,6 +76,8 @@ export async function POST(request: Request) {
           approvalStatus: "approved",
         };
 
+        const sessionToken = await issueStudentApiSession(student.studentId);
+
         return NextResponse.json({
           status: "student",
           session: {
@@ -82,6 +85,7 @@ export async function POST(request: Request) {
             displayName: student.name,
             loggedInAt: new Date().toISOString(),
             student,
+            sessionToken,
           },
         });
       }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSeasonPassState } from "@/lib/season-pass-server";
-import { SESSION_TOKEN_HEADER, STUDENT_ID_HEADER } from "@/lib/student-session";
+import { SESSION_TOKEN_HEADER, STUDENT_ID_HEADER } from "@/lib/student-session-headers";
 import { requireStudentSession } from "@/lib/student-session-server";
 
 export const maxDuration = 60;

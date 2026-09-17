@@ -6,6 +6,7 @@ import DeveloperEasterEgg from "@/components/DeveloperEasterEgg";
 import PromptModalProvider from "@/components/PromptModalProvider";
 import SitePwaFoldViewportApplier from "@/components/SitePwaFoldViewportApplier";
 import { SiteAppBackProvider } from "@/lib/app-back-stack";
+import { ensureStudentApiSession } from "@/lib/student-session";
 
 function useSessionCheck(intervalMs = 1000) {
   const router = useRouter();
@@ -26,6 +27,10 @@ function useSessionCheck(intervalMs = 1000) {
 
         const data = await res.json();
         if (!data.valid) {
+          const recovered = await ensureStudentApiSession(true);
+          if (recovered) {
+            return;
+          }
           alert("다른 기기에서 로그인되어 로그아웃되었습니다.");
           localStorage.clear();
           router.push("/login");
@@ -43,6 +48,10 @@ function useSessionCheck(intervalMs = 1000) {
 
 export default function AppProviders({ children }: { children: React.ReactNode }) {
   useSessionCheck(1000);
+
+  useEffect(() => {
+    void ensureStudentApiSession();
+  }, []);
 
   return (
     <SiteAppBackProvider>
