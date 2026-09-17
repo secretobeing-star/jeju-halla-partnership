@@ -246,22 +246,32 @@ export default function GoldShopAdminPanel({ onMessage }: GoldShopAdminPanelProp
   }
 
   async function registerItem() {
-    if (!selected) {
-      onMessage("시즌이 없습니다. 시즌패스 메뉴에서 시즌만 만들어 주세요.");
-      return;
-    }
     setSavingKey("add");
     try {
+      let season = selected;
+      if (!season) {
+        const payload = (await adminApiFetch("/api/admin/season-pass", {
+          method: "PATCH",
+          body: JSON.stringify({ entity: "gold_shop", gold_shop_enabled: true }),
+        })) as { seasons?: Season[] };
+        const nextSeasons = payload.seasons ?? [];
+        setSeasons(nextSeasons);
+        season = nextSeasons[0] ?? null;
+        setSeasonId(season?.id ?? null);
+      }
+      if (!season) {
+        throw new Error("골드상점을 준비하지 못했습니다.");
+      }
       if (addKind === "pass") {
         await adminApiFetch("/api/admin/season-pass", {
           method: "PATCH",
           body: JSON.stringify({
             entity: "season",
-            id: selected.id,
+            id: season.id,
             premium_gold_price: addPrice,
             premium_original_price_gold: addOriginal,
             premium_badge_label: addBadge || "인기",
-            gold_shop_enabled: selected.gold_shop_enabled !== false,
+            gold_shop_enabled: season.gold_shop_enabled !== false,
           }),
         });
         onMessage("시즌패스를 상점에 등록했습니다.");
@@ -318,7 +328,7 @@ export default function GoldShopAdminPanel({ onMessage }: GoldShopAdminPanelProp
         method: "POST",
         body: JSON.stringify({
           entity: "shop_item",
-          season_id: selected.id,
+          season_id: season.id,
           reward_item_id: rewardItemId,
           name,
           price_gold: addPrice,
@@ -362,25 +372,21 @@ export default function GoldShopAdminPanel({ onMessage }: GoldShopAdminPanelProp
   }
 
   async function toggleGoldShop(enabled: boolean) {
-    if (seasons.length === 0) {
-      onMessage("시즌이 없습니다. 시즌패스 메뉴에서 시즌만 만들어 주세요.");
-      return;
-    }
     setTogglingShop(true);
     try {
-      await Promise.all(
-        seasons.map((season) =>
-          adminApiFetch("/api/admin/season-pass", {
-            method: "PATCH",
-            body: JSON.stringify({
-              entity: "season",
-              id: season.id,
-              gold_shop_enabled: enabled,
-            }),
-          }),
-        ),
-      );
-      setSeasons((prev) => prev.map((item) => ({ ...item, gold_shop_enabled: enabled })));
+      const payload = (await adminApiFetch("/api/admin/season-pass", {
+        method: "PATCH",
+        body: JSON.stringify({
+          entity: "gold_shop",
+          gold_shop_enabled: enabled,
+        }),
+      })) as { seasons?: Season[] };
+      const nextSeasons = payload.seasons ?? [];
+      setSeasons(nextSeasons);
+      setSeasonId((current) => {
+        if (current && nextSeasons.some((item) => item.id === current)) return current;
+        return nextSeasons[0]?.id ?? null;
+      });
       onMessage(enabled ? "골드상점을 켰습니다. 시즌패스 활성화와는 별개입니다." : "골드상점을 껐습니다.");
     } catch (error) {
       onMessage(error instanceof Error ? error.message : "저장에 실패했습니다.");
@@ -402,7 +408,7 @@ export default function GoldShopAdminPanel({ onMessage }: GoldShopAdminPanelProp
           type="checkbox"
           className="h-4 w-4"
           checked={shopOn}
-          disabled={togglingShop || seasons.length === 0}
+          disabled={togglingShop}
           onChange={(event) => void toggleGoldShop(event.target.checked)}
         />
       </label>

@@ -6,7 +6,7 @@ import { adminApiFetch, getAdminAccessToken } from "@/lib/admin-api";
 import { fromDatetimeLocalValue, toDatetimeLocalValue } from "@/lib/site-events";
 import { getStorageErrorMessage } from "@/lib/storage";
 import type { RewardItem, Season, SeasonPassLevel, SeasonQuest } from "@/lib/season-pass";
-import { asSeasonPassQuestType, seasonPassQuestTypeLabel } from "@/lib/season-pass";
+import { asSeasonPassQuestType, isGoldShopCatalogSeason, seasonPassQuestTypeLabel } from "@/lib/season-pass";
 import type { PublicCardFrameItem } from "@/lib/student-card-frames";
 
 type SeasonPassAdminPanelProps = {
@@ -88,11 +88,15 @@ export default function SeasonPassAdminPanel({ onMessage }: SeasonPassAdminPanel
         error?: string;
       };
       if (payload.error) throw new Error(payload.error);
-      setSeasons(payload.seasons ?? []);
+      const nextSeasons = (payload.seasons ?? []).filter((season) => !isGoldShopCatalogSeason(season));
+      setSeasons(nextSeasons);
       setItems((payload.items ?? []) as RewardItem[]);
       setLevels(payload.levels ?? []);
       setQuests(payload.quests ?? []);
-      setSelectedId((current) => current ?? payload.seasons?.[0]?.id ?? null);
+      setSelectedId((current) => {
+        if (current && nextSeasons.some((season) => season.id === current)) return current;
+        return nextSeasons[0]?.id ?? null;
+      });
       const framesPayload = (await fetch("/api/student/frames")
         .then((res) => res.json())
         .catch(() => ({ frames: [] }))) as { frames?: PublicCardFrameItem[] };

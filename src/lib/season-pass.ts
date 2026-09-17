@@ -46,6 +46,13 @@ export function isGoldShopEnabled(season: Pick<Season, "gold_shop_enabled"> | nu
   return Boolean(season) && season?.gold_shop_enabled !== false;
 }
 
+export const GOLD_SHOP_CATALOG_CODE = "gold-shop";
+
+export function isGoldShopCatalogSeason(season: { code?: string | null } | null | undefined) {
+  const code = season?.code?.trim() ?? "";
+  return code === GOLD_SHOP_CATALOG_CODE || code.startsWith(`${GOLD_SHOP_CATALOG_CODE}-`);
+}
+
 export type RewardItem = {
   id: string;
   name: string;

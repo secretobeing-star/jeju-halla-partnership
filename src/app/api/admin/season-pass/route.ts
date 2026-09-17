@@ -1,7 +1,59 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuthMiddleware } from "@/lib/admin-auth-guard";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
-import { SEASON_PASS_ITEM_TYPES, asSeasonPassQuestType, type SeasonPassItemType } from "@/lib/season-pass";
+import {
+  GOLD_SHOP_CATALOG_CODE,
+  SEASON_PASS_ITEM_TYPES,
+  asSeasonPassQuestType,
+  type SeasonPassItemType,
+} from "@/lib/season-pass";
+
+async function listSeasons(admin: NonNullable<ReturnType<typeof createSupabaseAdmin>>) {
+  const { data, error } = await admin
+    .from("seasons")
+    .select("*")
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as Record<string, unknown>[];
+}
+
+async function ensureShopCatalogSeason(admin: NonNullable<ReturnType<typeof createSupabaseAdmin>>) {
+  const seasons = await listSeasons(admin);
+  if (seasons.length > 0) {
+    return seasons;
+  }
+
+  const inserted = await admin
+    .from("seasons")
+    .insert({
+      code: GOLD_SHOP_CATALOG_CODE,
+      title: "골드상점",
+      is_active: false,
+      gold_shop_enabled: true,
+      premium_gold_price: 0,
+    })
+    .select("*")
+    .maybeSingle();
+
+  if (inserted.error) {
+    const retry = await admin
+      .from("seasons")
+      .insert({
+        code: `${GOLD_SHOP_CATALOG_CODE}-${Date.now()}`,
+        title: "골드상점",
+        is_active: false,
+        gold_shop_enabled: true,
+        premium_gold_price: 0,
+      })
+      .select("*")
+      .maybeSingle();
+    if (retry.error) throw retry.error;
+    return retry.data ? [retry.data as Record<string, unknown>] : [];
+  }
+
+  return inserted.data ? [inserted.data as Record<string, unknown>] : [];
+}
 
 export const maxDuration = 60;
 
@@ -220,9 +272,13 @@ export async function POST(request: NextRequest) {
     }
 
     if (entity === "shop_item") {
-      const seasonId = String(body.season_id ?? "").trim();
+      let seasonId = String(body.season_id ?? "").trim();
       if (!seasonId) {
-        return NextResponse.json({ error: "시즌이 필요합니다." }, { status: 400 });
+        const seasons = await ensureShopCatalogSeason(admin);
+        seasonId = String(seasons[0]?.id ?? "").trim();
+      }
+      if (!seasonId) {
+        return NextResponse.json({ error: "골드상점 시즌을 만들지 못했습니다." }, { status: 500 });
       }
       const payload = {
           season_id: seasonId,
@@ -304,12 +360,35 @@ export async function PATCH(request: NextRequest) {
 
   const body = (await request.json()) as Record<string, unknown>;
   const entity = String(body.entity ?? "");
-  const id = String(body.id ?? "").trim();
-  if (!id) {
-    return NextResponse.json({ error: "id가 필요합니다." }, { status: 400 });
-  }
 
   try {
+    if (entity === "gold_shop") {
+      const enabled = Boolean(body.gold_shop_enabled);
+      let seasons = await listSeasons(admin);
+      if (enabled && seasons.length === 0) {
+        seasons = await ensureShopCatalogSeason(admin);
+      }
+      if (seasons.length > 0) {
+        const now = new Date().toISOString();
+        for (const season of seasons) {
+          const seasonId = String(season.id ?? "");
+          if (!seasonId) continue;
+          const { error } = await admin
+            .from("seasons")
+            .update({ gold_shop_enabled: enabled, updated_at: now })
+            .eq("id", seasonId);
+          if (error) throw error;
+        }
+        seasons = await listSeasons(admin);
+      }
+      return NextResponse.json({ ok: true, seasons });
+    }
+
+    const id = String(body.id ?? "").trim();
+    if (!id) {
+      return NextResponse.json({ error: "id가 필요합니다." }, { status: 400 });
+    }
+
     if (entity === "season") {
       if (body.is_active === true) {
         await admin.from("seasons").update({ is_active: false }).neq("id", id);
