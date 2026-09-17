@@ -27,6 +27,9 @@ export function getStudentSessionAuthHeaders(): Record<string, string> {
   if (!studentId || !sessionToken) {
     return {};
   }
+  if (sessionStudentId && storedId && sessionStudentId !== storedId) {
+    return {};
+  }
   return {
     [STUDENT_ID_HEADER]: studentId,
     [SESSION_TOKEN_HEADER]: sessionToken,
@@ -37,22 +40,22 @@ export async function ensureStudentApiSession(force = false): Promise<boolean> {
   if (typeof window === "undefined") {
     return false;
   }
-  if (!force && ensurePromise) {
+  if (ensurePromise) {
     return ensurePromise;
   }
 
-  const run = (async () => {
-    const student = getSiteMemberSession()?.student;
-    const studentId = student?.studentId?.trim() || "";
-    if (!studentId) {
-      return false;
-    }
-    const existingId = window.localStorage.getItem("studentId")?.trim() || "";
-    const existingToken = window.localStorage.getItem("sessionToken")?.trim() || "";
-    if (!force && existingId === studentId && existingToken) {
-      return true;
-    }
+  const student = getSiteMemberSession()?.student;
+  const studentId = student?.studentId?.trim() || "";
+  if (!studentId) {
+    return false;
+  }
+  const existingId = window.localStorage.getItem("studentId")?.trim() || "";
+  const existingToken = window.localStorage.getItem("sessionToken")?.trim() || "";
+  if (!force && existingId === studentId && existingToken) {
+    return true;
+  }
 
+  const run = (async () => {
     const response = await fetch("/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

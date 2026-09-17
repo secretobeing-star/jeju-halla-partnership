@@ -14,14 +14,17 @@ function fail(status: number, error: string): StudentSessionFail {
 export async function requireStudentSession(
   request: Request,
   claimedIds: Array<string | null | undefined> = [],
+  extra?: { studentId?: string | null; sessionToken?: string | null },
 ): Promise<StudentSessionResult> {
   const url = new URL(request.url);
   const studentId =
     request.headers.get(STUDENT_ID_HEADER)?.trim() ||
+    extra?.studentId?.trim() ||
     url.searchParams.get("sessionStudentId")?.trim() ||
     "";
   const sessionToken =
     request.headers.get(SESSION_TOKEN_HEADER)?.trim() ||
+    extra?.sessionToken?.trim() ||
     url.searchParams.get("sessionToken")?.trim() ||
     "";
 
@@ -47,14 +50,21 @@ export async function requireStudentSession(
     .eq("student_id", studentId)
     .maybeSingle();
 
-  if (error || !data || data.session_token !== sessionToken) {
+  if (error) {
+    return fail(503, error.message || "세션을 확인하지 못했습니다.");
+  }
+
+  if (!data || data.session_token !== sessionToken) {
     return fail(401, "세션이 만료되었습니다. 다시 로그인해 주세요.");
   }
 
   return { ok: true, studentId };
 }
 
-export async function issueStudentApiSession(studentIdRaw: string): Promise<string | null> {
+export async function issueStudentApiSession(
+  studentIdRaw: string,
+  options?: { rotate?: boolean },
+): Promise<string | null> {
   const studentId = studentIdRaw.trim();
   if (!studentId) {
     return null;
@@ -63,6 +73,18 @@ export async function issueStudentApiSession(studentIdRaw: string): Promise<stri
   if (!admin) {
     return null;
   }
+
+  if (!options?.rotate) {
+    const { data } = await admin
+      .from("site_user_sessions")
+      .select("session_token")
+      .eq("student_id", studentId)
+      .maybeSingle();
+    if (data?.session_token) {
+      return data.session_token;
+    }
+  }
+
   const sessionToken = randomUUID();
   const { error } = await admin.from("site_user_sessions").upsert(
     {

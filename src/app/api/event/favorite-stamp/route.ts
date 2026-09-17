@@ -85,7 +85,10 @@ export async function POST(request: NextRequest) {
 
   const placeId = body.placeId?.trim() || "";
   const eventId = body.eventId?.trim() || "";
-  const auth = await requireStudentSession(request, [body.userId]);
+  const auth = await requireStudentSession(request, [body.userId], {
+    studentId: body.userId,
+    sessionToken: body.sessionToken,
+  });
   if (!auth.ok) {
     return auth.response;
   }

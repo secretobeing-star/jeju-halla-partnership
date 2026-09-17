@@ -76,7 +76,7 @@ export async function POST(request: Request) {
           approvalStatus: "approved",
         };
 
-        const sessionToken = await issueStudentApiSession(student.studentId);
+        const sessionToken = await issueStudentApiSession(student.studentId, { rotate: true });
 
         return NextResponse.json({
           status: "student",

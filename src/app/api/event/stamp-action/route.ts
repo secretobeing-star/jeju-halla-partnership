@@ -31,6 +31,7 @@ type StampBody = {
   latitude?: number;
   longitude?: number;
   clientKey?: string;
+  sessionToken?: string;
 };
 
 async function pickReward(
@@ -106,7 +107,10 @@ export async function POST(request: NextRequest) {
   const eventId = body.eventId?.trim() || "";
   const placeId = body.placeId?.trim() || "";
   const placeName = body.placeName?.trim() || placeId;
-  const auth = await requireStudentSession(request, [body.userId, body.studentId]);
+  const auth = await requireStudentSession(request, [body.userId, body.studentId], {
+    studentId: body.studentId || body.userId,
+    sessionToken: body.sessionToken,
+  });
   if (!auth.ok) {
     return auth.response;
   }
