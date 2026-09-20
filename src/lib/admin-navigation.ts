@@ -71,7 +71,7 @@ export const ADMIN_NAV_GROUPS: ReadonlyArray<{
         key: "site-login-group",
         navKey: "site-login",
         permission: "settings",
-        label: "학생증 · 보상",
+        label: "학생증",
         children: [
           {
             kind: "item",
@@ -87,9 +87,36 @@ export const ADMIN_NAV_GROUPS: ReadonlyArray<{
           },
           {
             kind: "item",
+            key: "site-student-card-brand",
+            permission: "settings",
+            label: "학생증 · 카드 브랜딩",
+          },
+          {
+            kind: "item",
+            key: "site-student-sheets",
+            permission: "settings",
+            label: "연동",
+          },
+        ],
+      },
+      {
+        kind: "subgroup",
+        key: "site-rewards-group",
+        navKey: "site-student-rewards",
+        permission: "settings",
+        label: "보상",
+        children: [
+          {
+            kind: "item",
             key: "site-student-rewards",
             permission: "settings",
             label: "보상 지급",
+          },
+          {
+            kind: "item",
+            key: "site-login-reward",
+            permission: "settings",
+            label: "접속 보상",
           },
         ],
       },
@@ -112,13 +139,28 @@ export const ADMIN_NAV_GROUPS: ReadonlyArray<{
             permission: "settings",
             label: "회원 관리",
           },
+          {
+            kind: "item",
+            key: "site-student-recovery",
+            permission: "settings",
+            label: "회수",
+          },
         ],
       },
       { kind: "item", key: "site-browser-guide", permission: "settings", label: "브라우저 안내" },
       { kind: "item", key: "site-notifications", permission: "settings", label: "알림 · 푸시" },
       { kind: "item", key: "site-nav", permission: "settings", label: "상단·메뉴" },
       { kind: "item", key: "site-main", permission: "settings", label: "메인 화면" },
+      { kind: "item", key: "ai-chatbot", permission: "settings", label: "AI 챗봇" },
       { kind: "item", key: "user-settings", permission: "settings", label: "사용자 패널" },
+    ],
+  },
+  {
+    key: "analytics",
+    label: "분석",
+    items: [
+      { kind: "item", key: "site-analytics", permission: "settings", label: "사이트 분석" },
+      { kind: "item", key: "gold-analytics", permission: "settings", label: "골드 사용 분석" },
     ],
   },
   {
@@ -130,9 +172,6 @@ export const ADMIN_NAV_GROUPS: ReadonlyArray<{
       { kind: "item", key: "partner-search", permission: "partners", label: "검색 키워드" },
       { kind: "item", key: "partner-reviews", permission: "partners", label: "후기 관리" },
       { kind: "item", key: "partner-display", permission: "partners", label: "목록·지도·정렬" },
-      { kind: "item", key: "map-events", permission: "partners", label: "지도 이벤트" },
-      { kind: "item", key: "season-pass", permission: "partners", label: "시즌패스" },
-      { kind: "item", key: "gold-shop", permission: "partners", label: "골드상점" },
     ],
   },
   {
@@ -142,10 +181,41 @@ export const ADMIN_NAV_GROUPS: ReadonlyArray<{
       { kind: "item", key: "boards", permission: "boards", label: "게시판 종류" },
       { kind: "item", key: "board-settings", permission: "board-settings", label: "게시판 설정" },
       { kind: "item", key: "posts", permission: "posts", label: "게시글 관리" },
-      { kind: "item", key: "events", permission: "boards", label: "이벤트" },
-      { kind: "item", key: "board-reports", permission: "posts", label: "신고 관리" },
-      { kind: "item", key: "board-ip", permission: "posts", label: "IP 관리" },
-      { kind: "item", key: "board-device", permission: "posts", label: "기기 관리" },
+      {
+        kind: "subgroup",
+        key: "events-group",
+        navKey: "events",
+        permission: "boards",
+        label: "이벤트",
+        children: [
+          { kind: "item", key: "events", permission: "boards", label: "이벤트" },
+          { kind: "item", key: "map-events", permission: "partners", label: "지도 이벤트" },
+          { kind: "item", key: "season-pass", permission: "partners", label: "시즌패스" },
+          { kind: "item", key: "gold-shop", permission: "partners", label: "골드상점" },
+        ],
+      },
+      {
+        kind: "subgroup",
+        key: "board-reports-group",
+        navKey: "board-report-reasons",
+        permission: "posts",
+        label: "신고 관리",
+        children: [
+          { kind: "item", key: "board-report-reasons", permission: "posts", label: "신고 사유 설정" },
+          { kind: "item", key: "board-reports", permission: "posts", label: "신고 목록" },
+        ],
+      },
+      {
+        kind: "subgroup",
+        key: "board-moderation-group",
+        navKey: "board-ip",
+        permission: "posts",
+        label: "관리",
+        children: [
+          { kind: "item", key: "board-ip", permission: "posts", label: "IP 관리" },
+          { kind: "item", key: "board-device", permission: "posts", label: "기기 관리" },
+        ],
+      },
     ],
   },
   {
@@ -177,13 +247,20 @@ export type AdminNavKey =
   | "site-admin-pwa"
   | "site-login"
   | "site-student-card-frames"
+  | "site-student-card-brand"
+  | "site-student-sheets"
   | "site-student-rewards"
+  | "site-login-reward"
   | "site-student-logs"
   | "site-members"
+  | "site-student-recovery"
   | "site-browser-guide"
   | "site-notifications"
   | "site-nav"
   | "site-main"
+  | "ai-chatbot"
+  | "site-analytics"
+  | "gold-analytics"
   | "user-settings"
   | "partners"
   | "partner-taxonomy"
@@ -197,6 +274,7 @@ export type AdminNavKey =
   | "board-settings"
   | "posts"
   | "board-reports"
+  | "board-report-reasons"
   | "board-ip"
   | "board-device"
   | "ads"
@@ -366,7 +444,8 @@ export const ADMIN_NAV_WITH_HEADER_SAVE: AdminNavKey[] = [
   "site-admin-pwa",
   "site-login",
   "site-student-card-frames",
-  "site-student-rewards",
+  "site-student-card-brand",
+  "site-student-sheets",
   "site-browser-guide",
   "site-notifications",
   "site-nav",

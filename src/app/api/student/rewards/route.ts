@@ -49,15 +49,19 @@ export async function GET(request: NextRequest) {
         ? findCardFrameById(catalog, row.frame_id)
         : null;
       const publicFrame = frame ? toPublicCardFrame(frame) : null;
+      const claimed = row.status === "claimed";
+      const rewardType = String(row.reward_type || "frame").toLowerCase();
       return {
         id: row.id,
-        rewardType: row.reward_type,
+        rewardType,
         frameId: row.frame_id,
         frameName: publicFrame?.name ?? null,
         frameImageUrl: publicFrame?.imageUrl ?? null,
+        goldAmount: Number(row.gold_amount) > 0 ? Number(row.gold_amount) : null,
+        couponCode: claimed && row.coupon_code?.trim() ? row.coupon_code.trim() : null,
         title: row.title?.trim() || publicFrame?.name || "보상",
         message: row.message?.trim() || "",
-        status: row.status === "claimed" ? "claimed" : "pending",
+        status: claimed ? "claimed" : "pending",
         createdAt: row.created_at,
         claimedAt: row.claimed_at,
       };

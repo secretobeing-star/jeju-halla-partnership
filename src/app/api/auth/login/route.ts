@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { issueStudentApiSession } from "@/lib/student-session-server";
+import { getActiveStudentSuspension, studentSuspensionMessage } from "@/lib/student-suspension";
 
 type LoginBody = {
   studentId?: string;
@@ -20,6 +21,14 @@ export async function POST(request: NextRequest) {
 
   if (!studentId || !name) {
     return NextResponse.json({ error: "정보 입력 필수" }, { status: 400 });
+  }
+
+  const suspension = await getActiveStudentSuspension(studentId);
+  if (suspension) {
+    return NextResponse.json(
+      { error: studentSuspensionMessage(suspension), code: "STUDENT_SUSPENDED" },
+      { status: 403 },
+    );
   }
 
   const sessionToken = await issueStudentApiSession(studentId);

@@ -21,6 +21,8 @@ import { getBoardVoterKey } from "@/lib/board-voter";
 import { SITE_STUDENT_NEED_LOGIN_EVENT } from "@/lib/site-student-auth-settings";
 import { studentAuthFetch } from "@/lib/student-session";
 import { supabase } from "@/lib/supabase";
+import { notifyPublicSiteReload } from "@/lib/public-site-reload";
+import { OPEN_SITE_MAP_EVENT } from "@/lib/ai-chatbot";
 
 const DEFAULT_TAB_ID = "__default_partners__";
 const DEFAULT_STAMP_BAR_BG = "#ecfdf5";
@@ -148,6 +150,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const [cooldownTargetTime, setCooldownTargetTime] = useState<number>(0);
   const [cooldownRemainMs, setCooldownRemainMs] = useState<number>(0);
   const stampReadyPushSentRef = useRef<Set<string>>(new Set());
+  const forceIntroFromChatRef = useRef(false);
 
   const student = getSiteMemberSession()?.student;
   const userId = student?.studentId?.trim() || "";
@@ -437,6 +440,12 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       return;
     }
 
+    if (forceIntroFromChatRef.current) {
+      forceIntroFromChatRef.current = false;
+      setShowIntroModal(true);
+      return;
+    }
+
     if (isGuest) {
       setShowIntroModal(true);
     } else {
@@ -444,6 +453,25 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       setShowIntroModal(!hasConfirmed);
     }
   }, [activeTabId, activeEvent, isDefaultTab, isGuest, getIntroConfirmedKey]);
+
+  useEffect(() => {
+    function onOpenMapEvent(event: Event) {
+      const id = String((event as CustomEvent<{ id?: string }>).detail?.id ?? "").trim();
+      if (!id) return;
+      if (props.onPartnerSelect) {
+        props.onPartnerSelect("");
+      }
+      forceIntroFromChatRef.current = true;
+      setMessage(null);
+      setActiveTabId(id);
+      setShowIntroModal(true);
+      window.requestAnimationFrame(() => {
+        document.querySelector(".map-event-shell")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    }
+    window.addEventListener(OPEN_SITE_MAP_EVENT, onOpenMapEvent);
+    return () => window.removeEventListener(OPEN_SITE_MAP_EVENT, onOpenMapEvent);
+  }, [props.onPartnerSelect]);
 
   const handleConfirmStartEvent = useCallback(() => {
     if (!activeEvent) return;
@@ -714,6 +742,8 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
           showGiftButton: false,
         });
       }
+      window.dispatchEvent(new Event("site-stamp-progress-changed"));
+      notifyPublicSiteReload();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "도장 찍기에 실패했습니다.");
     } finally {
@@ -1208,7 +1238,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
                       style={{ background: "#6b7280", flex: 1, padding: "10px", borderRadius: "8px", color: "#fff", fontWeight: "600" }}
                       onClick={() => {
                         setRewardModal(null);
-                        void handleFullRefresh();
+                        window.location.reload();
                       }}
                     >
                       확인

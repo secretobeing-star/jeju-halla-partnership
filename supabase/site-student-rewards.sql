@@ -19,4 +19,10 @@ create index if not exists site_student_rewards_student_status_idx
 create index if not exists site_student_rewards_created_idx
   on public.site_student_rewards (created_at desc);
 
+alter table public.site_student_rewards
+  add column if not exists coupon_code text;
+
+alter table public.site_student_rewards
+  add column if not exists gold_amount integer;
+
 notify pgrst, 'reload schema';

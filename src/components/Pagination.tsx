@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
 import { scrollToSection } from "@/lib/scroll-to-section";
 
 type PaginationProps = {
@@ -9,6 +12,15 @@ type PaginationProps = {
   scrollOffsetPx?: number;
 };
 
+const MOBILE_PAGE_WINDOW = 5;
+const MOBILE_MQ = "(max-width: 767px)";
+
+function pageWindow(currentPage: number, totalPages: number, size: number) {
+  const start = Math.floor((Math.max(1, currentPage) - 1) / size) * size + 1;
+  const end = Math.min(totalPages, start + size - 1);
+  return Array.from({ length: Math.max(0, end - start + 1) }, (_, index) => start + index);
+}
+
 export default function Pagination({
   currentPage,
   totalPages,
@@ -17,11 +29,27 @@ export default function Pagination({
   scrollTargetId,
   scrollOffsetPx = 12,
 }: PaginationProps) {
+  const [mobile, setMobile] = useState(true);
+
+  useEffect(() => {
+    const media = window.matchMedia(MOBILE_MQ);
+    const sync = () => setMobile(media.matches);
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, []);
+
+  const pages = useMemo(() => {
+    if (totalPages <= 1) return [];
+    if (mobile) {
+      return pageWindow(currentPage, totalPages, MOBILE_PAGE_WINDOW);
+    }
+    return Array.from({ length: totalPages }, (_, index) => index + 1);
+  }, [currentPage, mobile, totalPages]);
+
   if (totalPages <= 1) {
     return null;
   }
-
-  const pages = Array.from({ length: totalPages }, (_, index) => index + 1);
 
   function handleChange(page: number) {
     onPageChange(page);

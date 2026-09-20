@@ -96,7 +96,10 @@ export async function POST(request: NextRequest) {
 
   let body: {
     studentIds?: string | string[];
+    kind?: string;
     frameId?: string;
+    goldAmount?: number | string;
+    couponCode?: string;
     title?: string;
     message?: string;
     reason?: string;
@@ -113,29 +116,42 @@ export async function POST(request: NextRequest) {
       )
     : parseStudentIds(typeof body.studentIds === "string" ? body.studentIds : "");
 
+  const kindRaw = String(body.kind ?? "costume").trim().toLowerCase();
+  const kind = kindRaw === "gold" || kindRaw === "coupon" ? kindRaw : "costume";
   const frameId = body.frameId?.trim() ?? "";
+  const goldAmount = Math.floor(Number(body.goldAmount) || 0);
+  const couponCode = body.couponCode?.trim() ?? "";
+
   if (!studentIds.length) {
     return NextResponse.json(
       { error: "받을 학번을 한 명 이상 입력해 주세요." },
       { status: 400 },
     );
   }
-  if (!frameId) {
+  if (kind === "costume" && !frameId) {
     return NextResponse.json({ error: "지급할 코스튬을 선택해 주세요." }, { status: 400 });
+  }
+  if (kind === "gold" && goldAmount < 1) {
+    return NextResponse.json({ error: "지급할 골드를 1 이상 입력해 주세요." }, { status: 400 });
+  }
+  if (kind === "coupon" && !couponCode) {
+    return NextResponse.json({ error: "쿠폰 코드를 입력해 주세요." }, { status: 400 });
   }
 
   let frameName = frameId;
-  try {
-    const catalog = await loadCardFrameCatalogFromDb();
-    const frame = findCardFrameById(catalog, frameId);
-    if (!frame) {
-      return NextResponse.json({ error: "코스튬을 찾을 수 없습니다." }, { status: 404 });
+  if (kind === "costume") {
+    try {
+      const catalog = await loadCardFrameCatalogFromDb();
+      const frame = findCardFrameById(catalog, frameId);
+      if (!frame) {
+        return NextResponse.json({ error: "코스튬을 찾을 수 없습니다." }, { status: 404 });
+      }
+      frameName = frame.name || frame.id;
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "코스튬 카탈로그를 불러오지 못했습니다.";
+      return NextResponse.json({ error: message }, { status: 500 });
     }
-    frameName = frame.name || frame.id;
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "코스튬 카탈로그를 불러오지 못했습니다.";
-    return NextResponse.json({ error: message }, { status: 500 });
   }
 
   const supabase = createSupabaseServer();
@@ -146,7 +162,14 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const title = body.title?.trim() || `코스튬 보상 · ${frameName}`;
+  const rewardType = kind === "costume" ? "frame" : kind;
+  const title =
+    body.title?.trim() ||
+    (kind === "gold"
+      ? `골드 ${goldAmount.toLocaleString("ko-KR")}개`
+      : kind === "coupon"
+        ? "쿠폰 보상"
+        : `코스튬 보상 · ${frameName}`);
   const message = body.message?.trim() || "";
   const reason = body.reason?.trim() || message || title;
   const adminId = auth.user.id;
@@ -159,8 +182,10 @@ export async function POST(request: NextRequest) {
 
   const rows = studentIds.map((student_id) => ({
     student_id,
-    reward_type: "frame",
-    frame_id: frameId,
+    reward_type: rewardType,
+    frame_id: kind === "costume" ? frameId : null,
+    coupon_code: kind === "coupon" ? couponCode : null,
+    gold_amount: kind === "gold" ? goldAmount : null,
     title,
     message: message || null,
     status: "pending",
@@ -177,20 +202,24 @@ export async function POST(request: NextRequest) {
       {
         error: error.message.includes("site_student_rewards")
           ? "보상 테이블이 없습니다. Supabase에서 site-student-rewards.sql을 실행해 주세요."
-          : error.message,
+          : error.message.includes("coupon_code") || error.message.includes("gold_amount")
+            ? "보상 종류 컬럼이 없습니다. supabase/site-student-rewards.sql 을 다시 실행해 주세요."
+            : error.message,
       },
       { status: 500 },
     );
   }
 
+  const auditType = kind === "gold" ? "GOLD" : kind === "coupon" ? "COUPON" : "FRAME";
   const auditRows = studentIds.map((target_user_id) => ({
     admin_id: adminId,
     admin_name: adminName,
     target_user_id,
     target_user_name: null,
-    reward_type: "FRAME",
-    reward_id: frameId,
-    reward_name: frameName,
+    reward_type: auditType,
+    reward_id:
+      kind === "gold" ? String(goldAmount) : kind === "coupon" ? couponCode.slice(0, 80) : frameId,
+    reward_name: title,
     reason,
     ip_address: ipAddress || null,
     user_agent: userAgent || null,
@@ -228,10 +257,16 @@ export async function DELETE(request: NextRequest) {
   }
 
   const { searchParams } = new URL(request.url);
+  const view = searchParams.get("view")?.trim().toLowerCase() || "";
+  const deleteAll = searchParams.get("all") === "1" || searchParams.get("all") === "true";
   const logId = searchParams.get("logId")?.trim();
+  const deleteRewards = view === "rewards";
 
-  if (!logId) {
+  if (!deleteAll && !logId) {
     return NextResponse.json({ error: "로그 ID가 필요합니다." }, { status: 400 });
+  }
+  if (deleteRewards && !deleteAll) {
+    return NextResponse.json({ error: "선물함 내역은 전체 삭제만 지원합니다." }, { status: 400 });
   }
 
   const supabase = createSupabaseServer();
@@ -242,10 +277,30 @@ export async function DELETE(request: NextRequest) {
     );
   }
 
-  const { error } = await supabase
-    .from("site_reward_distribution_logs")
-    .delete()
-    .eq("id", logId);
+  if (deleteRewards) {
+    const { error } = await supabase
+      .from("site_student_rewards")
+      .delete()
+      .gte("created_at", "1970-01-01");
+
+    if (error) {
+      return NextResponse.json(
+        {
+          error: error.message.includes("site_student_rewards")
+            ? "보상 테이블이 없습니다. Supabase에서 site-student-rewards.sql을 실행해 주세요."
+            : error.message,
+        },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json({ ok: true, deletedAllRewards: true });
+  }
+
+  const query = supabase.from("site_reward_distribution_logs").delete();
+  const { error } = deleteAll
+    ? await query.gte("created_at", "1970-01-01")
+    : await query.eq("id", logId as string);
 
   if (error) {
     return NextResponse.json(
@@ -258,5 +313,9 @@ export async function DELETE(request: NextRequest) {
     );
   }
 
-  return NextResponse.json({ ok: true, deletedLogId: logId });
+  return NextResponse.json({
+    ok: true,
+    deletedAll: deleteAll,
+    deletedLogId: deleteAll ? null : logId,
+  });
 }

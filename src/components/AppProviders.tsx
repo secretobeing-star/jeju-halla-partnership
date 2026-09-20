@@ -28,6 +28,12 @@ function useSessionCheck(intervalMs = 1000) {
 
         const data = await res.json();
         if (!data.valid) {
+          if (data.code === "STUDENT_SUSPENDED") {
+            alert(data.message || "이 학번은 정지되었습니다.");
+            localStorage.clear();
+            router.push("/");
+            return;
+          }
           const recovered = await ensureStudentApiSession(true);
           if (recovered) {
             return;

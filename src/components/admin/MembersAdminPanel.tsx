@@ -6,6 +6,7 @@ import { adminApiFetch } from "@/lib/admin-api";
 import { formatSiteSettingsSaveError } from "@/lib/site-settings-save-error";
 import { isSiteMemberWithdrawEnabled } from "@/lib/site-member-withdraw";
 import { SiteSettings } from "@/lib/supabase";
+import StudentSuspensionAdminPanel from "@/components/admin/StudentSuspensionAdminPanel";
 
 type Member = {
   id: string;
@@ -54,7 +55,7 @@ export default function MembersAdminPanel({
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteMessage, setDeleteMessage] = useState<string | null>(null);
   const [tab, setTab] = useState<
-    "members" | "withdrawals" | "deletion-requests" | "settings"
+    "members" | "withdrawals" | "deletion-requests" | "settings" | "suspensions"
   >("members");
   const [requestFilter, setRequestFilter] = useState<"pending" | "approved" | "rejected">("pending");
   const [withdrawalFilter, setWithdrawalFilter] = useState<"all" | "blocked" | "expired">("all");
@@ -364,6 +365,17 @@ export default function MembersAdminPanel({
           </button>
           <button
             type="button"
+            onClick={() => setTab("suspensions")}
+            className={`px-3 py-1.5 text-sm rounded-lg ${
+              tab === "suspensions"
+                ? "bg-emerald-600 text-white"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+            }`}
+          >
+            학번 정지
+          </button>
+          <button
+            type="button"
             onClick={() => setTab("settings")}
             className={`px-3 py-1.5 text-sm rounded-lg ${
               tab === "settings"
@@ -376,7 +388,9 @@ export default function MembersAdminPanel({
         </div>
       </div>
 
-      {tab === "withdrawals" ? (
+      {tab === "suspensions" ? (
+        <StudentSuspensionAdminPanel />
+      ) : tab === "withdrawals" ? (
         <>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm text-gray-600">

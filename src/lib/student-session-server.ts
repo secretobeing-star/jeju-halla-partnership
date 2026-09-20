@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { SESSION_TOKEN_HEADER, STUDENT_ID_HEADER } from "@/lib/student-session-headers";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
+import { getActiveStudentSuspension, studentSuspensionMessage } from "@/lib/student-suspension";
 
 export type StudentSessionOk = { ok: true; studentId: string };
 export type StudentSessionFail = { ok: false; response: NextResponse };
@@ -56,6 +57,11 @@ export async function requireStudentSession(
 
   if (!data || data.session_token !== sessionToken) {
     return fail(401, "세션이 만료되었습니다. 다시 로그인해 주세요.");
+  }
+
+  const suspension = await getActiveStudentSuspension(studentId);
+  if (suspension) {
+    return fail(403, studentSuspensionMessage(suspension));
   }
 
   return { ok: true, studentId };

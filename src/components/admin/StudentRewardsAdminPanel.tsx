@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import AdminCollapsibleSection from "@/components/admin/AdminCollapsibleSection";
+import StudentIdsField from "@/components/admin/StudentIdsField";
 import { adminApiFetch } from "@/lib/admin-api";
 import type { RewardDistributionLog } from "@/lib/reward-distribution-log";
 import { resolveCardFrameCatalog } from "@/lib/student-card-frames";
@@ -20,7 +21,11 @@ export default function StudentRewardsAdminPanel({
     [settings.site_student_card_frames],
   );
   const [studentIdsText, setStudentIdsText] = useState("");
+  const [kind, setKind] = useState<"costume" | "gold" | "coupon">("costume");
   const [frameId, setFrameId] = useState("");
+  const [frameQuery, setFrameQuery] = useState("");
+  const [goldAmount, setGoldAmount] = useState("100");
+  const [couponCode, setCouponCode] = useState("");
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
   const [reason, setReason] = useState("");
@@ -31,7 +36,16 @@ export default function StudentRewardsAdminPanel({
   const [loadingRecent, setLoadingRecent] = useState(false);
   const [loadingAudit, setLoadingAudit] = useState(false);
   const [deleteConfirmLogId, setDeleteConfirmLogId] = useState<string | null>(null);
+  const [deleteAllConfirm, setDeleteAllConfirm] = useState(false);
   const [deletingLogId, setDeletingLogId] = useState<string | null>(null);
+  const [deletingAll, setDeletingAll] = useState(false);
+  const [deleteAllRewardsConfirm, setDeleteAllRewardsConfirm] = useState(false);
+  const [deletingAllRewards, setDeletingAllRewards] = useState(false);
+
+  const costumeOptions = frames.filter((frame) => {
+    const hay = `${frame.name} ${frame.id}`.toLowerCase();
+    return hay.includes(frameQuery.trim().toLowerCase());
+  });
 
   const loadRecent = useCallback(async () => {
     setLoadingRecent(true);
@@ -93,7 +107,10 @@ export default function StudentRewardsAdminPanel({
         method: "POST",
         body: JSON.stringify({
           studentIds: studentIdsText,
+          kind,
           frameId,
+          goldAmount,
+          couponCode,
           title,
           message,
           reason,
@@ -132,6 +149,62 @@ export default function StudentRewardsAdminPanel({
     }
   }
 
+  async function handleDeleteAllRewards() {
+    setDeletingAllRewards(true);
+    setStatusMessage(null);
+    try {
+      const payload = (await adminApiFetch("/api/admin/student-rewards?view=rewards&all=1", {
+        method: "DELETE",
+      })) as {
+        ok?: boolean;
+        error?: string;
+      };
+
+      if (payload.error) {
+        setStatusMessage(payload.error);
+        return;
+      }
+
+      setStatusMessage("선물함 지급 내역을 모두 삭제했습니다.");
+      setDeleteAllRewardsConfirm(false);
+      await loadRecent();
+    } catch (error) {
+      setStatusMessage(
+        error instanceof Error ? error.message : "지급 내역 전체 삭제에 실패했습니다.",
+      );
+    } finally {
+      setDeletingAllRewards(false);
+    }
+  }
+
+  async function handleDeleteAllAuditLogs() {
+    setDeletingAll(true);
+    setStatusMessage(null);
+    try {
+      const payload = (await adminApiFetch("/api/admin/student-rewards?all=1", {
+        method: "DELETE",
+      })) as {
+        ok?: boolean;
+        error?: string;
+      };
+
+      if (payload.error) {
+        setStatusMessage(payload.error);
+        return;
+      }
+
+      setStatusMessage("감사 로그를 모두 삭제했습니다.");
+      setDeleteAllConfirm(false);
+      await loadAuditLogs();
+    } catch (error) {
+      setStatusMessage(
+        error instanceof Error ? error.message : "감사 로그 전체 삭제에 실패했습니다.",
+      );
+    } finally {
+      setDeletingAll(false);
+    }
+  }
+
   async function handleDeleteAuditLog(logId: string) {
     setDeletingLogId(logId);
     setStatusMessage(null);
@@ -166,8 +239,8 @@ export default function StudentRewardsAdminPanel({
 
   return (
     <AdminCollapsibleSection
-      title="보상 지급 · 학생증 코스튬"
-      description="학번을 지정해 학생증 코스튬을 선물함으로 보냅니다. 학생은 상단 메뉴 선물함(#gift-inbox)에서 수령합니다."
+      title="보상 지급"
+      description="학번을 지정해 골드, 쿠폰, 코스튬을 선물함으로 보냅니다. 학생은 상단 메뉴 선물함에서 수령합니다."
     >
       <p className="mb-3 text-xs text-gray-500">
         DB:{" "}
@@ -179,38 +252,94 @@ export default function StudentRewardsAdminPanel({
       </p>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        <label className="block text-sm font-medium text-gray-700">
-          받을 학번 (쉼표·줄바꿈으로 여러 명)
-          <textarea
-            value={studentIdsText}
-            onChange={(e) => setStudentIdsText(e.target.value)}
-            rows={4}
-            placeholder={"20241234\n20241235"}
-            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-sm outline-none focus:border-emerald-500"
-            required
-          />
-        </label>
+        <StudentIdsField
+          label="받을 학번 (쉼표·줄바꿈으로 여러 명)"
+          value={studentIdsText}
+          onChange={setStudentIdsText}
+        />
 
-        <label className="block text-sm font-medium text-gray-700">
-          지급할 코스튬
-          <select
-            value={frameId}
-            onChange={(e) => setFrameId(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-emerald-500"
-            required
-          >
-            <option value="">선택</option>
-            {frames.map((frame) => (
-              <option key={frame.id} value={frame.id}>
-                {frame.name || frame.id}
-              </option>
+        <div>
+          <p className="text-sm font-medium text-gray-700">지급 종류</p>
+          <div className="mt-1 flex rounded-lg border border-gray-200 p-0.5 text-xs">
+            {(
+              [
+                { id: "costume", label: "코스튬" },
+                { id: "gold", label: "골드" },
+                { id: "coupon", label: "쿠폰" },
+              ] as const
+            ).map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={`flex-1 rounded-md px-3 py-1.5 font-medium ${
+                  kind === item.id ? "bg-emerald-600 text-white" : "text-gray-600 hover:bg-gray-50"
+                }`}
+                onClick={() => setKind(item.id)}
+              >
+                {item.label}
+              </button>
             ))}
-          </select>
-        </label>
-        {frames.length === 0 ? (
-          <p className="text-xs text-amber-700">
-            등록된 코스튬이 없습니다. 「학생증 코스튬」 메뉴에서 먼저 추가해 주세요.
-          </p>
+          </div>
+        </div>
+
+        {kind === "costume" ? (
+          <>
+            <label className="block text-sm font-medium text-gray-700">
+              지급할 코스튬
+              <input
+                value={frameQuery}
+                onChange={(e) => setFrameQuery(e.target.value)}
+                placeholder="이름·ID 검색"
+                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+              />
+              <select
+                value={frameId}
+                onChange={(e) => setFrameId(e.target.value)}
+                className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-emerald-500"
+                required
+              >
+                <option value="">선택</option>
+                {costumeOptions.map((frame) => (
+                  <option key={frame.id} value={frame.id}>
+                    {frame.name || frame.id}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {frames.length === 0 ? (
+              <p className="text-xs text-amber-700">
+                등록된 코스튬이 없습니다. 「학생증 코스튬」 메뉴에서 먼저 추가해 주세요.
+              </p>
+            ) : null}
+          </>
+        ) : null}
+
+        {kind === "gold" ? (
+          <label className="block text-sm font-medium text-gray-700">
+            지급할 골드
+            <input
+              type="number"
+              min={1}
+              step={1}
+              value={goldAmount}
+              onChange={(e) => setGoldAmount(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-emerald-500"
+              required
+            />
+          </label>
+        ) : null}
+
+        {kind === "coupon" ? (
+          <label className="block text-sm font-medium text-gray-700">
+            쿠폰 코드
+            <input
+              value={couponCode}
+              onChange={(e) => setCouponCode(e.target.value)}
+              placeholder="학생이 받을 때 보이는 코드"
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-sm outline-none focus:border-emerald-500"
+              required
+            />
+          </label>
         ) : null}
 
         <label className="block text-sm font-medium text-gray-700">
@@ -247,7 +376,12 @@ export default function StudentRewardsAdminPanel({
 
         <button
           type="submit"
-          disabled={busy || !frameId}
+          disabled={
+            busy ||
+            (kind === "costume" && !frameId) ||
+            (kind === "gold" && !(Number(goldAmount) > 0)) ||
+            (kind === "coupon" && !couponCode.trim())
+          }
           className="rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
         >
           {busy ? "전송 중..." : "선물함으로 보내기"}
@@ -261,13 +395,25 @@ export default function StudentRewardsAdminPanel({
       <div className="mt-6 border-t border-gray-100 pt-4">
         <div className="mb-2 flex items-center justify-between gap-2">
           <p className="text-sm font-medium text-gray-700">최근 지급 내역 (선물함)</p>
-          <button
-            type="button"
-            onClick={() => void loadRecent()}
-            className="text-xs text-emerald-700 hover:underline"
-          >
-            새로고침
-          </button>
+          <div className="flex items-center gap-3">
+            {recent.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => setDeleteAllRewardsConfirm(true)}
+                disabled={deletingAllRewards}
+                className="text-xs text-red-600 hover:underline disabled:opacity-50"
+              >
+                전체 삭제
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => void loadRecent()}
+              className="text-xs text-emerald-700 hover:underline"
+            >
+              새로고침
+            </button>
+          </div>
         </div>
         {loadingRecent ? (
           <p className="text-sm text-gray-500">불러오는 중...</p>
@@ -281,7 +427,12 @@ export default function StudentRewardsAdminPanel({
                   {row.student_id} · {row.title || row.frame_id || "보상"}
                 </p>
                 <p className="text-xs text-gray-500">
-                  {row.status === "claimed" ? "수령 완료" : "대기"} ·{" "}
+                  {row.reward_type === "gold"
+                    ? "골드"
+                    : row.reward_type === "coupon"
+                      ? "쿠폰"
+                      : "코스튬"}{" "}
+                  · {row.status === "claimed" ? "수령 완료" : "대기"} ·{" "}
                   {new Date(row.created_at).toLocaleString("ko-KR")}
                 </p>
               </li>
@@ -293,13 +444,25 @@ export default function StudentRewardsAdminPanel({
       <div className="mt-6 border-t border-gray-100 pt-4">
         <div className="mb-2 flex items-center justify-between gap-2">
           <p className="text-sm font-medium text-gray-700">보상 지급 감사 로그</p>
-          <button
-            type="button"
-            onClick={() => void loadAuditLogs()}
-            className="text-xs text-emerald-700 hover:underline"
-          >
-            새로고침
-          </button>
+          <div className="flex items-center gap-3">
+            {auditLogs.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => setDeleteAllConfirm(true)}
+                disabled={deletingAll}
+                className="text-xs text-red-600 hover:underline disabled:opacity-50"
+              >
+                전체 삭제
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => void loadAuditLogs()}
+              className="text-xs text-emerald-700 hover:underline"
+            >
+              새로고침
+            </button>
+          </div>
         </div>
         <p className="mb-2 text-xs text-gray-500">
           관리자가 수동·일괄 지급할 때마다 실시간으로 누적됩니다. 비인가 API 접근은 401/403으로
@@ -365,6 +528,64 @@ export default function StudentRewardsAdminPanel({
                 className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50"
               >
                 {deletingLogId ? "삭제 중..." : "삭제"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {deleteAllConfirm && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50">
+          <div className="mx-4 w-full max-w-sm rounded-lg bg-white p-6 shadow-lg">
+            <h3 className="mb-2 text-lg font-semibold text-gray-900">감사 로그 전체 삭제</h3>
+            <p className="mb-4 text-sm text-gray-600">
+              보상 지급 감사 로그를 모두 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다. 학생
+              선물함 내역은 그대로 둡니다.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setDeleteAllConfirm(false)}
+                disabled={deletingAll}
+                className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 disabled:opacity-50"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleDeleteAllAuditLogs()}
+                disabled={deletingAll}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {deletingAll ? "삭제 중..." : "전체 삭제"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {deleteAllRewardsConfirm && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50">
+          <div className="mx-4 w-full max-w-sm rounded-lg bg-white p-6 shadow-lg">
+            <h3 className="mb-2 text-lg font-semibold text-gray-900">지급 내역 전체 삭제</h3>
+            <p className="mb-4 text-sm text-gray-600">
+              선물함 지급 내역을 모두 삭제하시겠습니까? 대기 중인 선물이 학생 선물함에서도
+              사라집니다. 이 작업은 되돌릴 수 없습니다.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setDeleteAllRewardsConfirm(false)}
+                disabled={deletingAllRewards}
+                className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 disabled:opacity-50"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleDeleteAllRewards()}
+                disabled={deletingAllRewards}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {deletingAllRewards ? "삭제 중..." : "전체 삭제"}
               </button>
             </div>
           </div>

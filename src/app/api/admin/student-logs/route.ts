@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         error:
-          "구글 시트 스프레드시트 ID가 설정되지 않았습니다. 로그인 · 학생증에서 시트 ID를 저장해 주세요.",
+          "구글 시트 스프레드시트 ID가 설정되지 않았습니다. 학생증 → 연동에서 시트 ID를 저장해 주세요.",
       },
       { status: 503 },
     );

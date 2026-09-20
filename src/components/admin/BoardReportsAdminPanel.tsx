@@ -48,7 +48,13 @@ type ReportTargetModeration = {
 const REPORT_SELECT_FIELDS =
   "id, post_id, comment_id, partner_review_id, reason, reporter_ip, is_reviewed, is_admin_created, admin_action_reason, created_at";
 
-export default function BoardReportsAdminPanel() {
+type BoardReportsAdminPanelProps = {
+  section?: "reasons" | "list";
+};
+
+export default function BoardReportsAdminPanel({
+  section = "list",
+}: BoardReportsAdminPanelProps) {
   const { prompt, confirm } = usePromptModal();
   const [boardDefinitions, setBoardDefinitions] = useState<BoardDefinition[]>(
     DEFAULT_BOARD_DEFINITIONS,
@@ -277,8 +283,12 @@ export default function BoardReportsAdminPanel() {
   }, [loadReportTargets]);
 
   useEffect(() => {
+    if (section === "reasons") {
+      setLoading(false);
+      return;
+    }
     void loadReports();
-  }, [loadReports]);
+  }, [loadReports, section]);
 
   async function markReviewed(report: BoardReport, adminActionReason?: string | null) {
     const payload: { is_reviewed: boolean; admin_action_reason?: string | null } = {
@@ -538,6 +548,7 @@ export default function BoardReportsAdminPanel() {
     <div className="space-y-6">
       {message ? <p className="text-sm text-emerald-700">{message}</p> : null}
 
+      {section === "reasons" ? (
       <AdminCollapsibleSection
         title="신고 사유 설정"
         description="게시글·댓글·제휴 후기에 공통으로 사용할 신고 사유 목록과 신고 완료 안내 문구를 설정합니다."
@@ -635,7 +646,9 @@ export default function BoardReportsAdminPanel() {
           </button>
         </form>
       </AdminCollapsibleSection>
+      ) : null}
 
+      {section === "list" ? (
       <AdminCollapsibleSection
         title={`신고 목록${pendingCount > 0 ? ` (${pendingCount})` : ""}`}
         description="회원·비회원 신고 내역입니다. 숨김 처리 시 정지 사유를 남길 수 있습니다."
@@ -774,6 +787,7 @@ export default function BoardReportsAdminPanel() {
           </div>
         )}
       </AdminCollapsibleSection>
+      ) : null}
     </div>
   );
 }

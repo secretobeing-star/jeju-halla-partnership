@@ -120,6 +120,10 @@ export async function openInIOSSafari(url: string) {
   if (typeof navigator.share === "function") {
     try {
       await navigator.share({ url, title: document.title });
+      if (url.startsWith(window.location.origin)) {
+        const { trackSiteAnalytics } = await import("@/lib/site-analytics");
+        trackSiteAnalytics("link_share");
+      }
       return true;
     } catch (error) {
       if ((error as DOMException)?.name === "AbortError") {

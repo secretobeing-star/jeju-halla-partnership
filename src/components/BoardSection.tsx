@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { trackSiteAnalytics } from "@/lib/site-analytics";
 import RichTextEditor from "@/components/RichTextEditor";
 import Pagination from "@/components/Pagination";
 import BoardPostModal from "@/components/BoardPostModal";
@@ -353,6 +354,7 @@ export default function BoardSection({
   useEffect(() => {
     if (selectedPostId) {
       setUserReaction(getStoredPostReaction(selectedPostId));
+      trackSiteAnalytics("board_view");
     } else {
       setUserReaction(null);
     }
@@ -815,6 +817,7 @@ export default function BoardSection({
     resetWriteForm();
     setShowWriteForm(false);
     setMessage("게시글이 등록되었습니다.");
+    trackSiteAnalytics("board_write");
     setCurrentPage(1);
     await loadPosts();
     setSubmitting(false);

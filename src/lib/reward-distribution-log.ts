@@ -2,7 +2,7 @@
  * 관리자 보상 지급 감사 로그.
  */
 
-export type RewardAuditRewardType = "FRAME" | "COUPON" | "ITEM";
+export type RewardAuditRewardType = "FRAME" | "COUPON" | "GOLD" | "ITEM";
 
 export interface RewardDistributionLog {
   logId: string;
@@ -40,7 +40,7 @@ export function toRewardDistributionLog(
 ): RewardDistributionLog {
   const rewardTypeRaw = (row.reward_type || "FRAME").toUpperCase();
   const rewardType: RewardAuditRewardType =
-    rewardTypeRaw === "COUPON" || rewardTypeRaw === "ITEM"
+    rewardTypeRaw === "COUPON" || rewardTypeRaw === "ITEM" || rewardTypeRaw === "GOLD"
       ? rewardTypeRaw
       : "FRAME";
 

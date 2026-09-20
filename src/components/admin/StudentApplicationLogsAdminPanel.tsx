@@ -174,7 +174,7 @@ export default function StudentApplicationLogsAdminPanel() {
           ) : null}
         </p>
         <p className="mt-1 text-emerald-800">
-          탭 이름이 실제 시트와 다르면 「로그인 · 학생증 → 구글 시트 연동」에서 맞춰 주세요. 기본 탭명
+          탭 이름이 실제 시트와 다르면 「학생증 → 연동」에서 맞춰 주세요. 기본 탭명
           은 <code>사용자_로그</code> 입니다.
         </p>
       </div>

@@ -55,6 +55,11 @@ export default function FloatingPageControls({
   }, [showScrollAfterPx]);
 
   useEffect(() => {
+    document.body.classList.toggle("floating-site-size-on", siteSizeEnabled);
+    return () => document.body.classList.remove("floating-site-size-on");
+  }, [siteSizeEnabled]);
+
+  useEffect(() => {
     if (!siteSizeEnabled) {
       return;
     }

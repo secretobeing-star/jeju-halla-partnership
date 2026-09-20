@@ -236,6 +236,9 @@ export default function GiftInboxNavChip({ hideChip = false }: GiftInboxNavChipP
         error?: string;
         frame?: PublicCardFrameItem | null;
         alreadyClaimed?: boolean;
+        rewardType?: string;
+        goldAmount?: number | null;
+        couponCode?: string | null;
       };
       if (!response.ok) {
         setMessage(payload.error || "수령에 실패했습니다.");
@@ -246,11 +249,28 @@ export default function GiftInboxNavChip({ hideChip = false }: GiftInboxNavChipP
           activate: true,
         });
       }
+      if (payload.couponCode) {
+        try {
+          await navigator.clipboard.writeText(payload.couponCode);
+        } catch {
+          // ignore
+        }
+      }
+      const claimedType = String(payload.rewardType || reward.rewardType || "").toLowerCase();
       setMessage(
         payload.alreadyClaimed
-          ? "이미 수령한 보상입니다."
-          : "보상을 수령했습니다. 코스튬 보관함에서 확인할 수 있습니다.",
+          ? payload.couponCode
+            ? `이미 수령한 쿠폰입니다. 코드: ${payload.couponCode}`
+            : "이미 수령한 보상입니다."
+          : claimedType === "gold" && payload.goldAmount
+            ? `골드 ${payload.goldAmount.toLocaleString("ko-KR")}개를 받았습니다.`
+            : payload.couponCode
+              ? `쿠폰 코드 ${payload.couponCode} 를 복사했습니다.`
+              : "보상을 수령했습니다. 코스튬 보관함에서 확인할 수 있습니다.",
       );
+      if (claimedType === "gold") {
+        window.dispatchEvent(new Event("site-season-pass-refresh"));
+      }
       await refresh();
       window.dispatchEvent(new Event("site-frame-inventory-refresh"));
     } catch {
@@ -518,11 +538,23 @@ export default function GiftInboxNavChip({ hideChip = false }: GiftInboxNavChipP
                           )}
                           <div className="gift-inbox__body">
                             <p className="gift-inbox__title">{reward.title}</p>
-                            {reward.message ? (
+                            {reward.rewardType === "gold" && reward.goldAmount ? (
+                              <p className="gift-inbox__description">
+                                골드 {reward.goldAmount.toLocaleString("ko-KR")}개가 포함되어 있습니다.
+                              </p>
+                            ) : reward.rewardType === "coupon" ? (
+                              <p className="gift-inbox__description">
+                                {reward.couponCode
+                                  ? `쿠폰 코드: ${reward.couponCode}`
+                                  : "쿠폰이 포함되어 있습니다. 받으면 코드가 표시됩니다."}
+                              </p>
+                            ) : reward.message ? (
                               <p className="gift-inbox__description" style={{ whiteSpace: "pre-line" }}>
                                 {reward.message}
                               </p>
-                            ) : null}
+                            ) : (
+                              <p className="gift-inbox__msg">코스튬이 포함되어 있습니다.</p>
+                            )}
                             <p className="gift-inbox__meta">
                               {reward.status === "claimed" ? "수령 완료" : "미수령"} ·{" "}
                               {new Date(reward.createdAt).toLocaleDateString("ko-KR")}

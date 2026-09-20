@@ -17,6 +17,7 @@ import {
 } from "@/lib/map-events";
 import { scheduleStampReadyPush } from "@/lib/stamp-ready-push";
 import { completeVisit } from "@/lib/season-pass-server";
+import { recordSiteAnalyticsEvent } from "@/lib/site-analytics-server";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 import { requireStudentSession } from "@/lib/student-session-server";
 
@@ -382,6 +383,7 @@ export async function POST(request: NextRequest) {
       .join(" / "),
   };
   void postPlainJsonWebhook({ ...webhookPayload });
+  recordSiteAnalyticsEvent("stamp_join");
   const seasonVisit = await completeVisit({
     userId,
     partnerId: placeId,

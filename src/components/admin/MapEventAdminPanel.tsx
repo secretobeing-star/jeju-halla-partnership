@@ -307,6 +307,7 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
       });
       setConfig(next);
       onMessage("기본 지도 설정을 저장했습니다.");
+      reloadAfterAdminSave();
     } catch (error) {
       onMessage(error instanceof Error ? error.message : "설정 저장에 실패했습니다.");
     } finally {
@@ -399,6 +400,7 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
         body: JSON.stringify({ is_active: !item.is_active }),
       });
       await loadAll();
+      reloadAfterAdminSave();
     } catch (error) {
       onMessage(error instanceof Error ? error.message : "활성화 변경에 실패했습니다.");
     }
@@ -414,6 +416,7 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
       }
       await loadAll();
       onMessage("이벤트를 삭제했습니다.");
+      reloadAfterAdminSave();
     } catch (error) {
       onMessage(error instanceof Error ? error.message : "삭제에 실패했습니다.");
     }
@@ -452,6 +455,7 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
       reset();
       await loadAll();
       onMessage("보상을 등록했습니다.");
+      reloadAfterAdminSave();
     } catch (error) {
       onMessage(error instanceof Error ? error.message : "보상 등록에 실패했습니다.");
     }
@@ -461,6 +465,7 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
     try {
       await adminApiFetch(`/api/map-events/rewards/${id}`, { method: "DELETE" });
       await loadAll();
+      reloadAfterAdminSave();
     } catch (error) {
       onMessage(error instanceof Error ? error.message : "보상 삭제에 실패했습니다.");
     }

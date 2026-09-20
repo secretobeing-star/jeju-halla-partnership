@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import SiteFooterSocialLinks from "@/components/SiteFooterSocialLinks";
+import SiteLinkShareButton from "@/components/SiteLinkShareButton";
 import { useAppBackHandler } from "@/lib/app-back-stack";
 import { getOptionalTextColor, renderTextWithOptionalLink } from "@/lib/footer-text";
 import { tapDeveloperEasterEgg } from "@/components/DeveloperEasterEgg";
@@ -137,7 +138,7 @@ export default function SiteFooter({
   const darkBackground = footer_dark_background_enabled ?? false;
   const textColor = getOptionalTextColor(footer_text_color);
   const lineClassName = "site-optional-text text-sm leading-relaxed";
-  const hasTopRow = policies.length > 0 || links.length > 0 || socialLinks.length > 0;
+  const hasTopRow = true;
   const hasMainBlock = Boolean(
     imageUrls.length > 0 || businessLine1 || businessLine2 || copyright,
   );
@@ -186,14 +187,17 @@ export default function SiteFooter({
                 <span className="hidden sm:block" aria-hidden />
               )}
 
-              {socialLinks.length > 0 ? (
-                <SiteFooterSocialLinks
-                  items={socialLinks}
-                  darkBackground={darkBackground}
-                  hintsEnabled={footer_social_hints_enabled ?? true}
-                  notifyEnabled={footer_social_notify_enabled ?? true}
-                />
-              ) : null}
+              <div className="flex flex-wrap items-center justify-center gap-3 sm:justify-end">
+                <SiteLinkShareButton dark={darkBackground} />
+                {socialLinks.length > 0 ? (
+                  <SiteFooterSocialLinks
+                    items={socialLinks}
+                    darkBackground={darkBackground}
+                    hintsEnabled={footer_social_hints_enabled ?? true}
+                    notifyEnabled={footer_social_notify_enabled ?? true}
+                  />
+                ) : null}
+              </div>
             </div>
           ) : null}
 

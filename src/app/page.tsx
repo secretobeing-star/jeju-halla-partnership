@@ -25,6 +25,9 @@ import GiftInboxNavChip from "@/components/GiftInboxNavChip";
 import FrameInventoryNavChip from "@/components/FrameInventoryNavChip";
 import SeasonPassNavChip from "@/components/SeasonPassNavChip";
 import GoldShopNavChip from "@/components/GoldShopNavChip";
+import AiChatbotWidget from "@/components/AiChatbotWidget";
+import SiteAnalyticsBeacon from "@/components/SiteAnalyticsBeacon";
+import { OPEN_SITE_PARTNER_EVENT } from "@/lib/ai-chatbot";
 import { isGoldShopOpen, type SeasonPassWidgetState } from "@/lib/season-pass";
 import SiteBrowserGuideBanner from "@/components/SiteBrowserGuideBanner";
 import SiteAppBackSettingsSync from "@/components/SiteAppBackSettingsSync";
@@ -1033,6 +1036,15 @@ export default function HomePage() {
     setSelectedPartnerId(null);
   }, []);
 
+  useEffect(() => {
+    function onOpenPartner(event: Event) {
+      const id = String((event as CustomEvent<{ id?: string }>).detail?.id ?? "");
+      if (id) setSelectedPartnerId(id);
+    }
+    window.addEventListener(OPEN_SITE_PARTNER_EVENT, onOpenPartner);
+    return () => window.removeEventListener(OPEN_SITE_PARTNER_EVENT, onOpenPartner);
+  }, []);
+
   const handleTopNavAction = useCallback((href: string) => {
     if (isBoardPopupNavHref(href)) {
       markBoardNavSeen();
@@ -1812,6 +1824,8 @@ export default function HomePage() {
         }
       />
       {pwaSplashVisible ? <SitePwaLoadingSplash {...pwaSplashProps} /> : null}
+      <SiteAnalyticsBeacon />
+      <AiChatbotWidget />
       </div>
       </StudentIdProvider>
     </SitePwaInstallProvider>

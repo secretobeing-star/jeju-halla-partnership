@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
+import { getActiveStudentSuspension, studentSuspensionMessage } from "@/lib/student-suspension";
 
 type VerifyBody = {
   studentId?: string;
@@ -38,6 +39,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       valid: false,
       message: "다른 기기에서 로그인하여 현재 기기에서 로그아웃되었습니다.",
+    });
+  }
+
+  const suspension = await getActiveStudentSuspension(studentId);
+  if (suspension) {
+    return NextResponse.json({
+      valid: false,
+      code: "STUDENT_SUSPENDED",
+      message: studentSuspensionMessage(suspension),
     });
   }
 

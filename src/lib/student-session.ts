@@ -1,5 +1,22 @@
+import { getBoardVoterKey } from "@/lib/board-voter";
 import { getSiteMemberSession } from "@/lib/site-member-session";
 import { SESSION_TOKEN_HEADER, STUDENT_ID_HEADER } from "@/lib/student-session-headers";
+
+function claimDailyLoginRewardClient(studentId: string, sessionToken: string) {
+  const clientKey = getBoardVoterKey();
+  void fetch("/api/student/login-reward", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      [STUDENT_ID_HEADER]: studentId,
+      [SESSION_TOKEN_HEADER]: sessionToken,
+    },
+    body: JSON.stringify({
+      studentId,
+      clientKey: clientKey !== "server" ? clientKey : "",
+    }),
+  }).catch(() => {});
+}
 
 let ensurePromise: Promise<boolean> | null = null;
 
@@ -14,6 +31,7 @@ export function storeStudentApiSession(studentId: string, sessionToken: string) 
   }
   window.localStorage.setItem("studentId", id);
   window.localStorage.setItem("sessionToken", token);
+  void claimDailyLoginRewardClient(id, token);
 }
 
 export function getStudentSessionAuthHeaders(): Record<string, string> {
@@ -52,6 +70,7 @@ export async function ensureStudentApiSession(force = false): Promise<boolean> {
   const existingId = window.localStorage.getItem("studentId")?.trim() || "";
   const existingToken = window.localStorage.getItem("sessionToken")?.trim() || "";
   if (!force && existingId === studentId && existingToken) {
+    void claimDailyLoginRewardClient(existingId, existingToken);
     return true;
   }
 

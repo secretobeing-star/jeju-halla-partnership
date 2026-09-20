@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import AdminCollapsibleSection from "@/components/admin/AdminCollapsibleSection";
+import Pagination from "@/components/Pagination";
 import { createEmptyCardFrameItem, type CardFrameItem } from "@/data/cardFrames";
 import { resolveCardFrameCatalog } from "@/lib/student-card-frames";
 import { SiteSettings } from "@/lib/supabase";
@@ -25,6 +26,8 @@ function createFrameId() {
   return `frame-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+const COSTUME_PAGE_SIZE = 10;
+
 export default function CardFramesAdminPanel({
   settings,
   setSettings,
@@ -33,6 +36,9 @@ export default function CardFramesAdminPanel({
 }: CardFramesAdminPanelProps) {
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const [draftCodeVisible, setDraftCodeVisible] = useState<Record<string, boolean>>({});
+  const [query, setQuery] = useState("");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [listPage, setListPage] = useState(1);
 
   const frames = useMemo(
     () => resolveCardFrameCatalog(settings.site_student_card_frames) as ExtendedCardFrameItem[],
@@ -54,18 +60,38 @@ export default function CardFramesAdminPanel({
 
   function removeFrame(id: string) {
     commitFrames(frames.filter((frame) => frame.id !== id));
+    setSelectedId((prev) => (prev === id ? null : prev));
   }
 
   function addFrame() {
+    const id = createFrameId();
     commitFrames([
-      ...frames,
       createEmptyCardFrameItem({
-        id: createFrameId(),
+        id,
         name: "새 코스튬",
         isDefaultUnlocked: false,
       }) as ExtendedCardFrameItem,
+      ...frames,
     ]);
+    setSelectedId(id);
+    setQuery("");
+    setListPage(1);
   }
+
+  const filtered = frames.filter((frame) => {
+    const hay = `${frame.name} ${frame.id} ${frame.inboxTitle ?? ""} ${frame.description ?? ""}`.toLowerCase();
+    return hay.includes(query.trim().toLowerCase());
+  });
+
+  const costumeTotalPages = Math.max(1, Math.ceil(filtered.length / COSTUME_PAGE_SIZE));
+  const pagedFrames = filtered.slice(
+    (Math.min(listPage, costumeTotalPages) - 1) * COSTUME_PAGE_SIZE,
+    Math.min(listPage, costumeTotalPages) * COSTUME_PAGE_SIZE,
+  );
+
+  useEffect(() => {
+    setListPage(1);
+  }, [query]);
 
   return (
     <AdminCollapsibleSection
@@ -80,14 +106,25 @@ export default function CardFramesAdminPanel({
         </ul>
       </div>
 
-      <div className="mt-4 space-y-4">
-        {frames.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-3 py-4 text-sm text-gray-500">
-            등록된 코스튬이 없습니다. 아래 버튼으로 추가해 주세요.
-          </p>
-        ) : null}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="코스튬 이름·ID 검색"
+          className="min-w-[12rem] flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+        />
+        <button
+          type="button"
+          onClick={addFrame}
+          className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+        >
+          + 코스튬 아이템 추가
+        </button>
+      </div>
 
+      <div className="mt-4 space-y-4">
         {frames.map((frame) => {
+          if (frame.id !== selectedId) return null;
           const uploading = frameImageUploadingId === frame.id;
           const showCode = draftCodeVisible[frame.id] ?? false;
 
@@ -129,6 +166,7 @@ export default function CardFramesAdminPanel({
                           item.id === frame.id ? { ...item, id: nextId } : item,
                         ),
                       );
+                      setSelectedId(nextId);
                     }}
                     className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-xs outline-none focus:border-emerald-500"
                   />
@@ -159,7 +197,6 @@ export default function CardFramesAdminPanel({
                 </label>
               </div>
 
-              {/* 보관함 전용 설정 영역 (띄어쓰기 및 줄바꿈 완전 유지) */}
               <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50/50 p-3.5 space-y-3">
                 <p className="text-xs font-bold text-emerald-900">📦 보관함 표시 설정</p>
                 <label className="block text-xs font-medium text-gray-700">
@@ -260,15 +297,54 @@ export default function CardFramesAdminPanel({
             </div>
           );
         })}
-      </div>
 
-      <button
-        type="button"
-        onClick={addFrame}
-        className="mt-4 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-      >
-        + 코스튬 아이템 추가
-      </button>
+        {frames.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-3 py-4 text-sm text-gray-500">
+            등록된 코스튬이 없습니다. 위 버튼으로 추가해 주세요.
+          </p>
+        ) : filtered.length === 0 ? (
+          <p className="text-sm text-gray-500">검색 결과가 없습니다.</p>
+        ) : (
+          <ul className="divide-y divide-gray-100 overflow-hidden rounded-xl border border-gray-200">
+            {pagedFrames.map((frame) => (
+              <li key={frame.id}>
+                <button
+                  type="button"
+                  onClick={() => setSelectedId((prev) => (prev === frame.id ? null : frame.id))}
+                  className={`flex w-full items-center gap-3 px-3 py-2 text-left text-sm ${
+                    selectedId === frame.id ? "bg-emerald-50" : "bg-white hover:bg-gray-50"
+                  }`}
+                >
+                  {frame.imageUrl ? (
+                    <img src={frame.imageUrl} alt="" className="h-10 w-10 rounded-md border border-gray-200 object-contain" />
+                  ) : (
+                    <span className="flex h-10 w-10 items-center justify-center rounded-md border border-dashed border-gray-300 text-[10px] text-gray-400">
+                      없음
+                    </span>
+                  )}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-medium text-gray-900">{frame.name || frame.id}</span>
+                    <span className="block truncate font-mono text-[11px] text-gray-500">{frame.id}</span>
+                  </span>
+                  <span className="text-xs text-gray-400">{selectedId === frame.id ? "접기" : "선택"}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {filtered.length > COSTUME_PAGE_SIZE ? (
+          <div>
+            <p className="text-center text-xs text-gray-500">
+              총 {filtered.length}개 · {Math.min(listPage, costumeTotalPages)}/{costumeTotalPages} 페이지
+            </p>
+            <Pagination
+              currentPage={Math.min(listPage, costumeTotalPages)}
+              totalPages={costumeTotalPages}
+              onPageChange={setListPage}
+            />
+          </div>
+        ) : null}
+      </div>
     </AdminCollapsibleSection>
   );
 }

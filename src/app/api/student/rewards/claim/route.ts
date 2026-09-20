@@ -7,6 +7,7 @@ import {
   toPublicCardFrame,
 } from "@/lib/student-card-frames";
 import type { StudentRewardRow } from "@/lib/student-rewards";
+import { creditStudentGold } from "@/lib/season-pass-server";
 import { requireStudentSession } from "@/lib/student-session-server";
 
 export async function POST(request: NextRequest) {
@@ -52,11 +53,17 @@ export async function POST(request: NextRequest) {
   const row = data as StudentRewardRow;
   const catalog = await loadCardFrameCatalogFromDb().catch(() => []);
   const frame = row.frame_id ? findCardFrameById(catalog, row.frame_id) : null;
+  const rewardType = String(row.reward_type || "frame").toLowerCase();
+  const goldAmount = Number(row.gold_amount) > 0 ? Number(row.gold_amount) : 0;
+  const couponCode = row.coupon_code?.trim() || "";
 
   if (row.status === "claimed") {
     return NextResponse.json({
       ok: true,
       alreadyClaimed: true,
+      rewardType,
+      goldAmount: goldAmount || null,
+      couponCode: couponCode || null,
       frame: frame ? toPublicCardFrame(frame) : null,
     });
   }
@@ -73,6 +80,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: updateError.message }, { status: 500 });
   }
 
+  if (rewardType === "gold" && goldAmount > 0) {
+    try {
+      await creditStudentGold(studentId, goldAmount);
+    } catch (grantError) {
+      await supabase
+        .from("site_student_rewards")
+        .update({ status: "pending", claimed_at: null })
+        .eq("id", rewardId)
+        .eq("student_id", studentId);
+      return NextResponse.json(
+        { error: grantError instanceof Error ? grantError.message : "골드를 지급하지 못했습니다." },
+        { status: 500 },
+      );
+    }
+  }
+
   if (frame?.id) {
     try {
       await grantStudentCardFrameOnServer(studentId, frame.id, "admin", {
@@ -86,6 +109,9 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({
     ok: true,
     alreadyClaimed: false,
+    rewardType,
+    goldAmount: goldAmount || null,
+    couponCode: couponCode || null,
     frame: frame ? toPublicCardFrame(frame) : null,
     claimedAt,
   });

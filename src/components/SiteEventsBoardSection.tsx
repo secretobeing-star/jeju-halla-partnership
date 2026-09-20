@@ -14,6 +14,7 @@ import {
   SITE_EVENT_BOARD_FILTERS,
   type SiteEventBoardFilter,
 } from "@/lib/site-events";
+import { OPEN_SITE_EVENT_DETAIL } from "@/lib/ai-chatbot";
 import {
   hasUnreadSiteEvents,
   markSiteEventsNavSeen,
@@ -183,9 +184,32 @@ export default function SiteEventsBoardSection({
     function onOpenRequest() {
       openModal();
     }
+    function onOpenDetail(event: Event) {
+      const id = String((event as CustomEvent<{ id?: string }>).detail?.id ?? "").trim();
+      if (!id) {
+        openModal();
+        return;
+      }
+      const target = visibleEvents.find((item) => item.id === id);
+      if (!target) {
+        openModal();
+        return;
+      }
+      markSiteEventsNavSeen();
+      setHasNewEvents(false);
+      setBoardFilter(resolveSiteEventBoardFilter(target));
+      setActiveTabId(null);
+      setSelectedEventId(id);
+      setOpen(true);
+      sendEventLog(id);
+    }
     window.addEventListener("site-events-open", onOpenRequest);
-    return () => window.removeEventListener("site-events-open", onOpenRequest);
-  }, [openModal]);
+    window.addEventListener(OPEN_SITE_EVENT_DETAIL, onOpenDetail);
+    return () => {
+      window.removeEventListener("site-events-open", onOpenRequest);
+      window.removeEventListener(OPEN_SITE_EVENT_DETAIL, onOpenDetail);
+    };
+  }, [openModal, visibleEvents]);
 
   const resolvedLabel = label?.trim() || "이벤트";
   const resolvedHint = hint?.trim() || resolvedLabel;

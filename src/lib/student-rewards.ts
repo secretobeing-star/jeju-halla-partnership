@@ -5,6 +5,8 @@ export type StudentRewardRow = {
   student_id: string;
   reward_type: string;
   frame_id: string | null;
+  coupon_code?: string | null;
+  gold_amount?: number | null;
   title: string | null;
   message: string | null;
   status: StudentRewardStatus;
@@ -19,6 +21,8 @@ export type StudentRewardPublic = {
   frameId: string | null;
   frameName: string | null;
   frameImageUrl: string | null;
+  goldAmount: number | null;
+  couponCode: string | null;
   title: string;
   message: string;
   status: StudentRewardStatus;

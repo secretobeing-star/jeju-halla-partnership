@@ -34,6 +34,9 @@ import AdminSidebar, { readStoredAdminNav } from "@/components/admin/AdminSideba
 import PartnerListSettingsPanel from "@/components/admin/PartnerListSettingsPanel";
 import MapEventAdminPanel from "@/components/admin/MapEventAdminPanel";
 import GoldShopAdminPanel from "@/components/admin/GoldShopAdminPanel";
+import AiChatbotAdminPanel from "@/components/admin/AiChatbotAdminPanel";
+import SiteAnalyticsAdminPanel from "@/components/admin/SiteAnalyticsAdminPanel";
+import GoldAnalyticsAdminPanel from "@/components/admin/GoldAnalyticsAdminPanel";
 import SeasonPassAdminPanel from "@/components/admin/SeasonPassAdminPanel";
 import Pagination from "@/components/Pagination";
 import SiteFeaturesApplier from "@/components/SiteFeaturesApplier";
@@ -62,10 +65,13 @@ import { getSiteNavLinks } from "@/lib/site-nav-links";
 import SiteNavLinksAdminPanel from "@/components/admin/SiteNavLinksAdminPanel";
 import SiteLoginAdminPanel from "@/components/admin/SiteLoginAdminPanel";
 import StudentAuthAdminPanel from "@/components/admin/StudentAuthAdminPanel";
+import StudentSheetsAdminPanel from "@/components/admin/StudentSheetsAdminPanel";
 import CardFramesAdminPanel from "@/components/admin/CardFramesAdminPanel";
 import StudentCardBrandAdminPanel from "@/components/admin/StudentCardBrandAdminPanel";
 import StudentRewardsAdminPanel from "@/components/admin/StudentRewardsAdminPanel";
+import LoginRewardAdminPanel from "@/components/admin/LoginRewardAdminPanel";
 import StudentApplicationLogsAdminPanel from "@/components/admin/StudentApplicationLogsAdminPanel";
+import StudentRecoveryAdminPanel from "@/components/admin/StudentRecoveryAdminPanel";
 import MembersAdminPanel from "@/components/admin/MembersAdminPanel";
 import SiteBrowserGuideAdminPanel from "@/components/admin/SiteBrowserGuideAdminPanel";
 import SiteNotificationsAdminPanel from "@/components/admin/SiteNotificationsAdminPanel";
@@ -2162,6 +2168,20 @@ export default function AdminPage() {
               onGuideImageUpload={handleStudentAuthGuideImageUpload}
               onClearGuideImage={handleClearStudentAuthGuideImage}
             />
+            {settingsMessage ? <p className="text-sm text-emerald-700">{settingsMessage}</p> : null}
+            <button
+              type="submit"
+              disabled={settingsSaving}
+              className="rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
+            >
+              {settingsSaving ? "저장 중..." : "로그인 · 학생증 설정 저장"}
+            </button>
+          </form>
+        )}
+
+        {hasAdminNavAccess(adminAccess, "site-student-card-brand") &&
+          activeNav === "site-student-card-brand" && (
+          <form onSubmit={handleSaveSettings} className="space-y-6" {...{ [ADMIN_PRIMARY_FORM_ATTR]: "" }}>
             <StudentCardBrandAdminPanel
               settings={settings}
               setSettings={setSettings}
@@ -2181,7 +2201,22 @@ export default function AdminPage() {
               disabled={settingsSaving}
               className="rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
             >
-              {settingsSaving ? "저장 중..." : "로그인 · 학생증 설정 저장"}
+              {settingsSaving ? "저장 중..." : "학생증 · 카드 브랜딩 저장"}
+            </button>
+          </form>
+        )}
+
+        {hasAdminNavAccess(adminAccess, "site-student-sheets") &&
+          activeNav === "site-student-sheets" && (
+          <form onSubmit={handleSaveSettings} className="space-y-6" {...{ [ADMIN_PRIMARY_FORM_ATTR]: "" }}>
+            <StudentSheetsAdminPanel settings={settings} setSettings={setSettings} />
+            {settingsMessage ? <p className="text-sm text-emerald-700">{settingsMessage}</p> : null}
+            <button
+              type="submit"
+              disabled={settingsSaving}
+              className="rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
+            >
+              {settingsSaving ? "저장 중..." : "연동 설정 저장"}
             </button>
           </form>
         )}
@@ -2213,6 +2248,13 @@ export default function AdminPage() {
           </div>
         )}
 
+        {hasAdminNavAccess(adminAccess, "site-login-reward") &&
+          activeNav === "site-login-reward" && (
+          <div className="space-y-6">
+            <LoginRewardAdminPanel settings={settings} />
+          </div>
+        )}
+
         {hasAdminNavAccess(adminAccess, "site-student-logs") && activeNav === "site-student-logs" && (
           <StudentApplicationLogsAdminPanel />
         )}
@@ -2225,6 +2267,11 @@ export default function AdminPage() {
               saveSettings={saveSettingsToDb}
             />
           </div>
+        )}
+
+        {hasAdminNavAccess(adminAccess, "site-student-recovery") &&
+          activeNav === "site-student-recovery" && (
+          <StudentRecoveryAdminPanel />
         )}
 
         {hasAdminNavAccess(adminAccess, "site-browser-guide") && activeNav === "site-browser-guide" && (
@@ -3247,6 +3294,33 @@ export default function AdminPage() {
           </div>
         )}
 
+        {hasAdminNavAccess(adminAccess, "ai-chatbot") && activeNav === "ai-chatbot" && (
+          <div className="space-y-4">
+            {settingsMessage ? (
+              <p className="text-sm text-emerald-700">{settingsMessage}</p>
+            ) : null}
+            <AiChatbotAdminPanel onMessage={setSettingsMessage} />
+          </div>
+        )}
+
+        {hasAdminNavAccess(adminAccess, "site-analytics") && activeNav === "site-analytics" && (
+          <div className="space-y-4">
+            {settingsMessage ? (
+              <p className="text-sm text-emerald-700">{settingsMessage}</p>
+            ) : null}
+            <SiteAnalyticsAdminPanel onMessage={setSettingsMessage} />
+          </div>
+        )}
+
+        {hasAdminNavAccess(adminAccess, "gold-analytics") && activeNav === "gold-analytics" && (
+          <div className="space-y-4">
+            {settingsMessage ? (
+              <p className="text-sm text-emerald-700">{settingsMessage}</p>
+            ) : null}
+            <GoldAnalyticsAdminPanel onMessage={setSettingsMessage} />
+          </div>
+        )}
+
         {hasAdminNavAccess(adminAccess, "partner-display") && activeNav === "partner-display" && (
           <div className="space-y-8">
             {settingsMessage && (
@@ -3892,7 +3966,12 @@ export default function AdminPage() {
         {hasAdminNavAccess(adminAccess, "posts") && activeNav === "posts" && <BoardAdminPanel />}
 
         {hasAdminNavAccess(adminAccess, "board-reports") && activeNav === "board-reports" && (
-          <BoardReportsAdminPanel />
+          <BoardReportsAdminPanel section="list" />
+        )}
+
+        {hasAdminNavAccess(adminAccess, "board-report-reasons") &&
+          activeNav === "board-report-reasons" && (
+          <BoardReportsAdminPanel section="reasons" />
         )}
 
         {hasAdminNavAccess(adminAccess, "user-settings") && activeNav === "user-settings" && (

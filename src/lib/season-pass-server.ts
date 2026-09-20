@@ -19,6 +19,7 @@ import {
 } from "@/lib/season-pass";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 import { logSeasonPassToSheets } from "@/lib/google-sheets-student";
+import type { GoldLedgerSource } from "@/lib/gold-analytics";
 import { encodeGiftCouponValue } from "@/lib/map-events";
 
 type AdminClient = NonNullable<ReturnType<typeof createSupabaseAdmin>>;
@@ -514,10 +515,12 @@ async function adjustGold(
   userId: string,
   season: Season,
   delta: number,
+  source: GoldLedgerSource,
 ) {
   const wallet = await loadWalletGold(admin, userId);
+  let next = 0;
   if (wallet != null) {
-    const next = Math.max(0, wallet + delta);
+    next = Math.max(0, wallet + delta);
     const { error } = await admin.from("user_gold_wallet").upsert(
       {
         user_id: userId,
@@ -527,18 +530,66 @@ async function adjustGold(
       { onConflict: "user_id" },
     );
     if (error) throw error;
-    return next;
+  } else {
+    const { data: existing } = await admin
+      .from("user_season_progress")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("season_id", season.id)
+      .maybeSingle();
+    next = Math.max(0, Number(existing?.gold || 0) + delta);
+    await upsertProgress(admin, userId, season, { gold: next });
   }
 
-  const { data: existing } = await admin
-    .from("user_season_progress")
-    .select("*")
-    .eq("user_id", userId)
-    .eq("season_id", season.id)
-    .maybeSingle();
-  const next = Math.max(0, Number(existing?.gold || 0) + delta);
-  await upsertProgress(admin, userId, season, { gold: next });
+  if (delta !== 0) {
+    void admin.from("gold_ledger").insert({
+      user_id: userId,
+      season_id: season.id,
+      amount: delta,
+      source,
+    });
+  }
   return next;
+}
+
+export async function creditStudentGold(userIdRaw: string, amountRaw: number) {
+  const userId = userIdRaw.trim();
+  const amount = Math.floor(Number(amountRaw) || 0);
+  if (!userId || amount <= 0) {
+    throw new Error("지급할 골드를 확인해 주세요.");
+  }
+  const admin = createSupabaseAdmin();
+  if (!admin) {
+    throw new Error("Supabase 서버 설정이 없습니다.");
+  }
+  const season = await getActiveSeason(admin);
+  if (season) {
+    await adjustGold(admin, userId, season, amount, "admin");
+    return;
+  }
+  const wallet = await loadWalletGold(admin, userId);
+  const next = Math.max(0, (wallet ?? 0) + amount);
+  const { error } = await admin.from("user_gold_wallet").upsert(
+    {
+      user_id: userId,
+      gold: next,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id" },
+  );
+  if (error) {
+    throw new Error(
+      error.message.includes("user_gold_wallet")
+        ? "골드 지갑이 없습니다. 시즌패스를 활성화하거나 supabase/season-pass.sql 을 실행해 주세요."
+        : error.message,
+    );
+  }
+  void admin.from("gold_ledger").insert({
+    user_id: userId,
+    season_id: null,
+    amount,
+    source: "admin",
+  });
 }
 
 function kstDateString(now = new Date()) {
@@ -602,7 +653,7 @@ async function bumpQuestsByType(
       await upsertProgress(admin, userId, season, {
         exp: Number(afterQuest?.exp || 0) + rewardExp,
       });
-      await adjustGold(admin, userId, season, rewardGold);
+      await adjustGold(admin, userId, season, rewardGold, "quest");
       const questTitle = String((quest as { title?: string }).title ?? "").trim() || "퀘스트";
       logSeasonPassToSheets({
         studentId: userId,
@@ -668,7 +719,7 @@ export async function completeVisit(input: {
     await upsertProgress(admin, userId, season, {
       exp: Number(existing?.exp || 0) + season.visit_exp,
     });
-    await adjustGold(admin, userId, season, season.visit_gold);
+    await adjustGold(admin, userId, season, season.visit_gold, "visit");
 
     await bumpQuestsByType(admin, userId, season, "partner_visit");
 
@@ -749,7 +800,7 @@ export async function completeAttendance(userIdRaw: string): Promise<{
     await upsertProgress(admin, userId, season, {
       exp: Number(existing?.exp || 0) + season.attendance_exp,
     });
-    await adjustGold(admin, userId, season, season.attendance_gold);
+    await adjustGold(admin, userId, season, season.attendance_gold, "attendance");
 
     await bumpQuestsByType(admin, userId, season, "attendance");
 
@@ -878,7 +929,7 @@ async function grantRewardItem(
     const amount = Math.max(0, Number(meta.gold_amount ?? meta.amount ?? 0));
     const seasonRow = await admin.from("seasons").select("*").eq("id", seasonId).maybeSingle();
     if (seasonRow.data) {
-      await adjustGold(admin, userId, mapSeason(seasonRow.data as Record<string, unknown>), amount);
+      await adjustGold(admin, userId, mapSeason(seasonRow.data as Record<string, unknown>), amount, "claim");
     }
   }
 
@@ -1028,7 +1079,7 @@ export async function purchasePremiumPass(userIdRaw: string) {
     throw new Error("골드가 부족합니다.");
   }
 
-  await adjustGold(admin, userId, state.season, -price);
+  await adjustGold(admin, userId, state.season, -price, "premium");
   await upsertProgress(admin, userId, state.season, {
     exp: Number(state.progress?.exp ?? 0),
     is_premium: true,
@@ -1102,7 +1153,7 @@ export async function purchaseGoldShopItem(userIdRaw: string, shopItemIdRaw: str
       ? { ...state.season, id: shopItem.season_id }
       : state.season;
 
-  await adjustGold(admin, userId, purchaseSeason, -shopItem.price_gold);
+  await adjustGold(admin, userId, purchaseSeason, -shopItem.price_gold, "shop_spend");
 
   let gifted = false;
   if (reward.item_type === "costume" || reward.item_type === "coupon") {
@@ -1110,7 +1161,7 @@ export async function purchaseGoldShopItem(userIdRaw: string, shopItemIdRaw: str
     gifted = true;
   } else if (reward.item_type === "gold") {
     const amount = Math.max(0, Number(reward.metadata.gold_amount ?? reward.metadata.amount ?? 0));
-    await adjustGold(admin, userId, state.season, amount);
+    await adjustGold(admin, userId, state.season, amount, "shop_reward");
   }
 
   const { error: purchaseError } = await admin.from("gold_shop_purchases").insert({

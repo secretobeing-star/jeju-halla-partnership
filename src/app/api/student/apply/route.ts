@@ -13,6 +13,7 @@ import {
   type StudentGraduationStatus,
 } from "@/lib/site-student-auth-settings";
 import { createSupabaseServer } from "@/lib/supabase-server";
+import { getActiveStudentSuspension, studentSuspensionMessage } from "@/lib/student-suspension";
 
 const REJOIN_BLOCK_MESSAGE =
   "탈퇴 후 14일이 지나지 않아 재가입할 수 없습니다. 기간이 지난 뒤 다시 신청해 주세요.";
@@ -143,6 +144,18 @@ export async function POST(request: Request) {
     }
   } catch {
     // 테이블 미존재 시 신청은 계속 진행
+  }
+
+  try {
+    const suspension = await getActiveStudentSuspension(studentId);
+    if (suspension) {
+      return NextResponse.json(
+        { error: studentSuspensionMessage(suspension), code: "STUDENT_SUSPENDED" },
+        { status: 403 },
+      );
+    }
+  } catch {
+    // 정지 테이블이 없으면 신청은 계속 진행
   }
 
   const config = await loadStudentSheetsConfigFromDb();

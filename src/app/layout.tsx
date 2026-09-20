@@ -14,6 +14,7 @@ import {
 } from "@/lib/site-settings-server";
 import "./globals.css";
 import "./season-pass.css";
+import "./ai-chatbot.css";
 
 export const revalidate = 300;
 
