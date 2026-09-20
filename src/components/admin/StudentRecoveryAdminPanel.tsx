@@ -60,8 +60,22 @@ function formatDate(value?: string | null) {
 export default function StudentRecoveryAdminPanel() {
   const [studentId, setStudentId] = useState("");
   const [loading, setLoading] = useState(false);
+  const [acting, setActing] = useState<string | null>(null);
+  const [goldAmount, setGoldAmount] = useState("0");
   const [message, setMessage] = useState<string | null>(null);
   const [data, setData] = useState<RecoveryPayload | null>(null);
+
+  async function loadStudent(id: string) {
+    const payload = (await adminApiFetch(
+      `/api/admin/student-recovery?studentId=${encodeURIComponent(id)}`,
+    )) as RecoveryPayload;
+    if (payload.error) {
+      setMessage(payload.error);
+      setData(null);
+      return;
+    }
+    setData(payload);
+  }
 
   async function handleSearch(event: FormEvent) {
     event.preventDefault();
@@ -73,15 +87,7 @@ export default function StudentRecoveryAdminPanel() {
     setLoading(true);
     setMessage(null);
     try {
-      const payload = (await adminApiFetch(
-        `/api/admin/student-recovery?studentId=${encodeURIComponent(id)}`,
-      )) as RecoveryPayload;
-      if (payload.error) {
-        setMessage(payload.error);
-        setData(null);
-        return;
-      }
-      setData(payload);
+      await loadStudent(id);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "회수 정보를 불러오지 못했습니다.");
       setData(null);
@@ -90,10 +96,36 @@ export default function StudentRecoveryAdminPanel() {
     }
   }
 
+  async function reclaim(kind: string, id?: string, amount?: number) {
+    const student = data?.studentId || studentId.trim();
+    if (!student) return;
+    const label =
+      kind === "gold"
+        ? `골드 ${amount?.toLocaleString("ko-KR")}개를 회수할까요?`
+        : "이 항목을 회수할까요? 학생 계정에서 바로 사라집니다.";
+    if (!window.confirm(label)) return;
+    const actionKey = `${kind}:${id ?? amount ?? "gold"}`;
+    setActing(actionKey);
+    setMessage(null);
+    try {
+      const payload = (await adminApiFetch("/api/admin/student-recovery", {
+        method: "PATCH",
+        body: JSON.stringify({ studentId: student, kind, id, amount }),
+      })) as { error?: string };
+      if (payload.error) throw new Error(payload.error);
+      await loadStudent(student);
+      setMessage("회수했습니다.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "회수에 실패했습니다.");
+    } finally {
+      setActing(null);
+    }
+  }
+
   return (
     <AdminCollapsibleSection
       title="회수"
-      description="학번으로 보관함·선물함·시즌패스·지도 이벤트 현황을 확인합니다. 복구·문의 대응용입니다."
+      description="학번으로 보관함·선물함·시즌패스·지도 이벤트를 확인한 뒤, 관리자가 바로 회수할 수 있습니다."
     >
       <form onSubmit={(event) => void handleSearch(event)} className="flex flex-wrap gap-2">
         <input
@@ -136,6 +168,14 @@ export default function StudentRecoveryAdminPanel() {
                     )}
                     <span className="min-w-0 flex-1 truncate">{item.name}</span>
                     <span className="text-xs text-gray-400">{item.source || ""}</span>
+                    <button
+                      type="button"
+                      disabled={Boolean(acting)}
+                      onClick={() => void reclaim("frame", item.id)}
+                      className="shrink-0 text-xs text-red-600 underline disabled:opacity-50"
+                    >
+                      {acting === `frame:${item.id}` ? "회수 중..." : "회수"}
+                    </button>
                   </li>
                 ))}
               </ul>
@@ -151,8 +191,16 @@ export default function StudentRecoveryAdminPanel() {
                 {data.gifts.map((gift) => (
                   <li key={gift.id} className="flex justify-between gap-2">
                     <span className="truncate">{gift.reward_name || gift.id}</span>
-                    <span className="shrink-0 text-xs text-gray-500">
+                    <span className="flex shrink-0 items-center gap-2 text-xs text-gray-500">
                       {gift.is_claimed ? "수령" : "미수령"} · {formatDate(gift.created_at)}
+                      <button
+                        type="button"
+                        disabled={Boolean(acting)}
+                        onClick={() => void reclaim("gift", gift.id)}
+                        className="text-red-600 underline disabled:opacity-50"
+                      >
+                        {acting === `gift:${gift.id}` ? "회수 중..." : "회수"}
+                      </button>
                     </span>
                   </li>
                 ))}
@@ -171,7 +219,17 @@ export default function StudentRecoveryAdminPanel() {
                     <span className="truncate">
                       {reward.title || reward.reward_type} · {reward.status}
                     </span>
-                    <span className="shrink-0 text-xs text-gray-500">{formatDate(reward.created_at)}</span>
+                    <span className="flex shrink-0 items-center gap-2 text-xs text-gray-500">
+                      {formatDate(reward.created_at)}
+                      <button
+                        type="button"
+                        disabled={Boolean(acting)}
+                        onClick={() => void reclaim("reward", reward.id)}
+                        className="text-red-600 underline disabled:opacity-50"
+                      >
+                        {acting === `reward:${reward.id}` ? "회수 중..." : "회수"}
+                      </button>
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -202,6 +260,24 @@ export default function StudentRecoveryAdminPanel() {
                 ) : null}
               </div>
             )}
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <input
+                type="number"
+                min={1}
+                value={goldAmount}
+                onChange={(event) => setGoldAmount(event.target.value)}
+                className="w-28 rounded-lg border border-gray-300 px-2 py-1 text-sm"
+                placeholder="골드"
+              />
+              <button
+                type="button"
+                disabled={Boolean(acting) || !(Number(goldAmount) > 0)}
+                onClick={() => void reclaim("gold", undefined, Math.floor(Number(goldAmount) || 0))}
+                className="rounded-lg border border-red-200 bg-red-50 px-3 py-1 text-xs font-medium text-red-700 disabled:opacity-50"
+              >
+                {acting?.startsWith("gold:") ? "회수 중..." : "골드 회수"}
+              </button>
+            </div>
           </section>
 
           <section className="rounded-xl border border-gray-200 bg-white p-4">
@@ -217,7 +293,17 @@ export default function StudentRecoveryAdminPanel() {
                       {event.title} · 도장 {event.currentStamps}
                       {event.isCompleted ? " · 완료" : ""}
                     </span>
-                    <span className="shrink-0 text-xs text-gray-500">{formatDate(event.updatedAt)}</span>
+                    <span className="flex shrink-0 items-center gap-2 text-xs text-gray-500">
+                      {formatDate(event.updatedAt)}
+                      <button
+                        type="button"
+                        disabled={Boolean(acting)}
+                        onClick={() => void reclaim("event", String(event.eventId))}
+                        className="text-red-600 underline disabled:opacity-50"
+                      >
+                        {acting === `event:${event.eventId}` ? "회수 중..." : "회수"}
+                      </button>
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -235,7 +321,17 @@ export default function StudentRecoveryAdminPanel() {
                     <span className="truncate">
                       {item.reward_name || item.id} · {item.category} · {item.source}
                     </span>
-                    <span className="shrink-0 text-xs text-gray-500">{formatDate(item.created_at)}</span>
+                    <span className="flex shrink-0 items-center gap-2 text-xs text-gray-500">
+                      {formatDate(item.created_at)}
+                      <button
+                        type="button"
+                        disabled={Boolean(acting)}
+                        onClick={() => void reclaim("inventory", item.id)}
+                        className="text-red-600 underline disabled:opacity-50"
+                      >
+                        {acting === `inventory:${item.id}` ? "회수 중..." : "회수"}
+                      </button>
+                    </span>
                   </li>
                 ))}
               </ul>

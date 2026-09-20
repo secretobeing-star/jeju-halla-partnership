@@ -13,6 +13,7 @@ import {
   DEFAULT_PWA_THEME_COLOR,
   isStandaloneDisplayMode,
 } from "@/lib/site-pwa";
+import { isAndroidDevice, isIOSDevice } from "@/lib/in-app-browser";
 
 /** Fold8 와이드 커버 상한 (S시리즈·아이폰 Max와 폭이 겹침 → 비율로 구분) */
 export const PWA_FOLD_COVER_MAX_WIDTH = 430;
@@ -191,7 +192,9 @@ export function syncPwaFoldViewportClasses(root: HTMLElement = document.document
   const width = readPwaDeviceViewportWidth();
   const height = readPwaDeviceViewportHeight();
   const landscape = isLayoutLandscape();
-  const signature = `${standalone}|${Math.round(width)}|${Math.round(height)}|${landscape ? "l" : "p"}`;
+  const ios = isIOSDevice();
+  const android = isAndroidDevice();
+  const signature = `${standalone}|${Math.round(width)}|${Math.round(height)}|${landscape ? "l" : "p"}|${ios ? "ios" : android ? "and" : "o"}`;
 
   if (signature === lastFoldViewportSignature) {
     return;
@@ -199,6 +202,8 @@ export function syncPwaFoldViewportClasses(root: HTMLElement = document.document
 
   lastFoldViewportSignature = signature;
   root.classList.toggle("pwa-standalone", standalone);
+  root.classList.toggle("ios-device", ios);
+  root.classList.toggle("android-device", android);
   syncPwaDeviceViewportClasses(root, width, height);
 }
 

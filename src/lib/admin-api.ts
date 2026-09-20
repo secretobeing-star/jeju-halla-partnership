@@ -61,6 +61,11 @@ export async function adminApiFetch(
       throw new Error(payload.error ?? "요청에 실패했습니다.");
     }
 
+    const method = (fetchInit.method ?? "GET").toUpperCase();
+    if (method !== "GET" && method !== "HEAD") {
+      notifyPublicSiteReload();
+    }
+
     return payload;
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {

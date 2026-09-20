@@ -9,6 +9,7 @@ import { usePromptModal } from "@/components/PromptModalProvider";
 import { getBoardVoterKey } from "@/lib/board-voter";
 import { confirmDeletion, maybeAlertPasswordError, resolveBoardActionError, alertProfanityBlocked } from "@/lib/app-modal-messages";
 import { containsProfanity } from "@/lib/profanity-filter";
+import { trackSiteAnalytics } from "@/lib/site-analytics";
 import { BoardComment, SiteSettings, supabase } from "@/lib/supabase";
 
 type BoardCommentsProps = {
@@ -600,6 +601,7 @@ export default function BoardComments({
     setShowWriteForm(false);
     setReplyToComment(null);
     setMessage(parentId ? "답글이 등록되었습니다." : "댓글이 등록되었습니다.");
+    trackSiteAnalytics("board_comment");
 
     await loadComments();
     setSubmitting(false);

@@ -34,6 +34,7 @@ export type UploadFolder =
   | "step-quest"
   | "season-pass"
   | "map-events"
+  | "ai-chatbot"
   | "push-notifications"
   | "pwa-icons"
   | "map-marker-settings";
@@ -74,6 +75,7 @@ export const ALLOWED_UPLOAD_FOLDERS = new Set<string>([
   "step-quest",
   "season-pass",
   "map-events",
+  "ai-chatbot",
   "push-notifications",
   "pwa-icons",
   "map-marker-settings",

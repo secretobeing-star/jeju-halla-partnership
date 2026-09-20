@@ -34,6 +34,7 @@ create table if not exists public.site_analytics_events (
     'link_share',
     'board_view',
     'board_write',
+    'board_comment',
     'chatbot_open',
     'chatbot_message',
     'stamp_join'
@@ -64,6 +65,7 @@ alter table public.site_analytics_events
     'link_share',
     'board_view',
     'board_write',
+    'board_comment',
     'chatbot_open',
     'chatbot_message',
     'stamp_join'

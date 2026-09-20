@@ -5,6 +5,7 @@ import AdminPwaHeadLinks from "@/components/AdminPwaHeadLinks";
 import AdminPwaTabletGate from "@/components/AdminPwaTabletGate";
 import { useAdminPwaInstall } from "@/hooks/useAdminPwaInstall";
 import type { SiteAdminPwaSettingsSource } from "@/lib/site-admin-pwa";
+import { notifyPublicSiteReload } from "@/lib/public-site-reload";
 import { supabase } from "@/lib/supabase";
 
 type AdminPwaInstallContextValue = ReturnType<typeof useAdminPwaInstall>;
@@ -57,6 +58,39 @@ export function AdminPwaRuntime({ settings: initialSettings, children }: AdminPw
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onFocus);
       window.removeEventListener("site-settings-saved", onFocus);
+    };
+  }, []);
+
+  useEffect(() => {
+    const originalFetch = window.fetch.bind(window);
+    window.fetch = async (input, init) => {
+      const response = await originalFetch(input, init);
+      if (!response.ok) {
+        return response;
+      }
+
+      const request = input instanceof Request ? input : null;
+      const method = String(init?.method || request?.method || "GET").toUpperCase();
+      if (method === "GET" || method === "HEAD" || method === "OPTIONS") {
+        return response;
+      }
+
+      const url =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.href
+            : request?.url ?? "";
+      if (/\/auth\/v1\//i.test(url) || /\/api\/auth\//i.test(url)) {
+        return response;
+      }
+
+      notifyPublicSiteReload();
+      return response;
+    };
+
+    return () => {
+      window.fetch = originalFetch;
     };
   }, []);
 

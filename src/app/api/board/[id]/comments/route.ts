@@ -140,6 +140,11 @@ export async function POST(
     return NextResponse.json({ error: message }, { status });
   }
 
+  void admin.from("site_analytics_events").insert({
+    event_type: "board_comment",
+    path: "/",
+  });
+
   const { data, error: fetchError } = await admin
     .from("board_comments")
     .select("id, post_id, parent_id, author_name, content, is_hidden, is_secret, created_at")

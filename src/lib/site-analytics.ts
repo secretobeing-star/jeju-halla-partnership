@@ -4,6 +4,7 @@ export const SITE_ANALYTICS_TYPES = [
   "link_share",
   "board_view",
   "board_write",
+  "board_comment",
   "chatbot_open",
   "chatbot_message",
   "stamp_join",
@@ -19,6 +20,7 @@ export type SiteAnalyticsDaily = {
   link_share: number;
   board_view: number;
   board_write: number;
+  board_comment: number;
   chatbot_open: number;
   chatbot_message: number;
   stamp_join: number;
@@ -36,6 +38,7 @@ export type SiteAnalyticsSummary = {
   linkShares: number;
   boardViews: number;
   boardWrites: number;
+  boardComments: number;
   chatbotOpens: number;
   chatbotMessages: number;
   stampJoins: number;
@@ -96,6 +99,7 @@ export function emptyDaily(date: string): SiteAnalyticsDaily {
     link_share: 0,
     board_view: 0,
     board_write: 0,
+    board_comment: 0,
     chatbot_open: 0,
     chatbot_message: 0,
     stamp_join: 0,

@@ -328,7 +328,9 @@ export default function AiChatbotWidget() {
                         {card.image_url ? (
                           <img src={card.image_url} alt="" className="ai-chatbot__card-photo" />
                         ) : (
-                          <div className="ai-chatbot__card-photo is-empty">사진 없음</div>
+                          <div className="ai-chatbot__card-photo is-empty">
+                            {card.openKind === "board" ? "게시판" : "사진 없음"}
+                          </div>
                         )}
                         <div className="ai-chatbot__card-body">
                           <p className="ai-chatbot__card-name">{card.name}</p>

@@ -460,7 +460,13 @@ export default function AdminPage() {
   }
 
   async function saveSettingsToDb(next: SiteSettings) {
-    return supabase.from("site_settings").upsert(buildSiteSettingsPayload(next));
+    const result = await supabase
+      .from("site_settings")
+      .upsert(buildSiteSettingsPayload(next));
+    if (!result.error) {
+      reloadAfterAdminSave();
+    }
+    return result;
   }
 
   async function handleMobileAdUpload(

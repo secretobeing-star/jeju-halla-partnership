@@ -133,3 +133,22 @@ export async function grantStudentCardFrameOnServer(
 
   return saveStudentCardFrameState(studentId, next);
 }
+
+export async function revokeStudentCardFrameOnServer(studentId: string, frameId: string) {
+  const current = await loadStudentCardFrameState(studentId);
+  const prev = current?.state ?? {
+    unlockedIds: [],
+    activeFrameId: null,
+    sources: {},
+  };
+  if (!prev.unlockedIds.includes(frameId)) {
+    throw new Error("해금된 코스튬이 아닙니다.");
+  }
+  const sources = { ...prev.sources };
+  delete sources[frameId];
+  return saveStudentCardFrameState(studentId, {
+    unlockedIds: prev.unlockedIds.filter((id) => id !== frameId),
+    activeFrameId: prev.activeFrameId === frameId ? null : prev.activeFrameId,
+    sources,
+  });
+}

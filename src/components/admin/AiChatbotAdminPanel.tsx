@@ -252,7 +252,7 @@ export default function AiChatbotAdminPanel({ onMessage }: AiChatbotAdminPanelPr
         <AdminCollapsibleSection title="문장 학습">
           <p className="text-xs leading-5 text-gray-600">
             모델을 다시 학습시키는 기능이 아닙니다. 사용자가 보낸 말에 아래 표현이 들어가면, 지정한 답변·추천 분류·제휴
-            검색을 먼저 실행합니다. 표현은 쉼표 또는 줄바꿈으로 여러 개 넣을 수 있습니다. 최대 40개입니다.
+            검색·이벤트·게시판을 먼저 실행합니다. 표현은 쉼표 또는 줄바꿈으로 여러 개 넣을 수 있습니다. 최대 40개입니다.
           </p>
 
           <div className="mt-3 space-y-3">
@@ -312,12 +312,18 @@ export default function AiChatbotAdminPanel({ onMessage }: AiChatbotAdminPanelPr
                     <option value="recommend">추천 분류 실행</option>
                     <option value="search">제휴 검색</option>
                     <option value="events">진행 중 이벤트 안내</option>
+                    <option value="board">게시판 열기</option>
                   </select>
                 </label>
                 {lesson.kind === "events" ? (
                   <p className="mt-2 text-xs leading-5 text-gray-500">
                     시즌패스·지도 이벤트·사이트 이벤트의 이름과 기간을 지금 진행 중인 것만 보여 줍니다. 문구를 따로 적을
                     필요는 없습니다.
+                  </p>
+                ) : lesson.kind === "board" ? (
+                  <p className="mt-2 text-xs leading-5 text-gray-500">
+                    게시판 팝업을 안내하고, 카드를 누르면 게시판(글쓰기 문장이면 글쓰기)을 엽니다. 기본 학습
+                    (게시판·글쓰기·댓글·신고 등)은 이미 들어 있습니다. 여기에는 추가로 알아듣게 할 말만 넣으면 됩니다.
                   </p>
                 ) : lesson.kind === "recommend" ? (
                   <label className="mt-2 block text-xs text-gray-500">

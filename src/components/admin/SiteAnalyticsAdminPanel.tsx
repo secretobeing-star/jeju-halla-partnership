@@ -186,9 +186,9 @@ export default function SiteAnalyticsAdminPanel({ onMessage }: SiteAnalyticsAdmi
 
           <AdminCollapsibleSection
             title="게시판"
-            description="게시글 열람과 작성입니다."
+            description="게시글 열람, 글 작성, 댓글 작성을 따로 집계합니다."
           >
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-3">
               <div>
                 <p className="text-xs text-gray-500">열람</p>
                 <p className="mt-1 text-2xl font-semibold text-gray-900">{formatCount(summary.boardViews)}</p>
@@ -197,12 +197,34 @@ export default function SiteAnalyticsAdminPanel({ onMessage }: SiteAnalyticsAdmi
                 <p className="text-xs text-gray-500">작성</p>
                 <p className="mt-1 text-2xl font-semibold text-gray-900">{formatCount(summary.boardWrites)}</p>
               </div>
+              <div>
+                <p className="text-xs text-gray-500">댓글</p>
+                <p className="mt-1 text-2xl font-semibold text-gray-900">{formatCount(summary.boardComments)}</p>
+              </div>
             </div>
+            <p className="mt-4 text-xs font-medium text-gray-500">열람</p>
             <AnalyticsMiniChart
+              className="mt-1"
               daily={summary.daily}
-              value={(item) => item.board_view + item.board_write}
+              value={(item) => item.board_view}
               color="#d97706"
-              metric="게시판 열람·작성"
+              metric="게시판 열람"
+            />
+            <p className="mt-3 text-xs font-medium text-gray-500">작성</p>
+            <AnalyticsMiniChart
+              className="mt-1"
+              daily={summary.daily}
+              value={(item) => item.board_write}
+              color="#b45309"
+              metric="게시판 작성"
+            />
+            <p className="mt-3 text-xs font-medium text-gray-500">댓글</p>
+            <AnalyticsMiniChart
+              className="mt-1"
+              daily={summary.daily}
+              value={(item) => item.board_comment}
+              color="#92400e"
+              metric="게시판 댓글"
             />
           </AdminCollapsibleSection>
 

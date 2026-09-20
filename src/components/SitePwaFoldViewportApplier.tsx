@@ -65,6 +65,8 @@ export default function SitePwaFoldViewportApplier() {
         "pwa-fold-tablet",
         "pwa-fold-tablet-lg",
         "pwa-fold-wide",
+        "ios-device",
+        "android-device",
       );
     };
   }, []);

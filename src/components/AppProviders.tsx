@@ -4,6 +4,8 @@ import React, { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import DeveloperEasterEgg from "@/components/DeveloperEasterEgg";
 import PromptModalProvider from "@/components/PromptModalProvider";
+import IosFormViewportFix from "@/components/IosFormViewportFix";
+import IosPullToRefresh from "@/components/IosPullToRefresh";
 import SitePwaFoldViewportApplier from "@/components/SitePwaFoldViewportApplier";
 import { SiteAppBackProvider } from "@/lib/app-back-stack";
 import { subscribePublicSiteReload } from "@/lib/public-site-reload";
@@ -70,6 +72,8 @@ export default function AppProviders({ children }: { children: React.ReactNode }
     <SiteAppBackProvider>
       <PromptModalProvider>
         <SitePwaFoldViewportApplier />
+        <IosFormViewportFix />
+        <IosPullToRefresh />
         <DeveloperEasterEgg />
         {children}
       </PromptModalProvider>

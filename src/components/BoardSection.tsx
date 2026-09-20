@@ -72,6 +72,7 @@ type BoardSectionProps = {
   siteSettings?: Partial<SiteSettings>;
   placement?: "above-partners" | "below-partners";
   presentation?: "inline" | "popup";
+  openRequest?: { id: number; boardId?: string; write?: boolean } | null;
 };
 
 function formatDate(value: string) {
@@ -90,6 +91,7 @@ export default function BoardSection({
   siteSettings = {},
   placement = "above-partners",
   presentation = "inline",
+  openRequest = null,
 }: BoardSectionProps) {
   const { prompt, alert, confirm } = usePromptModal();
   const isPopupPresentation = presentation === "popup";
@@ -230,6 +232,19 @@ export default function BoardSection({
       setActiveBoard(visibleTabs[0].id);
     }
   }, [visibleTabs, activeBoard]);
+
+  useEffect(() => {
+    if (!openRequest) return;
+    const requested = openRequest.boardId?.trim();
+    if (requested && visibleTabs.some((tab) => tab.id === requested)) {
+      setActiveBoard(requested);
+    }
+    if (openRequest.write) {
+      setSelectedPostId(null);
+      setShowEditForm(false);
+      setShowWriteForm(true);
+    }
+  }, [openRequest, visibleTabs]);
 
   const loadPosts = useCallback(async (options?: { background?: boolean }) => {
     if (!activeBoard) {
@@ -1368,13 +1383,15 @@ export default function BoardSection({
               </p>
             ) : null}
 
-            <button
-              type="submit"
-              disabled={submitting}
-              className="mt-4 rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
-            >
-              {submitting ? "등록 중..." : "등록하기"}
-            </button>
+            <div className="board-composer-actions">
+              <button
+                type="submit"
+                disabled={submitting}
+                className="rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
+              >
+                {submitting ? "저장 중..." : "저장하기"}
+              </button>
+            </div>
           </form>
         )}
 

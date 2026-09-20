@@ -16,6 +16,7 @@ import {
   normalizeBoardLabel,
   sanitizeBoardIdInput,
 } from "@/lib/board-definitions";
+import { reloadAfterAdminSave } from "@/lib/admin-api";
 import { migrateBoardPostTypes } from "@/lib/board-id-migration";
 import { supabase } from "@/lib/supabase";
 
@@ -102,6 +103,7 @@ export default function BoardDefinitionsAdminPanel() {
     setInitialBoards(nextBoards);
     setBoardMessage("게시판 설정이 저장되었습니다.");
     setBoardSaving(false);
+    reloadAfterAdminSave();
   }
 
   function addBoard() {
@@ -170,7 +172,7 @@ export default function BoardDefinitionsAdminPanel() {
   }
 
   return (
-    <form onSubmit={handleSaveBoardDefinitions} className="space-y-6">
+    <form onSubmit={handleSaveBoardDefinitions} className="space-y-6" data-admin-primary-form>
       <AdminCollapsibleSection
         title="게시판 관리"
         description="게시판을 추가·삭제하고 제목, 색상, 메인 표시, 사용자 글쓰기 여부를 설정합니다."
@@ -341,16 +343,15 @@ export default function BoardDefinitionsAdminPanel() {
           있습니다.
         </p>
       )}
-
+      </AdminCollapsibleSection>
       {boardMessage && <p className="text-sm text-emerald-700">{boardMessage}</p>}
       <button
         type="submit"
         disabled={boardSaving}
         className="rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
       >
-        {boardSaving ? "저장 중..." : "게시판 설정 저장"}
+        {boardSaving ? "저장 중..." : "저장하기"}
       </button>
-      </AdminCollapsibleSection>
     </form>
   );
 }

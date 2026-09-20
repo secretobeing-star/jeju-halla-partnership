@@ -592,6 +592,46 @@ export async function creditStudentGold(userIdRaw: string, amountRaw: number) {
   });
 }
 
+export async function debitStudentGold(userIdRaw: string, amountRaw: number) {
+  const userId = userIdRaw.trim();
+  const amount = Math.floor(Number(amountRaw) || 0);
+  if (!userId || amount <= 0) {
+    throw new Error("회수할 골드를 확인해 주세요.");
+  }
+  const admin = createSupabaseAdmin();
+  if (!admin) {
+    throw new Error("Supabase 서버 설정이 없습니다.");
+  }
+  const season = await getActiveSeason(admin);
+  if (season) {
+    await adjustGold(admin, userId, season, -amount, "admin");
+    return;
+  }
+  const wallet = await loadWalletGold(admin, userId);
+  const next = Math.max(0, (wallet ?? 0) - amount);
+  const { error } = await admin.from("user_gold_wallet").upsert(
+    {
+      user_id: userId,
+      gold: next,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id" },
+  );
+  if (error) {
+    throw new Error(
+      error.message.includes("user_gold_wallet")
+        ? "골드 지갑이 없습니다. 시즌패스를 활성화하거나 supabase/season-pass.sql 을 실행해 주세요."
+        : error.message,
+    );
+  }
+  void admin.from("gold_ledger").insert({
+    user_id: userId,
+    season_id: null,
+    amount: -amount,
+    source: "admin",
+  });
+}
+
 function kstDateString(now = new Date()) {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Seoul",

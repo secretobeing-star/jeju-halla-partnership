@@ -27,7 +27,7 @@ import SeasonPassNavChip from "@/components/SeasonPassNavChip";
 import GoldShopNavChip from "@/components/GoldShopNavChip";
 import AiChatbotWidget from "@/components/AiChatbotWidget";
 import SiteAnalyticsBeacon from "@/components/SiteAnalyticsBeacon";
-import { OPEN_SITE_PARTNER_EVENT } from "@/lib/ai-chatbot";
+import { OPEN_SITE_BOARD_EVENT, OPEN_SITE_PARTNER_EVENT } from "@/lib/ai-chatbot";
 import { isGoldShopOpen, type SeasonPassWidgetState } from "@/lib/season-pass";
 import SiteBrowserGuideBanner from "@/components/SiteBrowserGuideBanner";
 import SiteAppBackSettingsSync from "@/components/SiteAppBackSettingsSync";
@@ -292,6 +292,11 @@ export default function HomePage() {
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [selectedPartnerId, setSelectedPartnerId] = useState<string | null>(null);
   const [boardPopupOpen, setBoardPopupOpen] = useState(false);
+  const [boardOpenRequest, setBoardOpenRequest] = useState<{
+    id: number;
+    boardId?: string;
+    write?: boolean;
+  } | null>(null);
   const [partnerSort, setPartnerSort] = useState<PartnerSort>("old");
   const standaloneMode = useStandaloneDisplayMode();
   const [pwaViewportWidth, setPwaViewportWidth] = useState(() =>
@@ -1045,6 +1050,22 @@ export default function HomePage() {
     return () => window.removeEventListener(OPEN_SITE_PARTNER_EVENT, onOpenPartner);
   }, []);
 
+  useEffect(() => {
+    function onOpenBoard(event: Event) {
+      const detail = (event as CustomEvent<{ boardId?: string; write?: boolean }>).detail ?? {};
+      setBoardOpenRequest({
+        id: Date.now(),
+        boardId: typeof detail.boardId === "string" ? detail.boardId : undefined,
+        write: Boolean(detail.write),
+      });
+      markBoardNavSeen();
+      dispatchBoardNavVisited();
+      setBoardPopupOpen(true);
+    }
+    window.addEventListener(OPEN_SITE_BOARD_EVENT, onOpenBoard);
+    return () => window.removeEventListener(OPEN_SITE_BOARD_EVENT, onOpenBoard);
+  }, []);
+
   const handleTopNavAction = useCallback((href: string) => {
     if (isBoardPopupNavHref(href)) {
       markBoardNavSeen();
@@ -1758,6 +1779,7 @@ export default function HomePage() {
             siteSettings={settings}
             placement={boardAbovePartners ? "above-partners" : "below-partners"}
             presentation="popup"
+            openRequest={boardOpenRequest}
           />
         </BoardPostModal>
       ) : null}

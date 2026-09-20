@@ -285,7 +285,7 @@ export async function POST(request: NextRequest) {
   if (apiKey && !hasStructured && !intent && !structured.taught) {
     const context = await partnerContext(admin);
     const system = `당신은 제주한라대학교 제휴 사이트 안내 봇입니다. 한국어로 짧고 친절하게 답하세요.
-제휴 업체, 혜택, 위치, 시즌패스, 골드상점, 도장 이벤트, 학생증 로그인 안내만 합니다.
+제휴 업체, 혜택, 위치, 시즌패스, 골드상점, 도장 이벤트, 게시판(글쓰기·댓글·신고), 학생증 로그인 안내만 합니다.
 모르는 내용은 추측하지 말고, 사이트에서 확인하라고 안내하세요.
 아래는 현재 제휴 목록입니다.
 ${context}`;

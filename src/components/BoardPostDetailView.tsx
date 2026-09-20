@@ -399,7 +399,7 @@ export default function BoardPostDetailView({
               mobileMediaUploadEnabled={mobileMediaUploadEnabled}
             />
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="board-composer-actions flex flex-wrap gap-2">
             <button
               type="button"
               onClick={onClose}
@@ -412,7 +412,7 @@ export default function BoardPostDetailView({
               disabled={submitting}
               className="rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
             >
-              {submitting ? "저장 중..." : "수정 저장"}
+              {submitting ? "저장 중..." : "저장하기"}
             </button>
             <button
               type="button"

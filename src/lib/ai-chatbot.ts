@@ -3,7 +3,7 @@ import { parsePartnerRegion } from "@/lib/partner-regions";
 export const AI_CHATBOT_PROVIDERS = ["openai", "gemini"] as const;
 export type AiChatbotProvider = (typeof AI_CHATBOT_PROVIDERS)[number];
 
-export type AiChatbotLessonKind = "answer" | "recommend" | "search" | "events";
+export type AiChatbotLessonKind = "answer" | "recommend" | "search" | "events" | "board";
 
 export type AiChatbotLesson = {
   id: string;
@@ -35,7 +35,7 @@ export type AiChatbotPublicConfig = {
   icon_url: string | null;
 };
 
-export type ChatbotCardOpenKind = "partner" | "season" | "map" | "site";
+export type ChatbotCardOpenKind = "partner" | "season" | "map" | "site" | "board";
 
 export type ChatbotPartnerCard = {
   id: string;
@@ -88,7 +88,7 @@ const CHOICE_PAGE = 6;
 const CARD_PAGE = 4;
 
 export function asAiChatbotLessonKind(value: unknown): AiChatbotLessonKind {
-  if (value === "recommend" || value === "search" || value === "events") return value;
+  if (value === "recommend" || value === "search" || value === "events" || value === "board") return value;
   return "answer";
 }
 
@@ -145,6 +145,17 @@ export function toPublicAiChatbotConfig(settings: AiChatbotSettings): AiChatbotP
 export const OPEN_SITE_PARTNER_EVENT = "halla-open-partner";
 export const OPEN_SITE_MAP_EVENT = "halla-open-map-event";
 export const OPEN_SITE_EVENT_DETAIL = "halla-open-site-event";
+export const OPEN_SITE_BOARD_EVENT = "halla-open-board";
+
+export type ChatbotBoardOpenDetail = {
+  boardId?: string;
+  write?: boolean;
+};
+
+export function requestOpenSiteBoard(detail: ChatbotBoardOpenDetail = {}) {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(OPEN_SITE_BOARD_EVENT, { detail }));
+}
 
 export function requestOpenSitePartner(partnerId: string) {
   if (typeof window === "undefined") return;
@@ -170,6 +181,14 @@ export function requestOpenChatbotCard(card: ChatbotPartnerCard) {
     const id = card.id.trim();
     if (!id) return;
     window.dispatchEvent(new CustomEvent(OPEN_SITE_EVENT_DETAIL, { detail: { id } }));
+    return;
+  }
+  if (kind === "board") {
+    const id = card.id.trim();
+    requestOpenSiteBoard({
+      boardId: id === "notice" ? "notice" : undefined,
+      write: id === "write",
+    });
     return;
   }
   requestOpenSitePartner(card.id);
@@ -398,6 +417,182 @@ export function formatLiveEventsReply(lines: ChatbotLiveEventLine[]): ChatbotRep
     cards,
     taught: true,
   };
+}
+
+export function isBoardQuestion(question: string) {
+  const compact = compactText(question);
+  if (!compact) return false;
+  if (includesAny(compact, ["비밀번호", "패스워드", "password", "제휴목록", "제휴리스트"])) return false;
+  if (
+    includesAny(compact, [
+      "게시판",
+      "게새판",
+      "게시팡",
+      "자유게시판",
+      "문의게시판",
+      "공지게시판",
+      "커뮤니티게시판",
+      "게시글",
+      "게시물",
+      "글쓰기",
+      "글쓸래",
+      "글쓸까",
+      "글씁니",
+      "글쓰게",
+      "글작성",
+      "작성하고싶",
+      "글올리고싶",
+      "글올려",
+      "글올릴",
+      "글좀써",
+      "글좀올",
+      "새글쓰",
+      "새글올",
+      "포스팅하",
+      "포스팅해",
+      "글남기",
+      "의견남기",
+      "문의글",
+      "건의글",
+      "익명게시",
+      "댓글다",
+      "댓글달",
+      "댓글쓰",
+      "댓글어케",
+      "댓글어떻게",
+      "게시판열어",
+      "게시판보여",
+      "게시판창",
+      "게시판팝업",
+      "게시판어디",
+      "게시판가는",
+      "게시판가자",
+      "게시판가줘",
+      "게시판켜",
+      "게시판켜줘",
+      "보드열어",
+      "보드보여",
+      "글목록",
+      "글보러",
+      "글확인",
+      "올린글",
+      "작성한글",
+      "신고하는법",
+      "게시글신고",
+      "글신고",
+      "게시판신고",
+      "신고어떻게",
+      "신고어케",
+      "커뮤열어",
+      "커뮤보여",
+      "커뮤니티열어",
+      "커뮤니티보여",
+    ])
+  ) {
+    return true;
+  }
+  const aboutBoard = includesAny(compact, ["게시", "커뮤니티", "자유게시", "문의하", "건의하", "댓글", "보드"]);
+  const asking = includesAny(compact, [
+    "열어",
+    "보여",
+    "알려",
+    "어디",
+    "어케",
+    "어떻게",
+    "하는법",
+    "쓰는법",
+    "올리는법",
+    "작성",
+    "쓰고싶",
+    "올릴래",
+    "하자",
+    "가자",
+    "가줘",
+    "켜줘",
+    "목록",
+    "창",
+    "팝업",
+  ]);
+  return aboutBoard && asking;
+}
+
+function boardWriteIntent(compact: string) {
+  return includesAny(compact, [
+    "글쓰기",
+    "글쓸",
+    "글쓰",
+    "글작성",
+    "작성하고",
+    "글올리",
+    "글올려",
+    "글올릴",
+    "새글",
+    "포스팅",
+    "글남기",
+    "의견남기",
+    "문의글",
+    "건의글",
+    "쓰고싶",
+    "올릴래",
+    "올리는법",
+    "글좀써",
+    "글좀올",
+  ]);
+}
+
+function boardNoticeIntent(compact: string) {
+  return includesAny(compact, ["공지게시", "게시판공지", "공지글", "공지사항게시"]);
+}
+
+function boardReportIntent(compact: string) {
+  return includesAny(compact, ["신고하는법", "게시글신고", "글신고", "게시판신고", "신고어떻게", "신고어케"]);
+}
+
+export function formatBoardReply(question: string): ChatbotReply {
+  const compact = compactText(question);
+  const write = boardWriteIntent(compact);
+  const notice = boardNoticeIntent(compact);
+  const report = boardReportIntent(compact);
+  const comment = includesAny(compact, ["댓글"]);
+
+  let text = "상단 메뉴의 게시판을 누르면 글을 볼 수 있습니다. 아래 카드를 누르면 바로 열어 드립니다.";
+  if (write) {
+    text =
+      "게시판에서 글쓰기를 누르면 됩니다. 제목·내용·비밀번호를 넣고 등록하세요. 아래 카드로 글쓰기 화면을 열어 드립니다.";
+  } else if (report) {
+    text = "게시글을 연 뒤 신고를 누르면 됩니다. 사유를 고르면 접수됩니다. 아래 카드로 게시판을 열어 드립니다.";
+  } else if (comment) {
+    text = "게시글을 연 뒤 댓글을 남길 수 있습니다. 아래 카드로 게시판을 열어 드립니다.";
+  } else if (notice) {
+    text = "공지 게시판입니다. 아래 카드를 누르면 게시판을 열어 드립니다.";
+  }
+
+  const cards: ChatbotPartnerCard[] = [
+    {
+      id: notice ? "notice" : "list",
+      name: notice ? "공지 게시판 열기" : "게시판 열기",
+      category: "게시판",
+      region: "",
+      benefit: "눌러서 게시판 보기",
+      address: "",
+      image_url: null,
+      openKind: "board",
+    },
+  ];
+  if (write) {
+    cards.unshift({
+      id: "write",
+      name: "글쓰기 열기",
+      category: "게시판",
+      region: "",
+      benefit: "눌러서 글쓰기",
+      address: "",
+      image_url: null,
+      openKind: "board",
+    });
+  }
+
+  return { text, cards, taught: true };
 }
 
 export function chatbotNeedsLiveEvents(
@@ -912,8 +1107,8 @@ function kstHour(now = new Date()) {
 
 function mealKeyByKstTime(now = new Date()): RecoKey {
   const hour = kstHour(now);
-  if (hour >= 5 && hour < 11) return "breakfast";
-  if (hour >= 11 && hour < 16) return "lunch";
+  if (hour <= 10) return "breakfast";
+  if (hour < 15) return "lunch";
   return "dinner";
 }
 
@@ -1325,6 +1520,9 @@ function siteGuideReply(question: string): ChatbotReply | null {
       text: "제휴 혜택은 업체 카드에서 확인할 수 있습니다. 업체 이름이나 「제휴 목록이 뭐있어?」로 물어보세요.",
     };
   }
+  if (includesAny(compact, ["신고하는법", "게시글신고", "글신고", "게시판신고"])) {
+    return formatBoardReply(question);
+  }
   if (includesAny(compact, ["공지", "알림", "푸시", "공지사항"])) {
     return {
       text: "사이트 상단 공지와 알림에서 확인할 수 있습니다.",
@@ -1353,7 +1551,7 @@ function siteGuideReply(question: string): ChatbotReply | null {
     ])
   ) {
     return {
-      text: "제휴 업체, 혜택, 시즌패스, 골드상점, 도장 이벤트, 로그인을 안내합니다. 「밥메뉴 추천」, 「놀러갈 곳」, 「현재 진행중인 이벤트」처럼 물어보세요.",
+      text: "제휴 업체, 혜택, 시즌패스, 골드상점, 도장 이벤트, 게시판, 로그인을 안내합니다. 「밥메뉴 추천」, 「놀러갈 곳」, 「현재 진행중인 이벤트」, 「게시판 열어줘」처럼 물어보세요.",
     };
   }
   return null;
@@ -1387,6 +1585,9 @@ function applyChatbotLessons(
   if (best.kind === "events") {
     return formatLiveEventsReply(liveEvents);
   }
+  if (best.kind === "board") {
+    return formatBoardReply(question);
+  }
   if (best.kind === "recommend") {
     const key = asRecoKey(best.reco) ?? "hangout";
     return { ...recommendCards(partners, key, 0, undefined, false, detectMentionedRegion(question, partners)), taught: true };
@@ -1416,6 +1617,10 @@ export function buildChatbotReply(
 
   if (!intent && isLiveEventsQuestion(question)) {
     return formatLiveEventsReply(liveEvents);
+  }
+
+  if (!intent && isBoardQuestion(question)) {
+    return formatBoardReply(question);
   }
 
   if (intent?.type === "partner_list" && !intent.query) {

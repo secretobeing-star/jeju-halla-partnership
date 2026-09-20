@@ -525,7 +525,7 @@ export default function BoardAdminPanel() {
 
   return (
     <div className="space-y-6">
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} data-admin-primary-form>
         <AdminCollapsibleSection
           title={editingId ? "게시글 수정" : "게시글 작성 (관리자)"}
           headerActions={
@@ -588,15 +588,14 @@ export default function BoardAdminPanel() {
         </div>
 
         {message && <p className="mt-4 text-sm text-emerald-700">{message}</p>}
-
+        </AdminCollapsibleSection>
         <button
           type="submit"
           disabled={saving}
           className="mt-6 rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
         >
-          {saving ? "저장 중..." : editingId ? "수정 저장" : "등록하기"}
+          {saving ? "저장 중..." : "저장하기"}
         </button>
-        </AdminCollapsibleSection>
       </form>
 
       <AdminCollapsibleSection
