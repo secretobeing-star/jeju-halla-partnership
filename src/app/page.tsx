@@ -1239,7 +1239,7 @@ export default function HomePage() {
           type="button"
           onClick={() => void loadPartners({ silent: true })}
           disabled={partnersRefreshing || loading}
-          className="shrink-0 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-60 sm:text-sm"
+          className="partner-list-refresh-btn shrink-0 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-60 sm:text-sm"
         >
           {partnersRefreshing ? "새로고침 중..." : "새로고침"}
         </button>

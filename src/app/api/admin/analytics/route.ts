@@ -82,9 +82,6 @@ export async function GET(request: NextRequest) {
     } else if (row.event_type === "board_view") {
       bucket.board_view += 1;
       boardViews += 1;
-    } else if (row.event_type === "board_write") {
-      bucket.board_write += 1;
-      boardWrites += 1;
     } else if (row.event_type === "chatbot_open") {
       bucket.chatbot_open += 1;
       chatbotOpens += 1;
@@ -100,7 +97,7 @@ export async function GET(request: NextRequest) {
   async function addJoinRows(
     table: string,
     column: string,
-    field: "season_pass_join" | "stamp_join" | "board_comment",
+    field: "season_pass_join" | "stamp_join" | "board_comment" | "board_write",
   ) {
     if (!admin) return;
     let extraQuery = admin.from(table).select(column).gte(column, range.from).limit(40000);
@@ -115,6 +112,7 @@ export async function GET(request: NextRequest) {
       bucket[field] += 1;
       if (field === "season_pass_join") seasonPassJoins += 1;
       else if (field === "stamp_join") stampJoins += 1;
+      else if (field === "board_write") boardWrites += 1;
       else boardComments += 1;
     }
   }
@@ -129,7 +127,10 @@ export async function GET(request: NextRequest) {
     await addJoinRows("user_event_progress", "last_stamped_at", "stamp_join");
   }
 
-  await addJoinRows("board_comments", "created_at", "board_comment");
+  await Promise.all([
+    addJoinRows("board_posts", "created_at", "board_write"),
+    addJoinRows("board_comments", "created_at", "board_comment"),
+  ]);
 
   const summary: SiteAnalyticsSummary = {
     period,

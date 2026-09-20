@@ -60,12 +60,16 @@ function waitForNaverMaps(timeoutMs = 8_000): Promise<void> {
 
 function waitForNaverMapSubmodules(
   submodules: string[],
-  timeoutMs = 2_000,
+  timeoutMs = 8_000,
 ): Promise<void> {
   const pending = submodules.filter((name) => !loadedSubmodules.has(name));
   if (pending.length === 0) {
     return Promise.resolve();
   }
+
+  const aliases: Record<string, string[]> = {
+    markerClustering: ["markerClustering", "MarkerClustering"],
+  };
 
   return new Promise((resolve) => {
     const startedAt = Date.now();
@@ -73,7 +77,8 @@ function waitForNaverMapSubmodules(
     const check = () => {
       const maps = window.naver?.maps as Record<string, unknown> | undefined;
       for (const name of pending) {
-        if (maps?.[name]) {
+        const keys = aliases[name] ?? [name];
+        if (keys.some((key) => Boolean(maps?.[key]))) {
           loadedSubmodules.add(name);
         }
       }

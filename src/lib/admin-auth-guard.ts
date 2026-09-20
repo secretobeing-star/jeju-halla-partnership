@@ -30,7 +30,7 @@ function getAccessToken(request: NextRequest) {
  */
 export async function adminAuthMiddleware(
   request: NextRequest,
-  permission: AdminPermissionKey = "settings",
+  permission: AdminPermissionKey | null = "settings",
 ): Promise<AdminAuthSuccess | AdminAuthFailure> {
   const user = await getRequestUser(getAccessToken(request));
   if (!user?.email) {
@@ -63,7 +63,7 @@ export async function adminAuthMiddleware(
     };
   }
 
-  if (!access.permissions[permission]) {
+  if (permission && !access.permissions[permission]) {
     return {
       error: NextResponse.json(
         { error: `「${permission}」 권한이 없습니다.`, code: "FORBIDDEN" },

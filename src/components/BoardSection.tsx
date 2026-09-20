@@ -1384,13 +1384,13 @@ export default function BoardSection({
             ) : null}
 
             <div className="board-composer-actions">
-              <button
-                type="submit"
-                disabled={submitting}
+            <button
+              type="submit"
+              disabled={submitting}
                 className="rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
-              >
+            >
                 {submitting ? "저장 중..." : "저장하기"}
-              </button>
+            </button>
             </div>
           </form>
         )}

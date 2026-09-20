@@ -908,6 +908,44 @@ const THEME_PARK_HINTS = [
 ];
 const LIFESTYLE_BLOCK_FOR_FOOD = ["생활", "뷰티", "헤어", "미용", "의료", "병원", "약국", "기타"];
 const CAFE_HINTS = ["카페", "커피", "디저트", "베이커리", "빵집", "브런치카페"];
+const HANGOUT_PHONE_BLOCK = [
+  "휴대폰",
+  "핸드폰",
+  "스마트폰",
+  "중고폰",
+  "알뜰폰",
+  "아이폰",
+  "갤럭시",
+  "소니폰",
+  "소년폰",
+  "sony",
+  "통신사",
+  "통신",
+  "skt",
+  "유플러스",
+  "lg유플",
+  "개통",
+  "폰수리",
+  "폰케이스",
+  "액정보호",
+  "휴대폰성지",
+  "폰가게",
+  "폰성지",
+];
+
+function isPhoneShopPartner(partner: SitePartnerHint) {
+  const category = compactText(String(partner.category ?? ""));
+  const hay = partnerHay(partner);
+  if (HANGOUT_PHONE_BLOCK.some((item) => category.includes(item) || hay.includes(item))) {
+    return true;
+  }
+  return (
+    hay.includes("폰") &&
+    ["판매", "수리", "성지", "개통", "케이스", "액정", "삼성", "애플", "중고", "대리"].some((item) =>
+      hay.includes(item),
+    )
+  );
+}
 
 function partnerHay(partner: SitePartnerHint) {
   return compactText(`${partner.name ?? ""} ${partner.category ?? ""} ${partner.benefit ?? ""}`);
@@ -931,6 +969,7 @@ function isRestaurantPartner(partner: SitePartnerHint) {
 function isHangoutPartner(partner: SitePartnerHint) {
   const category = compactText(String(partner.category ?? ""));
   const nameHay = compactText(`${partner.name ?? ""} ${partner.benefit ?? ""}`);
+  if (isPhoneShopPartner(partner)) return false;
   if (["병원", "약국", "의원", "치과", "한의"].some((item) => nameHay.includes(item))) return false;
   if (["음식", "주점", "식당"].some((item) => category.includes(item))) return false;
   if (CAFE_HINTS.some((item) => category.includes(item))) return false;

@@ -6,10 +6,11 @@ import {
   revokeStudentCardFrameOnServer,
 } from "@/lib/student-card-settings-server";
 import {
-  findCardFrameById,
+  findCardFrameByRef,
   loadCardFrameCatalogFromDb,
 } from "@/lib/student-card-frames";
 import { debitStudentGold, getSeasonPassState } from "@/lib/season-pass-server";
+import { bumpPublicReloadAt } from "@/lib/public-reload-server";
 
 export async function GET(request: NextRequest) {
   const auth = await adminAuthMiddleware(request, "settings");
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest) {
   const frameState = await loadStudentCardFrameState(studentId).catch(() => null);
   const unlockedIds = frameState?.state.unlockedIds ?? [];
   const frames = unlockedIds.map((id) => {
-    const frame = findCardFrameById(catalog, id);
+    const frame = findCardFrameByRef(catalog, id);
     return {
       id,
       name: frame?.name ?? id,
@@ -38,7 +39,8 @@ export async function GET(request: NextRequest) {
     };
   });
 
-  const [giftsRes, rewardsRes, inventoryRes, progressRes, passState] = await Promise.all([
+  const [giftsRes, rewardsRes, inventoryRes, progressRes, passState, shopRes, loginRes, claimRes] =
+    await Promise.all([
     admin.from("user_gifts").select("*").eq("user_id", studentId).order("created_at", { ascending: false }).limit(80),
     admin
       .from("site_student_rewards")
@@ -49,6 +51,24 @@ export async function GET(request: NextRequest) {
     admin.from("user_inventory").select("*").eq("user_id", studentId).order("created_at", { ascending: false }).limit(80),
     admin.from("user_event_progress").select("*").eq("user_id", studentId).order("updated_at", { ascending: false }).limit(40),
     getSeasonPassState(studentId).catch(() => null),
+    admin
+      .from("gold_shop_purchases")
+      .select("id, shop_item_id, gold_spent, created_at")
+      .eq("user_id", studentId)
+      .order("created_at", { ascending: false })
+      .limit(80),
+    admin
+      .from("site_login_reward_claims")
+      .select("claimed_on, gold_amount, costume_frame_id, coupon_code, created_at")
+      .eq("student_id", studentId)
+      .order("claimed_on", { ascending: false })
+      .limit(80),
+    admin
+      .from("reward_claims")
+      .select("id, level, track, claimed_at")
+      .eq("user_id", studentId)
+      .order("claimed_at", { ascending: false })
+      .limit(80),
   ]);
 
   const eventIds = [...new Set((progressRes.data ?? []).map((row) => String(row.event_id ?? "")).filter(Boolean))];
@@ -76,6 +96,15 @@ export async function GET(request: NextRequest) {
     };
   });
 
+  const shopItemIds = [...new Set((shopRes.data ?? []).map((row) => String(row.shop_item_id ?? "")).filter(Boolean))];
+  const shopNames = new Map<string, string>();
+  if (shopItemIds.length > 0) {
+    const { data: shopItems } = await admin.from("gold_shop_items").select("id, name").in("id", shopItemIds);
+    for (const row of shopItems ?? []) {
+      shopNames.set(String(row.id), String(row.name ?? "상점 상품"));
+    }
+  }
+
   return NextResponse.json({
     studentId,
     frames: {
@@ -91,15 +120,34 @@ export async function GET(request: NextRequest) {
     inventoryError: inventoryRes.error?.message ?? null,
     events,
     eventsError: progressRes.error?.message ?? null,
+    shopPurchases: (shopRes.data ?? []).map((row) => ({
+      id: String(row.id),
+      name: shopNames.get(String(row.shop_item_id)) || "상점 상품",
+      goldSpent: Number(row.gold_spent) || 0,
+      createdAt: row.created_at,
+    })),
+    loginClaims: (loginRes.data ?? []).map((row) => ({
+      claimedOn: String(row.claimed_on ?? ""),
+      goldAmount: Number(row.gold_amount) || 0,
+      costumeFrameId: row.costume_frame_id ?? null,
+      couponCode: row.coupon_code ?? null,
+      createdAt: row.created_at,
+    })),
     seasonPass: passState
       ? {
+          seasonId: passState.season?.id ?? null,
           seasonTitle: passState.season?.title ?? null,
           passEnabled: passState.passEnabled,
           level: passState.currentLevel,
           exp: passState.currentExp,
           gold: passState.progress?.gold ?? 0,
           isPremium: passState.isPremium,
-          claims: passState.claims,
+          claims: (claimRes.data ?? []).map((row) => ({
+            id: String(row.id),
+            level: Number(row.level) || 0,
+            track: row.track === "premium" ? "premium" : "free",
+            claimedAt: row.claimed_at,
+          })),
           quests: passState.quests.map((quest) => ({
             title: quest.title,
             progress: quest.progress,
@@ -138,19 +186,35 @@ export async function PATCH(request: NextRequest) {
     if (kind === "gold") {
       const amount = Math.floor(Number(body.amount) || 0);
       await debitStudentGold(studentId, amount);
+      await bumpPublicReloadAt();
       return NextResponse.json({ ok: true });
     }
 
     if (kind === "frame") {
       if (!id) return NextResponse.json({ error: "코스튬을 선택해 주세요." }, { status: 400 });
       await revokeStudentCardFrameOnServer(studentId, id);
+      await bumpPublicReloadAt();
       return NextResponse.json({ ok: true });
     }
 
     if (kind === "gift") {
       if (!id) return NextResponse.json({ error: "선물을 선택해 주세요." }, { status: 400 });
+      const { data: gift } = await admin
+        .from("user_gifts")
+        .select("id, frame_css_value")
+        .eq("id", id)
+        .eq("user_id", studentId)
+        .maybeSingle();
+      const { parseGiftPayload } = await import("@/lib/map-events");
+      const parsed = parseGiftPayload({
+        frame_css_value: String(gift?.frame_css_value ?? ""),
+      });
       const { error } = await admin.from("user_gifts").delete().eq("id", id).eq("user_id", studentId);
       if (error) throw error;
+      if (parsed.kind === "costume" && parsed.frameId) {
+        await revokeStudentCardFrameOnServer(studentId, parsed.frameId);
+      }
+      await bumpPublicReloadAt();
       return NextResponse.json({ ok: true });
     }
 
@@ -158,6 +222,7 @@ export async function PATCH(request: NextRequest) {
       if (!id) return NextResponse.json({ error: "아이템을 선택해 주세요." }, { status: 400 });
       const { error } = await admin.from("user_inventory").delete().eq("id", id).eq("user_id", studentId);
       if (error) throw error;
+      await bumpPublicReloadAt();
       return NextResponse.json({ ok: true });
     }
 
@@ -165,10 +230,28 @@ export async function PATCH(request: NextRequest) {
       if (!id) return NextResponse.json({ error: "보상을 선택해 주세요." }, { status: 400 });
       const { error } = await admin.from("site_student_rewards").delete().eq("id", id).eq("student_id", studentId);
       if (error) throw error;
+      await bumpPublicReloadAt();
       return NextResponse.json({ ok: true });
     }
 
-    if (kind === "event") {
+    if (kind === "event" || kind === "stamp") {
+      if (!id) return NextResponse.json({ error: "이벤트를 선택해 주세요." }, { status: 400 });
+      const { error } = await admin
+        .from("user_event_progress")
+        .update({
+          current_stamps: 0,
+          stamped_places: [],
+          is_completed: false,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("event_id", id)
+        .eq("user_id", studentId);
+      if (error) throw error;
+      await bumpPublicReloadAt();
+      return NextResponse.json({ ok: true });
+    }
+
+    if (kind === "event-delete") {
       if (!id) return NextResponse.json({ error: "이벤트를 선택해 주세요." }, { status: 400 });
       const { error } = await admin
         .from("user_event_progress")
@@ -176,6 +259,81 @@ export async function PATCH(request: NextRequest) {
         .eq("event_id", id)
         .eq("user_id", studentId);
       if (error) throw error;
+      await bumpPublicReloadAt();
+      return NextResponse.json({ ok: true });
+    }
+
+    if (kind === "stamp-all") {
+      const { error } = await admin
+        .from("user_event_progress")
+        .update({
+          current_stamps: 0,
+          stamped_places: [],
+          is_completed: false,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", studentId);
+      if (error) throw error;
+      await bumpPublicReloadAt();
+      return NextResponse.json({ ok: true });
+    }
+
+    if (kind === "claim") {
+      if (!id) return NextResponse.json({ error: "시즌패스 보상을 선택해 주세요." }, { status: 400 });
+      const { error } = await admin.from("reward_claims").delete().eq("id", id).eq("user_id", studentId);
+      if (error) throw error;
+      await bumpPublicReloadAt();
+      return NextResponse.json({ ok: true });
+    }
+
+    if (kind === "season") {
+      const { error: claimError } = await admin.from("reward_claims").delete().eq("user_id", studentId);
+      if (claimError) throw claimError;
+      const { error: questError } = await admin.from("user_quest_logs").delete().eq("user_id", studentId);
+      if (questError && !questError.message.includes("user_quest_logs")) throw questError;
+      const { error: attendError } = await admin.from("season_attendance_logs").delete().eq("user_id", studentId);
+      if (attendError && !attendError.message.includes("season_attendance_logs")) throw attendError;
+      const { error } = await admin
+        .from("user_season_progress")
+        .update({
+          exp: 0,
+          level: 1,
+          is_premium: false,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", studentId);
+      if (error) throw error;
+      await bumpPublicReloadAt();
+      return NextResponse.json({ ok: true });
+    }
+
+    if (kind === "shop") {
+      if (!id) return NextResponse.json({ error: "상점 구매 내역을 선택해 주세요." }, { status: 400 });
+      const { error } = await admin.from("gold_shop_purchases").delete().eq("id", id).eq("user_id", studentId);
+      if (error) throw error;
+      await bumpPublicReloadAt();
+      return NextResponse.json({ ok: true });
+    }
+
+    if (kind === "login") {
+      if (!id) return NextResponse.json({ error: "접속 보상 날짜를 선택해 주세요." }, { status: 400 });
+      const { error } = await admin
+        .from("site_login_reward_claims")
+        .delete()
+        .eq("student_id", studentId)
+        .eq("claimed_on", id);
+      if (error) throw error;
+      await bumpPublicReloadAt();
+      return NextResponse.json({ ok: true });
+    }
+
+    if (kind === "premium") {
+      const { error } = await admin
+        .from("user_season_progress")
+        .update({ is_premium: false })
+        .eq("user_id", studentId);
+      if (error) throw error;
+      await bumpPublicReloadAt();
       return NextResponse.json({ ok: true });
     }
   } catch (error) {

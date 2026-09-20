@@ -81,7 +81,7 @@ export function AdminPwaRuntime({ settings: initialSettings, children }: AdminPw
           : input instanceof URL
             ? input.href
             : request?.url ?? "";
-      if (/\/auth\/v1\//i.test(url) || /\/api\/auth\//i.test(url)) {
+      if (/\/auth\/v1\//i.test(url) || /\/api\/auth\//i.test(url) || /\/api\/public-reload/i.test(url)) {
         return response;
       }
 

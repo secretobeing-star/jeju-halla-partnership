@@ -274,6 +274,7 @@ export default function NaverMapPartnersView({
             mapDataControl: false,
             logoControl: false,
             zoomControl: false,
+            mapTypeControl: false,
           });
 
           mapRef.current = map;
@@ -516,7 +517,6 @@ export default function NaverMapPartnersView({
       const marker = new window.naver.maps.Marker({
         position,
         title: partner.name,
-        map: activeMap,
         icon: {
           ...createPartnerMapHtmlIcon(markerElement, {
             width: MARKER_SIZE.width,
@@ -539,14 +539,16 @@ export default function NaverMapPartnersView({
     markersRef.current = markers;
 
     // 클러스터링 적용
+    const clusterGrid = window.matchMedia("(max-width: 639px)").matches ? 200 : 140;
+
     if (markers.length > 1 && window.naver.maps.MarkerClustering) {
       try {
         markerClusteringRef.current = new window.naver.maps.MarkerClustering({
           map: activeMap,
           markers,
           minClusterSize: 2,
-          maxZoom: 18,
-          gridSize: 140,
+          maxZoom: 14,
+          gridSize: clusterGrid,
           disableClickZoom: false,
           icons: [
             createPartnerMapClusterIcon(40),
@@ -557,7 +559,15 @@ export default function NaverMapPartnersView({
           indexGenerator: [10, 30, 60, 100],
           stylingFunction: stylePartnerMapClusterMarker,
         });
-      } catch {}
+      } catch {
+        for (const marker of markers) {
+          marker.setMap(activeMap);
+        }
+      }
+    } else {
+      for (const marker of markers) {
+        marker.setMap(activeMap);
+      }
     }
 
     // 제휴처 위치 범위에 맞춘 카메라 최적화

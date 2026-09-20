@@ -327,15 +327,17 @@ export async function syncCardFrameUserStateFromRemote(
           (id): id is string => typeof id === "string" && Boolean(id.trim()),
         )
       : [];
-    const unlocked = new Set([
-      ...(payload.exists ? remoteUnlocked : local.unlockedIds),
-      ...remoteUnlocked,
-      ...local.unlockedIds,
-    ]);
-    const sources = {
-      ...local.sources,
-      ...(payload.state?.sources ?? {}),
-    };
+    const unlocked = new Set(
+      payload.exists
+        ? remoteUnlocked
+        : [...local.unlockedIds, ...remoteUnlocked],
+    );
+    const sources = payload.exists
+      ? { ...(payload.state?.sources ?? {}) }
+      : {
+          ...local.sources,
+          ...(payload.state?.sources ?? {}),
+        };
 
     for (const item of catalog) {
       if (item.isDefaultUnlocked) {
@@ -370,7 +372,9 @@ export async function syncCardFrameUserStateFromRemote(
       sources,
     };
     writeCardFrameUserState(studentId, next);
-    await persistCardFrameUserStateRemote(studentId, next);
+    if (!payload.exists) {
+      await persistCardFrameUserStateRemote(studentId, next);
+    }
     return next;
   } catch {
     return hydrateCardFrameUserState(studentId, catalog);

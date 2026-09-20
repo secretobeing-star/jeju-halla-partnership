@@ -185,42 +185,40 @@ export default function SiteAnalyticsAdminPanel({ onMessage }: SiteAnalyticsAdmi
           </AdminCollapsibleSection>
 
           <AdminCollapsibleSection
-            title="게시판"
-            description="게시글 열람, 글 작성, 댓글 작성을 따로 집계합니다."
+            title="게시판 열람"
+            description="게시글을 열어 본 횟수입니다."
           >
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div>
-                <p className="text-xs text-gray-500">열람</p>
-                <p className="mt-1 text-2xl font-semibold text-gray-900">{formatCount(summary.boardViews)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500">작성</p>
-                <p className="mt-1 text-2xl font-semibold text-gray-900">{formatCount(summary.boardWrites)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500">댓글</p>
-                <p className="mt-1 text-2xl font-semibold text-gray-900">{formatCount(summary.boardComments)}</p>
-              </div>
-            </div>
-            <p className="mt-4 text-xs font-medium text-gray-500">열람</p>
+            <p className="text-3xl font-semibold text-gray-900">{formatCount(summary.boardViews)}</p>
+            <p className="mt-1 text-sm text-gray-500">{summary.periodLabel}</p>
             <AnalyticsMiniChart
-              className="mt-1"
               daily={summary.daily}
               value={(item) => item.board_view}
               color="#d97706"
               metric="게시판 열람"
             />
-            <p className="mt-3 text-xs font-medium text-gray-500">작성</p>
+          </AdminCollapsibleSection>
+
+          <AdminCollapsibleSection
+            title="게시판 작성"
+            description="게시글이 등록된 횟수입니다."
+          >
+            <p className="text-3xl font-semibold text-gray-900">{formatCount(summary.boardWrites)}</p>
+            <p className="mt-1 text-sm text-gray-500">{summary.periodLabel}</p>
             <AnalyticsMiniChart
-              className="mt-1"
               daily={summary.daily}
               value={(item) => item.board_write}
               color="#b45309"
               metric="게시판 작성"
             />
-            <p className="mt-3 text-xs font-medium text-gray-500">댓글</p>
+          </AdminCollapsibleSection>
+
+          <AdminCollapsibleSection
+            title="게시판 댓글"
+            description="댓글·답글이 등록된 횟수입니다."
+          >
+            <p className="text-3xl font-semibold text-gray-900">{formatCount(summary.boardComments)}</p>
+            <p className="mt-1 text-sm text-gray-500">{summary.periodLabel}</p>
             <AnalyticsMiniChart
-              className="mt-1"
               daily={summary.daily}
               value={(item) => item.board_comment}
               color="#92400e"

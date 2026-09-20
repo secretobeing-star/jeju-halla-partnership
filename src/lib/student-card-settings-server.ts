@@ -63,17 +63,37 @@ export async function loadStudentCardFrameState(
     throw error;
   }
 
-  if (!data) {
+  const { data: frameRows } = await db
+    .from("user_frames")
+    .select("frame_id")
+    .eq("user_id", studentId.trim());
+
+  const extraIds = (frameRows ?? [])
+    .map((row) => String(row.frame_id ?? "").trim())
+    .filter(Boolean);
+
+  if (!data && extraIds.length === 0) {
     return {
       state: { unlockedIds: [], activeFrameId: null, sources: {} },
       exists: false,
     };
   }
 
+  const state = data
+    ? rowToState(data)
+    : { unlockedIds: [] as string[], activeFrameId: null as string | null, sources: {} };
+  const unlocked = new Set(state.unlockedIds);
+  for (const id of extraIds) {
+    unlocked.add(id);
+  }
+
   return {
-    state: rowToState(data),
-    exists: true,
-    updatedAt: data.updated_at,
+    state: {
+      ...state,
+      unlockedIds: Array.from(unlocked),
+    },
+    exists: Boolean(data) || extraIds.length > 0,
+    updatedAt: data?.updated_at,
   };
 }
 
@@ -135,20 +155,77 @@ export async function grantStudentCardFrameOnServer(
 }
 
 export async function revokeStudentCardFrameOnServer(studentId: string, frameId: string) {
+  const { findCardFrameByRef, loadCardFrameCatalogFromDb } = await import(
+    "@/lib/student-card-frames"
+  );
+  const catalog = await loadCardFrameCatalogFromDb().catch(() => []);
+  const matched = findCardFrameByRef(catalog, frameId);
+  const aliases = Array.from(
+    new Set(
+      [frameId.trim(), matched?.id, matched?.itemCode].filter(
+        (value): value is string => Boolean(value && value.trim()),
+      ),
+    ),
+  );
+
   const current = await loadStudentCardFrameState(studentId);
   const prev = current?.state ?? {
     unlockedIds: [],
     activeFrameId: null,
     sources: {},
   };
-  if (!prev.unlockedIds.includes(frameId)) {
-    throw new Error("해금된 코스튬이 아닙니다.");
-  }
+  const remaining = prev.unlockedIds.filter((id) => {
+    if (aliases.includes(id)) return false;
+    const resolved = findCardFrameByRef(catalog, id);
+    return !matched || resolved?.id !== matched.id;
+  });
   const sources = { ...prev.sources };
-  delete sources[frameId];
-  return saveStudentCardFrameState(studentId, {
-    unlockedIds: prev.unlockedIds.filter((id) => id !== frameId),
-    activeFrameId: prev.activeFrameId === frameId ? null : prev.activeFrameId,
+  for (const id of [...aliases, ...prev.unlockedIds]) {
+    if (!remaining.includes(id)) {
+      delete sources[id];
+    }
+  }
+
+  const activeMatches =
+    Boolean(prev.activeFrameId) &&
+    (aliases.includes(prev.activeFrameId ?? "") ||
+      Boolean(matched && findCardFrameByRef(catalog, prev.activeFrameId ?? "")?.id === matched.id));
+
+  await saveStudentCardFrameState(studentId, {
+    unlockedIds: remaining,
+    activeFrameId: activeMatches ? null : prev.activeFrameId,
     sources,
   });
+
+  const db = getDb();
+  if (db && aliases.length > 0) {
+    await db.from("user_frames").delete().eq("user_id", studentId.trim()).in("frame_id", aliases);
+    await db
+      .from("user_inventory")
+      .delete()
+      .eq("user_id", studentId.trim())
+      .in("item_value", aliases);
+
+    const { data: gifts } = await db
+      .from("user_gifts")
+      .select("id, frame_css_value")
+      .eq("user_id", studentId.trim());
+    const { parseGiftPayload } = await import("@/lib/map-events");
+    const giftIds = (gifts ?? [])
+      .filter((gift) => {
+        const parsed = parseGiftPayload({
+          frame_css_value: String(gift.frame_css_value ?? ""),
+        });
+        return (
+          parsed.kind === "costume" &&
+          parsed.frameId &&
+          (aliases.includes(parsed.frameId) ||
+            Boolean(matched && findCardFrameByRef(catalog, parsed.frameId)?.id === matched.id))
+        );
+      })
+      .map((gift) => String(gift.id));
+    if (giftIds.length > 0) {
+      await db.from("user_gifts").delete().eq("user_id", studentId.trim()).in("id", giftIds);
+    }
+  }
 }

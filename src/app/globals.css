@@ -4651,13 +4651,18 @@ html.dark-mode .board-post-popup-close:hover {
   flex-direction: column;
   align-items: flex-end;
   justify-content: flex-end;
-  gap: 0.5rem;
-  padding: 0.75rem;
+  gap: 0.45rem;
+  padding: 0.65rem;
 }
 
 .partner-main-map__canvas .nmap_zoom_control,
 .partner-main-map__canvas .nmap_control_zoom,
 .partner-main-map__canvas .nmap_scale_control,
+.partner-main-map__canvas .zoom,
+.partner-main-map__canvas .btn_zoomin,
+.partner-main-map__canvas .btn_zoomout,
+.partner-main-map__canvas .plus_control,
+.partner-main-map__canvas .mobile_control,
 .naver-map-embed .nmap_zoom_control,
 .naver-map-embed .nmap_control_zoom,
 .naver-map-embed .nmap_scale_control {
@@ -4666,6 +4671,8 @@ html.dark-mode .board-post-popup-close:hover {
 
 .partner-main-map__canvas .nmap_logo,
 .partner-main-map__canvas .nmap_control_logo,
+.partner-main-map__canvas .watermark,
+.partner-main-map__canvas .naver_logo,
 .partner-main-map__canvas a[href*="map.naver.com"],
 .partner-main-map__canvas a[href*="naver.me"],
 .naver-map-embed .nmap_logo,
@@ -6945,6 +6952,30 @@ html.pwa-v-tablet-lg .site-top-nav__search-wrap {
   justify-content: flex-end;
   gap: 0.5rem;
   margin-left: auto;
+}
+
+@media (max-width: 639px) {
+  .partner-list-toolbar__header,
+  .partner-list-toolbar__sort {
+    padding-right: 4.35rem;
+  }
+
+  .partner-list-toolbar__sort {
+    justify-content: flex-start;
+    margin-left: 0;
+  }
+
+  html.ios-device .partner-map-locate-button,
+  html.android-device .partner-map-locate-button {
+    height: 2.4rem;
+    width: 2.4rem;
+  }
+
+  .partner-list-refresh-btn {
+    min-width: 2.4rem;
+    padding-left: 0.6rem;
+    padding-right: 0.6rem;
+  }
 }
 
 .partner-list-toolbar__search-wrap:has(.site-partner-search--icon-toggle.site-partner-search--open) {

@@ -87,6 +87,7 @@ declare namespace naver.maps {
     mapDataControl?: boolean;
     logoControl?: boolean;
     zoomControl?: boolean;
+    mapTypeControl?: boolean;
   }
 
   interface MarkerOptions {

@@ -39,18 +39,53 @@ type RecoveryPayload = {
     isCompleted: boolean;
     updatedAt?: string;
   }>;
+  shopPurchases: Array<{
+    id: string;
+    name: string;
+    goldSpent: number;
+    createdAt?: string;
+  }>;
+  loginClaims: Array<{
+    claimedOn: string;
+    goldAmount: number;
+    costumeFrameId?: string | null;
+    couponCode?: string | null;
+    createdAt?: string;
+  }>;
   seasonPass: {
+    seasonId: string | null;
     seasonTitle: string | null;
     passEnabled: boolean;
     level: number;
     exp: number;
     gold: number;
     isPremium: boolean;
-    claims: Array<{ level: number; track: string; claimed_at: string }>;
+    claims: Array<{ id: string; level: number; track: string; claimedAt?: string }>;
     quests: Array<{ title: string; progress: number; target: number; completed: boolean }>;
   } | null;
   error?: string;
 };
+
+function ReclaimButton({
+  disabled,
+  busy,
+  onClick,
+}: {
+  disabled?: boolean;
+  busy?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className="shrink-0 rounded-md border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-100 disabled:opacity-50"
+    >
+      {busy ? "회수 중..." : "회수"}
+    </button>
+  );
+}
 
 function formatDate(value?: string | null) {
   if (!value) return "";
@@ -102,7 +137,11 @@ export default function StudentRecoveryAdminPanel() {
     const label =
       kind === "gold"
         ? `골드 ${amount?.toLocaleString("ko-KR")}개를 회수할까요?`
-        : "이 항목을 회수할까요? 학생 계정에서 바로 사라집니다.";
+        : kind === "season"
+          ? "시즌패스 레벨·경험치·수령 보상을 회수할까요? 골드는 그대로 둡니다."
+          : kind === "stamp" || kind === "stamp-all"
+            ? "도장 진행도를 초기화할까요?"
+            : "이 항목을 회수할까요? 학생 계정에서 바로 사라집니다.";
     if (!window.confirm(label)) return;
     const actionKey = `${kind}:${id ?? amount ?? "gold"}`;
     setActing(actionKey);
@@ -125,7 +164,7 @@ export default function StudentRecoveryAdminPanel() {
   return (
     <AdminCollapsibleSection
       title="회수"
-      description="학번으로 보관함·선물함·시즌패스·지도 이벤트를 확인한 뒤, 관리자가 바로 회수할 수 있습니다."
+      description="사이트 · 로그인 · 회수에서 학번을 조회한 뒤, 코스튬·선물·골드·시즌패스·도장 이벤트·상점·접속보상을 바로 회수할 수 있습니다."
     >
       <form onSubmit={(event) => void handleSearch(event)} className="flex flex-wrap gap-2">
         <input
@@ -168,14 +207,11 @@ export default function StudentRecoveryAdminPanel() {
                     )}
                     <span className="min-w-0 flex-1 truncate">{item.name}</span>
                     <span className="text-xs text-gray-400">{item.source || ""}</span>
-                    <button
-                      type="button"
+                    <ReclaimButton
                       disabled={Boolean(acting)}
+                      busy={acting === `frame:${item.id}`}
                       onClick={() => void reclaim("frame", item.id)}
-                      className="shrink-0 text-xs text-red-600 underline disabled:opacity-50"
-                    >
-                      {acting === `frame:${item.id}` ? "회수 중..." : "회수"}
-                    </button>
+                    />
                   </li>
                 ))}
               </ul>
@@ -193,14 +229,11 @@ export default function StudentRecoveryAdminPanel() {
                     <span className="truncate">{gift.reward_name || gift.id}</span>
                     <span className="flex shrink-0 items-center gap-2 text-xs text-gray-500">
                       {gift.is_claimed ? "수령" : "미수령"} · {formatDate(gift.created_at)}
-                      <button
-                        type="button"
+                      <ReclaimButton
                         disabled={Boolean(acting)}
+                        busy={acting === `gift:${gift.id}`}
                         onClick={() => void reclaim("gift", gift.id)}
-                        className="text-red-600 underline disabled:opacity-50"
-                      >
-                        {acting === `gift:${gift.id}` ? "회수 중..." : "회수"}
-                      </button>
+                      />
                     </span>
                   </li>
                 ))}
@@ -221,14 +254,11 @@ export default function StudentRecoveryAdminPanel() {
                     </span>
                     <span className="flex shrink-0 items-center gap-2 text-xs text-gray-500">
                       {formatDate(reward.created_at)}
-                      <button
-                        type="button"
+                      <ReclaimButton
                         disabled={Boolean(acting)}
+                        busy={acting === `reward:${reward.id}`}
                         onClick={() => void reclaim("reward", reward.id)}
-                        className="text-red-600 underline disabled:opacity-50"
-                      >
-                        {acting === `reward:${reward.id}` ? "회수 중..." : "회수"}
-                      </button>
+                      />
                     </span>
                   </li>
                 ))}
@@ -237,29 +267,10 @@ export default function StudentRecoveryAdminPanel() {
           </section>
 
           <section className="rounded-xl border border-gray-200 bg-white p-4">
-            <h3 className="text-sm font-semibold text-gray-900">시즌패스</h3>
-            {!data.seasonPass?.seasonTitle && !data.seasonPass?.passEnabled ? (
-              <p className="mt-2 text-sm text-gray-500">시즌패스 기록이 없습니다.</p>
-            ) : (
-              <div className="mt-2 space-y-1 text-sm text-gray-700">
-                <p>시즌: {data.seasonPass.seasonTitle || "-"}</p>
-                <p>
-                  Lv.{data.seasonPass.level} · EXP {data.seasonPass.exp} · 골드 {data.seasonPass.gold}
-                  {data.seasonPass.isPremium ? " · 프리미엄" : ""}
-                </p>
-                <p>수령 보상 {data.seasonPass.claims.length}개</p>
-                {data.seasonPass.quests.length > 0 ? (
-                  <ul className="mt-2 space-y-1 text-xs text-gray-500">
-                    {data.seasonPass.quests.map((quest) => (
-                      <li key={quest.title}>
-                        {quest.title}: {quest.progress}/{quest.target}
-                        {quest.completed ? " (완료)" : ""}
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
-              </div>
-            )}
+            <h3 className="text-sm font-semibold text-gray-900">골드</h3>
+            <p className="mt-1 text-sm text-gray-700">
+              보유 골드 {(data.seasonPass?.gold ?? 0).toLocaleString("ko-KR")}개
+            </p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <input
                 type="number"
@@ -281,32 +292,156 @@ export default function StudentRecoveryAdminPanel() {
           </section>
 
           <section className="rounded-xl border border-gray-200 bg-white p-4">
-            <h3 className="text-sm font-semibold text-gray-900">지도 이벤트 ({data.events.length})</h3>
-            {data.events.length === 0 ? (
-              <p className="mt-2 text-sm text-gray-500">이벤트 진행 기록이 없습니다.</p>
+            <h3 className="text-sm font-semibold text-gray-900">시즌패스</h3>
+            {!data.seasonPass?.seasonTitle && !data.seasonPass?.passEnabled ? (
+              <p className="mt-2 text-sm text-gray-500">시즌패스 기록이 없습니다.</p>
+            ) : (
+              <div className="mt-2 space-y-1 text-sm text-gray-700">
+                <p>시즌: {data.seasonPass.seasonTitle || "-"}</p>
+                <p>
+                  Lv.{data.seasonPass.level} · EXP {data.seasonPass.exp}
+                  {data.seasonPass.isPremium ? " · 프리미엄" : ""}
+                </p>
+                <p>수령 보상 {data.seasonPass.claims.length}개</p>
+                {data.seasonPass.quests.length > 0 ? (
+                  <ul className="mt-2 space-y-1 text-xs text-gray-500">
+                    {data.seasonPass.quests.map((quest) => (
+                      <li key={quest.title}>
+                        {quest.title}: {quest.progress}/{quest.target}
+                        {quest.completed ? " (완료)" : ""}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <ReclaimButton
+                    disabled={Boolean(acting)}
+                    busy={acting === "season:reset"}
+                    onClick={() => void reclaim("season", "reset")}
+                  />
+                  <span className="text-xs text-gray-500">레벨·EXP·수령 보상 전체 회수 (골드는 유지)</span>
+                </div>
+                {data.seasonPass.isPremium ? (
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <ReclaimButton
+                      disabled={Boolean(acting)}
+                      busy={acting === "premium:premium"}
+                      onClick={() => void reclaim("premium", "premium")}
+                    />
+                    <span className="text-xs text-gray-500">프리미엄 패스 회수</span>
+                  </div>
+                ) : null}
+                {data.seasonPass.claims.length > 0 ? (
+                  <ul className="mt-3 space-y-1 text-sm">
+                    {data.seasonPass.claims.map((claim) => (
+                      <li key={claim.id} className="flex justify-between gap-2">
+                        <span>
+                          LV {claim.level} · {claim.track === "premium" ? "프리미엄" : "무료"}
+                        </span>
+                        <span className="flex shrink-0 items-center gap-2 text-xs text-gray-500">
+                          {formatDate(claim.claimedAt)}
+                          <ReclaimButton
+                            disabled={Boolean(acting)}
+                            busy={acting === `claim:${claim.id}`}
+                            onClick={() => void reclaim("claim", claim.id)}
+                          />
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-2 text-xs text-gray-500">수령한 레벨 보상이 없습니다.</p>
+                )}
+              </div>
+            )}
+          </section>
+
+          <section className="rounded-xl border border-gray-200 bg-white p-4">
+            <h3 className="text-sm font-semibold text-gray-900">골드 상점 구매 ({data.shopPurchases?.length ?? 0})</h3>
+            {(data.shopPurchases ?? []).length === 0 ? (
+              <p className="mt-2 text-sm text-gray-500">상점 구매 내역이 없습니다.</p>
             ) : (
               <ul className="mt-2 space-y-1 text-sm">
-                {data.events.map((event) => (
-                  <li key={String(event.eventId)} className="flex justify-between gap-2">
+                {data.shopPurchases.map((item) => (
+                  <li key={item.id} className="flex justify-between gap-2">
                     <span className="truncate">
-                      {event.tabName ? `${event.tabName} · ` : ""}
-                      {event.title} · 도장 {event.currentStamps}
-                      {event.isCompleted ? " · 완료" : ""}
+                      {item.name} · {item.goldSpent.toLocaleString("ko-KR")} 골드
                     </span>
                     <span className="flex shrink-0 items-center gap-2 text-xs text-gray-500">
-                      {formatDate(event.updatedAt)}
-                      <button
-                        type="button"
+                      {formatDate(item.createdAt)}
+                      <ReclaimButton
                         disabled={Boolean(acting)}
-                        onClick={() => void reclaim("event", String(event.eventId))}
-                        className="text-red-600 underline disabled:opacity-50"
-                      >
-                        {acting === `event:${event.eventId}` ? "회수 중..." : "회수"}
-                      </button>
+                        busy={acting === `shop:${item.id}`}
+                        onClick={() => void reclaim("shop", item.id)}
+                      />
                     </span>
                   </li>
                 ))}
               </ul>
+            )}
+          </section>
+
+          <section className="rounded-xl border border-gray-200 bg-white p-4">
+            <h3 className="text-sm font-semibold text-gray-900">접속 보상 ({data.loginClaims?.length ?? 0})</h3>
+            {(data.loginClaims ?? []).length === 0 ? (
+              <p className="mt-2 text-sm text-gray-500">접속 보상 내역이 없습니다.</p>
+            ) : (
+              <ul className="mt-2 space-y-1 text-sm">
+                {data.loginClaims.map((item) => (
+                  <li key={item.claimedOn} className="flex justify-between gap-2">
+                    <span className="truncate">
+                      {item.claimedOn} · 골드 {item.goldAmount.toLocaleString("ko-KR")}
+                      {item.costumeFrameId ? " · 코스튬" : ""}
+                      {item.couponCode ? ` · ${item.couponCode}` : ""}
+                    </span>
+                    <span className="flex shrink-0 items-center gap-2 text-xs text-gray-500">
+                      {formatDate(item.createdAt)}
+                      <ReclaimButton
+                        disabled={Boolean(acting)}
+                        busy={acting === `login:${item.claimedOn}`}
+                        onClick={() => void reclaim("login", item.claimedOn)}
+                      />
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section className="rounded-xl border border-gray-200 bg-white p-4">
+            <h3 className="text-sm font-semibold text-gray-900">도장 이벤트 ({data.events.length})</h3>
+            {data.events.length === 0 ? (
+              <p className="mt-2 text-sm text-gray-500">도장 이벤트 진행 기록이 없습니다.</p>
+            ) : (
+              <>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <ReclaimButton
+                    disabled={Boolean(acting)}
+                    busy={acting === "stamp-all:all"}
+                    onClick={() => void reclaim("stamp-all", "all")}
+                  />
+                  <span className="text-xs text-gray-500">모든 도장 초기화</span>
+                </div>
+                <ul className="mt-2 space-y-1 text-sm">
+                  {data.events.map((event) => (
+                    <li key={String(event.eventId)} className="flex justify-between gap-2">
+                      <span className="truncate">
+                        {event.tabName ? `${event.tabName} · ` : ""}
+                        {event.title} · 도장 {event.currentStamps}
+                        {event.isCompleted ? " · 완료" : ""}
+                      </span>
+                      <span className="flex shrink-0 items-center gap-2 text-xs text-gray-500">
+                        {formatDate(event.updatedAt)}
+                        <ReclaimButton
+                          disabled={Boolean(acting)}
+                          busy={acting === `stamp:${event.eventId}`}
+                          onClick={() => void reclaim("stamp", String(event.eventId))}
+                        />
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </>
             )}
           </section>
 
@@ -323,14 +458,11 @@ export default function StudentRecoveryAdminPanel() {
                     </span>
                     <span className="flex shrink-0 items-center gap-2 text-xs text-gray-500">
                       {formatDate(item.created_at)}
-                      <button
-                        type="button"
+                      <ReclaimButton
                         disabled={Boolean(acting)}
+                        busy={acting === `inventory:${item.id}`}
                         onClick={() => void reclaim("inventory", item.id)}
-                        className="text-red-600 underline disabled:opacity-50"
-                      >
-                        {acting === `inventory:${item.id}` ? "회수 중..." : "회수"}
-                      </button>
+                      />
                     </span>
                   </li>
                 ))}

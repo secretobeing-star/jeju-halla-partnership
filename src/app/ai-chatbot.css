@@ -59,6 +59,7 @@ body.site-pwa-install-banner-visible.floating-site-size-on .ai-chatbot {
   height: min(30rem, calc(100dvh - 12rem - var(--keyboard-inset, 0px)));
   display: flex;
   flex-direction: column;
+  min-height: 0;
   overflow: hidden;
   border-radius: 1rem;
   background: #fff;
@@ -97,6 +98,7 @@ body.site-pwa-install-banner-visible.floating-site-size-on .ai-chatbot {
 
 .ai-chatbot__head {
   display: flex;
+  flex-shrink: 0;
   align-items: flex-start;
   justify-content: space-between;
   gap: 0.5rem;
@@ -159,7 +161,8 @@ body.site-pwa-install-banner-visible.floating-site-size-on .ai-chatbot {
 }
 
 .ai-chatbot__list {
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: auto;
   padding: 0.75rem;
   background: #f8fafc;
@@ -167,10 +170,13 @@ body.site-pwa-install-banner-visible.floating-site-size-on .ai-chatbot {
 
 .ai-chatbot__intro {
   display: flex;
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
   flex-direction: column;
   align-items: center;
   gap: 0.3rem;
-  margin: 0 0 0.85rem;
+  margin: 0 0 0.35rem;
   padding: 0.85rem 0.7rem 0.9rem;
   border: 1px solid #d1fae5;
   border-radius: 0.95rem;
@@ -235,19 +241,31 @@ body.site-pwa-install-banner-visible.floating-site-size-on .ai-chatbot {
   color: #047857;
 }
 
-.ai-chatbot__turn.is-user {
+.ai-chatbot__turn {
   display: flex;
+  position: relative;
+  z-index: 0;
+  flex-shrink: 0;
   flex-direction: column;
+  gap: 0.28rem;
+  margin-top: 0.85rem;
+}
+
+.ai-chatbot__turn.is-user {
   align-items: flex-end;
 }
 
 .ai-chatbot__bubble {
+  display: block;
+  box-sizing: border-box;
   max-width: 90%;
   margin: 0;
   padding: 0.55rem 0.7rem;
   border-radius: 0.8rem;
   font-size: 0.85rem;
   line-height: 1.45;
+  overflow-wrap: anywhere;
+  word-break: break-word;
   white-space: pre-wrap;
 }
 
@@ -354,13 +372,18 @@ body.site-pwa-install-banner-visible.floating-site-size-on .ai-chatbot {
 
 .ai-chatbot__form {
   display: flex;
+  flex-shrink: 0;
+  align-items: center;
   gap: 0.4rem;
   padding: 0.65rem;
+  padding-bottom: calc(0.65rem + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid #e5e7eb;
+  background: #fff;
 }
 
 .ai-chatbot__form input {
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 0;
   border: 1px solid #d1d5db;
   border-radius: 0.55rem;
   padding: 0.5rem 0.65rem;
@@ -368,13 +391,15 @@ body.site-pwa-install-banner-visible.floating-site-size-on .ai-chatbot {
 }
 
 .ai-chatbot__form button {
+  flex: 0 0 auto;
   border: 0;
   border-radius: 0.55rem;
-  padding: 0.5rem 0.7rem;
+  padding: 0.5rem 0.75rem;
   background: #059669;
   color: #fff;
   font-size: 0.8rem;
   font-weight: 700;
+  white-space: nowrap;
   cursor: pointer;
 }
 
@@ -384,32 +409,37 @@ body.site-pwa-install-banner-visible.floating-site-size-on .ai-chatbot {
 }
 
 @media (max-width: 1023px) {
+  .ai-chatbot {
+    max-height: calc(100dvh - env(safe-area-inset-top, 0px) - 0.5rem);
+  }
+
   .ai-chatbot__panel {
     width: min(22rem, calc(100vw - 1.5rem));
-    height: min(62dvh, calc(100dvh - 11.5rem - var(--keyboard-inset, 0px)));
+    height: min(58dvh, calc(100dvh - 9.5rem - var(--keyboard-inset, 0px)));
+    max-height: calc(100dvh - 8.75rem - var(--keyboard-inset, 0px));
   }
 
   html.android-device.pwa-v-phone .ai-chatbot__panel {
     width: min(22.5rem, calc(100vw - 1.35rem));
-    height: min(64dvh, calc(100dvh - 11rem - var(--keyboard-inset, 0px)));
+    height: min(56dvh, calc(100dvh - 9.25rem - var(--keyboard-inset, 0px)));
   }
 
   html.android-device.pwa-v-s-bar .ai-chatbot__panel {
     width: min(22.75rem, calc(100vw - 1.25rem));
-    height: min(68dvh, calc(100dvh - 10.5rem - var(--keyboard-inset, 0px)));
+    height: min(58dvh, calc(100dvh - 8.75rem - var(--keyboard-inset, 0px)));
   }
 
   html.android-device.pwa-v-fold-cover .ai-chatbot__panel {
     width: min(19.5rem, calc(100vw - 1.1rem));
-    height: min(52dvh, calc(100dvh - 9.5rem - var(--keyboard-inset, 0px)));
+    height: min(48dvh, calc(100dvh - 8.25rem - var(--keyboard-inset, 0px)));
   }
 
   html.ios-device.pwa-v-phone .ai-chatbot__panel {
     width: min(21.25rem, calc(100vw - 1.35rem));
     height: min(
-      60dvh,
+      52dvh,
       calc(
-        100dvh - 11.25rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) -
+        100dvh - 9.75rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) -
           var(--keyboard-inset, 0px)
       )
     );
@@ -427,9 +457,9 @@ body.site-pwa-install-banner-visible.floating-site-size-on .ai-chatbot {
   html.ios-device.pwa-v-s-bar .ai-chatbot__panel,
   html.ios-device.pwa-v-bar .ai-chatbot__panel {
     height: min(
-      63dvh,
+      54dvh,
       calc(
-        100dvh - 10.75rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) -
+        100dvh - 9.25rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) -
           var(--keyboard-inset, 0px)
       )
     );
@@ -438,13 +468,13 @@ body.site-pwa-install-banner-visible.floating-site-size-on .ai-chatbot {
   @media (max-height: 700px) {
     html.ios-device .ai-chatbot__panel,
     html.android-device .ai-chatbot__panel {
-      height: min(54dvh, calc(100dvh - 9rem - var(--keyboard-inset, 0px)));
+      height: min(48dvh, calc(100dvh - 8.25rem - var(--keyboard-inset, 0px)));
     }
   }
 
   html.ios-device.pwa-v-landscape .ai-chatbot__panel,
   html.android-device.pwa-v-landscape .ai-chatbot__panel {
     width: min(26rem, calc(100vw - 7rem));
-    height: min(78dvh, calc(100dvh - 5.5rem - var(--keyboard-inset, 0px)));
+    height: min(70dvh, calc(100dvh - 5.25rem - var(--keyboard-inset, 0px)));
   }
 }
