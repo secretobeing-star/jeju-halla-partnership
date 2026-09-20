@@ -302,6 +302,9 @@ export function isLiveEventsQuestion(question: string) {
       "이벤트팝업",
       "이벤트목록",
       "이벤트리스트",
+      "이벤트list",
+      "진행목록",
+      "진행리스트",
       "이벤트현황",
       "이벤트일정",
       "이벤트기간",
@@ -329,6 +332,9 @@ export function isLiveEventsQuestion(question: string) {
       "시즌패스뭐",
       "시즌패스알려",
       "시즌패스목록",
+      "시즌패스리스트",
+      "패스목록",
+      "패스리스트",
       "시즌패스열어",
       "시즌패스보여",
       "시즌패스창",
@@ -369,7 +375,7 @@ export function isLiveEventsQuestion(question: string) {
   if (
     !howTo &&
     includesAny(compact, ["도장", "스탬프", "시즌패스", "패스"]) &&
-    includesAny(compact, ["열어", "보여", "알려", "뭐있", "있어", "있냐", "목록", "추천", "참여", "하자", "찍자"])
+    includesAny(compact, ["열어", "보여", "알려", "뭐있", "있어", "있냐", "목록", "리스트", "list", "추천", "참여", "하자", "찍자"])
   ) {
     return true;
   }
@@ -394,6 +400,8 @@ export function isLiveEventsQuestion(question: string) {
     "열어",
     "추천",
     "목록",
+    "리스트",
+    "list",
   ]);
   return aboutEvent && askingNow && !howTo;
 }
@@ -422,7 +430,7 @@ export function formatLiveEventsReply(lines: ChatbotLiveEventLine[]): ChatbotRep
 export function isBoardQuestion(question: string) {
   const compact = compactText(question);
   if (!compact) return false;
-  if (includesAny(compact, ["비밀번호", "패스워드", "password", "제휴목록", "제휴리스트"])) return false;
+  if (includesAny(compact, ["비밀번호", "패스워드", "password", "제휴목록", "제휴리스트", "제휴list"])) return false;
   if (
     includesAny(compact, [
       "게시판",
@@ -473,6 +481,14 @@ export function isBoardQuestion(question: string) {
       "보드열어",
       "보드보여",
       "글목록",
+      "글리스트",
+      "게시글목록",
+      "게시글리스트",
+      "게시판목록",
+      "게시판리스트",
+      "게시판list",
+      "보드목록",
+      "보드리스트",
       "글보러",
       "글확인",
       "올린글",
@@ -510,6 +526,8 @@ export function isBoardQuestion(question: string) {
     "가줘",
     "켜줘",
     "목록",
+    "리스트",
+    "list",
     "창",
     "팝업",
   ]);
@@ -565,6 +583,8 @@ export function formatBoardReply(question: string): ChatbotReply {
     text = "게시글을 연 뒤 댓글을 남길 수 있습니다. 아래 카드로 게시판을 열어 드립니다.";
   } else if (notice) {
     text = "공지 게시판입니다. 아래 카드를 누르면 게시판을 열어 드립니다.";
+  } else if (includesAny(compact, ["목록", "리스트", "list"])) {
+    text = "게시판 글 목록입니다. 아래 카드를 누르면 바로 열어 드립니다.";
   }
 
   const cards: ChatbotPartnerCard[] = [
@@ -709,6 +729,19 @@ const INTENT_PHRASES = [
   "검색해줘",
   "검색해봐",
   "검색",
+  "목록보여줘",
+  "목록보여",
+  "목록좀",
+  "목록주세요",
+  "목록줘",
+  "리스트보여줘",
+  "리스트보여",
+  "리스트좀",
+  "리스트주세요",
+  "리스트줘",
+  "리스트",
+  "목록",
+  "list",
   "추천해주세요",
   "추천해줄래",
   "추천해줘",
@@ -745,7 +778,8 @@ function stripIntentPhrases(question: string) {
     compact = compact.split(compactText(phrase)).join("");
   }
   return compact
-    .replace(/제휴(업체|처|목록)?/g, "")
+    .replace(/제휴(업체|처|목록|리스트|list)?/g, "")
+    .replace(/(목록|리스트|list)/g, "")
     .replace(/(을|를|이|가|은|는|에|으로|로)+$/g, "")
     .trim();
 }
@@ -1487,21 +1521,67 @@ function extractSearchQuery(question: string) {
 
 function isListQuestion(question: string) {
   const compact = compactText(question);
-  return includesAny(compact, [
-    "제휴목록",
-    "제휴리스트",
-    "제휴뭐있",
-    "제휴뭐야",
-    "제휴어떤",
-    "제휴전체",
-    "제휴다보",
-    "제휴처뭐있",
-    "제휴처목록",
-    "제휴업체목록",
-    "가맹점목록",
-    "파트너목록",
-    "분류뭐있",
-  ]);
+  if (!compact) return false;
+  if (
+    includesAny(compact, [
+      "게시판",
+      "게시글",
+      "글쓰",
+      "댓글",
+      "신고",
+      "이벤트",
+      "시즌패스",
+      "도장",
+      "스탬프",
+      "코스튬",
+      "골드상점",
+      "선물함",
+      "비밀번호",
+    ])
+  ) {
+    return false;
+  }
+  if (
+    includesAny(compact, [
+      "제휴목록",
+      "제휴리스트",
+      "제휴list",
+      "제휴뭐있",
+      "제휴뭐야",
+      "제휴어떤",
+      "제휴전체",
+      "제휴다보",
+      "제휴처뭐있",
+      "제휴처목록",
+      "제휴처리스트",
+      "제휴업체목록",
+      "제휴업체리스트",
+      "가맹점목록",
+      "가맹점리스트",
+      "파트너목록",
+      "파트너리스트",
+      "업체목록",
+      "업체리스트",
+      "매장목록",
+      "매장리스트",
+      "분류뭐있",
+      "분류목록",
+      "분류리스트",
+      "전체목록",
+      "전체리스트",
+      "전체list",
+    ])
+  ) {
+    return true;
+  }
+  const leftover = stripIntentPhrases(question);
+  if (!leftover && includesAny(compact, ["목록", "리스트", "list"])) {
+    return true;
+  }
+  return (
+    includesAny(compact, ["제휴", "업체", "가맹", "파트너", "매장", "분류"]) &&
+    includesAny(compact, ["목록", "리스트", "list", "뭐있", "다보", "전체"])
+  );
 }
 
 function siteGuideReply(question: string): ChatbotReply | null {
@@ -1590,7 +1670,7 @@ function siteGuideReply(question: string): ChatbotReply | null {
     ])
   ) {
     return {
-      text: "제휴 업체, 혜택, 시즌패스, 골드상점, 도장 이벤트, 게시판, 로그인을 안내합니다. 「밥메뉴 추천」, 「놀러갈 곳」, 「현재 진행중인 이벤트」, 「게시판 열어줘」처럼 물어보세요.",
+      text: "제휴 업체, 혜택, 시즌패스, 골드상점, 도장 이벤트, 게시판, 로그인을 안내합니다. 「밥메뉴 추천」, 「놀러갈 곳」, 「목록」, 「리스트」, 「현재 진행중인 이벤트」, 「게시판 열어줘」처럼 물어보세요.",
     };
   }
   return null;

@@ -1,3 +1,5 @@
+import type { ChatbotWordCount } from "@/lib/chatbot-word-analytics";
+
 export const SITE_ANALYTICS_TYPES = [
   "page_view",
   "pwa_view",
@@ -45,6 +47,7 @@ export type SiteAnalyticsSummary = {
   stampRate: number;
   seasonPassJoins: number;
   seasonPassRate: number;
+  chatbotWords: ChatbotWordCount[];
   daily: SiteAnalyticsDaily[];
 };
 

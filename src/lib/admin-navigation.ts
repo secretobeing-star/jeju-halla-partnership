@@ -151,7 +151,7 @@ export const ADMIN_NAV_GROUPS: ReadonlyArray<{
       { kind: "item", key: "site-notifications", permission: "settings", label: "알림 · 푸시" },
       { kind: "item", key: "site-nav", permission: "settings", label: "상단·메뉴" },
       { kind: "item", key: "site-main", permission: "settings", label: "메인 화면" },
-      { kind: "item", key: "ai-chatbot", permission: "settings", label: "AI 챗봇" },
+      { kind: "item", key: "ai-chatbot", permission: "settings", label: "AI 챗봇 (Beta)" },
       { kind: "item", key: "user-settings", permission: "settings", label: "사용자 패널" },
     ],
   },

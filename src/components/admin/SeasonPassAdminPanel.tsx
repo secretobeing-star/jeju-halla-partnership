@@ -365,7 +365,7 @@ export default function SeasonPassAdminPanel({ onMessage }: SeasonPassAdminPanel
               </div>
             </label>
             <ImageField
-              label="배경 이미지"
+              label="뒷배경 이미지"
               value={selected.bg_image_url ?? ""}
               uploading={uploadingKey === "bg"}
               onUpload={async (file) => {
@@ -383,7 +383,7 @@ export default function SeasonPassAdminPanel({ onMessage }: SeasonPassAdminPanel
               }
             />
             <ImageField
-              label="UI / 뱃지 이미지"
+              label="제목 이미지"
               value={selected.ui_image_url ?? ""}
               uploading={uploadingKey === "ui"}
               onUpload={async (file) => {
@@ -397,78 +397,6 @@ export default function SeasonPassAdminPanel({ onMessage }: SeasonPassAdminPanel
               onClear={() =>
                 setSeasons((prev) =>
                   prev.map((item) => (item.id === selected.id ? { ...item, ui_image_url: null } : item)),
-                )
-              }
-            />
-            <ImageField
-              label="일반 패스 탭 이미지"
-              value={selected.free_pass_image_url ?? ""}
-              uploading={uploadingKey === "free-pass"}
-              onUpload={async (file) => {
-                const url = await uploadImage(file, "free-pass");
-                if (url) {
-                  setSeasons((prev) =>
-                    prev.map((item) => (item.id === selected.id ? { ...item, free_pass_image_url: url } : item)),
-                  );
-                }
-              }}
-              onClear={() =>
-                setSeasons((prev) =>
-                  prev.map((item) => (item.id === selected.id ? { ...item, free_pass_image_url: null } : item)),
-                )
-              }
-            />
-            <ImageField
-              label="프리미엄 패스 탭 이미지"
-              value={selected.premium_pass_image_url ?? ""}
-              uploading={uploadingKey === "premium-pass"}
-              onUpload={async (file) => {
-                const url = await uploadImage(file, "premium-pass");
-                if (url) {
-                  setSeasons((prev) =>
-                    prev.map((item) => (item.id === selected.id ? { ...item, premium_pass_image_url: url } : item)),
-                  );
-                }
-              }}
-              onClear={() =>
-                setSeasons((prev) =>
-                  prev.map((item) => (item.id === selected.id ? { ...item, premium_pass_image_url: null } : item)),
-                )
-              }
-            />
-            <ImageField
-              label="골드 기본 이미지"
-              value={selected.gold_icon_url ?? ""}
-              uploading={uploadingKey === "gold-icon"}
-              onUpload={async (file) => {
-                const url = await uploadImage(file, "gold-icon");
-                if (url) {
-                  setSeasons((prev) =>
-                    prev.map((item) => (item.id === selected.id ? { ...item, gold_icon_url: url } : item)),
-                  );
-                }
-              }}
-              onClear={() =>
-                setSeasons((prev) =>
-                  prev.map((item) => (item.id === selected.id ? { ...item, gold_icon_url: null } : item)),
-                )
-              }
-            />
-            <ImageField
-              label="수령 완료 체크 이미지"
-              value={selected.claimed_check_image_url ?? ""}
-              uploading={uploadingKey === "claimed-check"}
-              onUpload={async (file) => {
-                const url = await uploadImage(file, "claimed-check");
-                if (url) {
-                  setSeasons((prev) =>
-                    prev.map((item) => (item.id === selected.id ? { ...item, claimed_check_image_url: url } : item)),
-                  );
-                }
-              }}
-              onClear={() =>
-                setSeasons((prev) =>
-                  prev.map((item) => (item.id === selected.id ? { ...item, claimed_check_image_url: null } : item)),
                 )
               }
             />

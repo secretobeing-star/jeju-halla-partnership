@@ -99,7 +99,7 @@ export default function SeasonPassModalBody({
   const season = state.season;
   const passEnabled = Boolean(state.passEnabled);
   const shopEnabled = isGoldShopOpen(state);
-  const hideSeasonText = Boolean(season?.ui_image_url || season?.bg_image_url || season?.track_image_url);
+  const hideSeasonText = Boolean(season?.ui_image_url);
   const days = passEnabled ? remainingDays(season?.ends_at ?? null) : null;
   const lastLevel = state.levels[state.levels.length - 1] ?? null;
   const nextLevel = Math.min(lastLevel?.level ?? state.currentLevel, state.currentLevel + 1);
@@ -107,8 +107,6 @@ export default function SeasonPassModalBody({
   if (!season) {
     return <p className="season-pass-kart__empty">진행 중인 시즌패스가 없습니다.</p>;
   }
-
-  const hasBannerImages = Boolean(season.ui_image_url || season.premium_badge_url || season.track_image_url);
 
   return (
     <div
@@ -123,12 +121,11 @@ export default function SeasonPassModalBody({
     >
       {tab === "pass" && passEnabled ? (
       <div className="season-pass-kart__banners">
-        {season.ui_image_url ? <img src={season.ui_image_url} alt="" /> : null}
-        {season.premium_badge_url ? <img src={season.premium_badge_url} alt="" /> : null}
-        {season.track_image_url ? <img src={season.track_image_url} alt="" /> : null}
-        {!hasBannerImages && !hideSeasonText ? (
+        {season.ui_image_url ? (
+          <img src={season.ui_image_url} alt={season.title} />
+        ) : (
           <div className="season-pass-kart__banner-fallback">{season.title}</div>
-        ) : null}
+        )}
       </div>
       ) : null}
 
@@ -218,13 +215,13 @@ export default function SeasonPassModalBody({
                 gridTemplateColumns: `6.6rem repeat(${Math.max(1, state.levels.length)}, minmax(5.8rem, 1fr)) 6.6rem`,
               }}
             >
-              <TrackName imageUrl={season.free_pass_image_url} label="일반 패스" />
+              <TrackName label="일반 패스" />
               <TrackRow
                 state={state}
                 userId={userId}
                 track="free"
                 busy={busy !== null}
-                hideText={hideSeasonText}
+                hideText={false}
                 goldIconUrl={season.gold_icon_url}
                 checkImageUrl={season.claimed_check_image_url}
                 onClaim={claim}
@@ -241,17 +238,13 @@ export default function SeasonPassModalBody({
                 gridTemplateColumns: `6.6rem repeat(${Math.max(1, state.levels.length)}, minmax(5.8rem, 1fr)) 6.6rem`,
               }}
             >
-              <TrackName
-                imageUrl={season.premium_pass_image_url}
-                label="프리미엄 패스"
-                premium
-              />
+              <TrackName label="프리미엄 패스" premium />
               <TrackRow
                 state={state}
                 userId={userId}
                 track="premium"
                 busy={busy !== null}
-                hideText={hideSeasonText}
+                hideText={false}
                 goldIconUrl={season.gold_icon_url}
                 checkImageUrl={season.claimed_check_image_url}
                 onClaim={claim}

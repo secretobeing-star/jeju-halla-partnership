@@ -21,6 +21,7 @@ import {
 } from "@/lib/naver-map-partner-ui";
 import { createPartnerMapMiniCardOverlay } from "@/lib/naver-map-mini-card-overlay";
 import { refreshMapLayout, SITE_MAP_REFRESH_EVENT } from "@/lib/naver-map-layout";
+import { createPartnerMarkerClustering } from "@/lib/naver-marker-clustering";
 import { usePartnerMapLocate } from "@/lib/use-partner-map-locate";
 import PartnerMapLocateControl from "@/components/PartnerMapLocateControl";
 import { hasValidPartnerMapCoords } from "@/lib/partner-map-url";
@@ -115,7 +116,7 @@ export default function NaverMapPartnersView({
   const mapRef = useRef<naver.maps.Map | null>(null);
   const miniCardOverlayRef = useRef<ReturnType<typeof createPartnerMapMiniCardOverlay> | null>(null);
   const miniCardElementRef = useRef<HTMLElement | null>(null);
-  const markerClusteringRef = useRef<naver.maps.MarkerClustering | null>(null);
+  const markerClusteringRef = useRef<ReturnType<typeof createPartnerMarkerClustering> | null>(null);
   const markersRef = useRef<naver.maps.Marker[]>([]);
   const markerElementsRef = useRef<Map<string, HTMLElement>>(new Map());
   const mapListenersRef = useRef<unknown[]>([]);
@@ -258,7 +259,7 @@ export default function NaverMapPartnersView({
     setMapRevealed(false);
     mapRef.current = null;
 
-    void loadNaverMapsSdk(clientId, ["markerClustering"], { waitForSubmodules: true })
+    void loadNaverMapsSdk(clientId)
       .then(() => {
         if (cancelled) return;
 
@@ -354,7 +355,7 @@ export default function NaverMapPartnersView({
       miniCardOverlayRef.current?.close();
       miniCardOverlayRef.current = null;
       miniCardElementRef.current = null;
-      markerClusteringRef.current?.setMap(null);
+      markerClusteringRef.current?.destroy();
       markerClusteringRef.current = null;
       for (const marker of markersRef.current) {
         marker.setMap(null);
@@ -392,7 +393,7 @@ export default function NaverMapPartnersView({
 
     // 이전 마커 정리
     if (markerClusteringRef.current) {
-      markerClusteringRef.current.setMap(null);
+      markerClusteringRef.current.destroy();
       markerClusteringRef.current = null;
     }
     for (const marker of markersRef.current) {
@@ -538,32 +539,26 @@ export default function NaverMapPartnersView({
 
     markersRef.current = markers;
 
-    // 클러스터링 적용
-    const clusterGrid = window.matchMedia("(max-width: 639px)").matches ? 200 : 140;
+    const clusterGrid = window.matchMedia("(max-width: 639px)").matches ? 110 : 96;
 
-    if (markers.length > 1 && window.naver.maps.MarkerClustering) {
-      try {
-        markerClusteringRef.current = new window.naver.maps.MarkerClustering({
-          map: activeMap,
-          markers,
-          minClusterSize: 2,
-          maxZoom: 14,
-          gridSize: clusterGrid,
-          disableClickZoom: false,
-          icons: [
-            createPartnerMapClusterIcon(40),
-            createPartnerMapClusterIcon(46),
-            createPartnerMapClusterIcon(52),
-            createPartnerMapClusterIcon(58),
-          ],
-          indexGenerator: [10, 30, 60, 100],
-          stylingFunction: stylePartnerMapClusterMarker,
-        });
-      } catch {
-        for (const marker of markers) {
-          marker.setMap(activeMap);
-        }
-      }
+    if (markers.length > 1) {
+      markerClusteringRef.current = createPartnerMarkerClustering({
+        map: activeMap,
+        markers: validPartners.flatMap((partner, index) => {
+          const marker = markers[index];
+          return marker
+            ? [{ marker, latitude: partner.latitude, longitude: partner.longitude }]
+            : [];
+        }),
+        minClusterSize: 2,
+        maxZoom: 16,
+        gridSize: clusterGrid,
+        iconForCount: (count) => {
+          const size = count >= 60 ? 58 : count >= 30 ? 52 : count >= 10 ? 46 : 40;
+          return createPartnerMapClusterIcon(size);
+        },
+        stylingFunction: stylePartnerMapClusterMarker,
+      });
     } else {
       for (const marker of markers) {
         marker.setMap(activeMap);

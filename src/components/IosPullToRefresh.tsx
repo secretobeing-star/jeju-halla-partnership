@@ -4,20 +4,28 @@ import { useEffect, useRef, useState } from "react";
 import { isIOSDevice } from "@/lib/in-app-browser";
 import { isSoftKeyboardOpen, isTextEntryElement } from "@/lib/text-entry";
 
-const PULL_THRESHOLD = 72;
-const MAX_PULL = 112;
+const PULL_THRESHOLD = 64;
 
 function pageScrollTop() {
   return window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
 }
 
-function isBlocked() {
+function isBlocked(target: EventTarget | null) {
   if (isSoftKeyboardOpen()) return true;
   if (document.body.classList.contains("board-post-popup-open")) return true;
   if (document.body.classList.contains("site-popup-open")) return true;
   if (document.body.classList.contains("site-event-open")) return true;
   if (document.querySelector(".ai-chatbot__panel")) return true;
   if (document.querySelector(".site-pwa-loading-splash")) return true;
+  if (target instanceof Element) {
+    if (
+      target.closest(
+        ".partner-main-map, .partner-main-map__canvas, .naver-map-embed, .ai-chatbot, .floating-page-controls",
+      )
+    ) {
+      return true;
+    }
+  }
   return false;
 }
 
@@ -36,8 +44,7 @@ function hasInnerScroll(target: EventTarget | null) {
 }
 
 export default function IosPullToRefresh() {
-  const [pull, setPull] = useState(0);
-  const [ready, setReady] = useState(false);
+  const [visible, setVisible] = useState(false);
   const [enabled, setEnabled] = useState(false);
   const startY = useRef(0);
   const pulling = useRef(false);
@@ -52,7 +59,7 @@ export default function IosPullToRefresh() {
 
     function onStart(event: TouchEvent) {
       if (event.touches.length !== 1) return;
-      if (isBlocked() || isTextEntryElement(event.target) || hasInnerScroll(event.target)) {
+      if (isBlocked(event.target) || isTextEntryElement(event.target) || hasInnerScroll(event.target)) {
         pulling.current = false;
         return;
       }
@@ -62,7 +69,8 @@ export default function IosPullToRefresh() {
       }
       startY.current = event.touches[0].clientY;
       pulling.current = true;
-      setReady(false);
+      pullRef.current = 0;
+      setVisible(false);
     }
 
     function onMove(event: TouchEvent) {
@@ -70,21 +78,17 @@ export default function IosPullToRefresh() {
       if (pageScrollTop() > 2) {
         pulling.current = false;
         pullRef.current = 0;
-        setPull(0);
-        setReady(false);
+        setVisible(false);
         return;
       }
       const delta = event.touches[0].clientY - startY.current;
-      if (delta <= 0) {
+      if (delta <= 8) {
         pullRef.current = 0;
-        setPull(0);
-        setReady(false);
+        setVisible(false);
         return;
       }
-      const next = Math.min(MAX_PULL, delta * 0.55);
-      pullRef.current = next;
-      setPull(next);
-      setReady(next >= PULL_THRESHOLD);
+      pullRef.current = delta;
+      setVisible(true);
       if (delta > 12) {
         event.preventDefault();
       }
@@ -94,14 +98,12 @@ export default function IosPullToRefresh() {
       if (!pulling.current) return;
       pulling.current = false;
       const amount = pullRef.current;
+      pullRef.current = 0;
       if (amount >= PULL_THRESHOLD) {
-        setPull(PULL_THRESHOLD);
-        window.setTimeout(() => window.location.reload(), 160);
-      } else {
-        pullRef.current = 0;
-        setPull(0);
-        setReady(false);
+        window.location.reload();
+        return;
       }
+      setVisible(false);
     }
 
     document.addEventListener("touchstart", onStart, { passive: true });
@@ -116,13 +118,11 @@ export default function IosPullToRefresh() {
     };
   }, [enabled]);
 
-  if (!enabled || pull <= 0) return null;
+  if (!enabled || !visible) return null;
 
   return (
-    <div className="ios-pull-refresh" style={{ height: `${Math.round(pull)}px` }} aria-hidden>
-      <span className={`ios-pull-refresh__label${ready ? " is-ready" : ""}`}>
-        {ready ? "놓으면 새로고침" : "아래로 당겨 새로고침"}
-      </span>
+    <div className="ios-pull-refresh" aria-hidden>
+      <span className="ios-pull-refresh__label">새로고침</span>
     </div>
   );
 }

@@ -75,9 +75,7 @@ export default function PartnerMainMapPanel({
       return;
     }
 
-    void loadNaverMapsSdk(clientId, ["markerClustering"], { waitForSubmodules: true }).catch(
-      () => {},
-    );
+    void loadNaverMapsSdk(clientId).catch(() => {});
   }, [clientId, expanded]);
 
   useEffect(() => {

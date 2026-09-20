@@ -122,7 +122,7 @@ export default function AiChatbotAdminPanel({ onMessage }: AiChatbotAdminPanelPr
   return (
     <div className="space-y-6">
       <form onSubmit={(event) => void handleSave(event)}>
-        <AdminCollapsibleSection title="AI 챗봇">
+        <AdminCollapsibleSection title="AI 챗봇 (Beta)" description="베타 기능입니다. 제휴·게시판·이벤트 안내를 학습하고 바로 열 수 있습니다.">
           <label className="flex items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-950">
             <span>
               AI 챗봇 활성화
@@ -323,7 +323,8 @@ export default function AiChatbotAdminPanel({ onMessage }: AiChatbotAdminPanelPr
                 ) : lesson.kind === "board" ? (
                   <p className="mt-2 text-xs leading-5 text-gray-500">
                     게시판 팝업을 안내하고, 카드를 누르면 게시판(글쓰기 문장이면 글쓰기)을 엽니다. 기본 학습
-                    (게시판·글쓰기·댓글·신고 등)은 이미 들어 있습니다. 여기에는 추가로 알아듣게 할 말만 넣으면 됩니다.
+                    (게시판·글쓰기·댓글·신고·목록·리스트 등)은 이미 들어 있습니다. 여기에는 추가로 알아듣게 할 말만
+                    넣으면 됩니다.
                   </p>
                 ) : lesson.kind === "recommend" ? (
                   <label className="mt-2 block text-xs text-gray-500">

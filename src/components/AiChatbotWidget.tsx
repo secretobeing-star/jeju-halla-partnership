@@ -284,7 +284,10 @@ export default function AiChatbotWidget() {
                 {config.icon_url ? <img src={config.icon_url} alt="" /> : <span aria-hidden>💬</span>}
               </span>
               <span className="ai-chatbot__identity">
-                <span className="ai-chatbot__name">{config.name}</span>
+                <span className="ai-chatbot__name-row">
+                  <span className="ai-chatbot__name">{config.name}</span>
+                  <span className="ai-chatbot__beta">Beta</span>
+                </span>
                 <span className="ai-chatbot__bio">{config.profile_bio}</span>
               </span>
             </div>
@@ -297,7 +300,10 @@ export default function AiChatbotWidget() {
               <span className="ai-chatbot__intro-avatar">
                 {config.icon_url ? <img src={config.icon_url} alt="" /> : <span aria-hidden>💬</span>}
               </span>
-              <p className="ai-chatbot__intro-name">{config.name}</p>
+              <p className="ai-chatbot__intro-name">
+                {config.name}
+                <span className="ai-chatbot__beta">Beta</span>
+              </p>
               <p className="ai-chatbot__intro-bio">{config.profile_bio}</p>
             </div>
             {lines.map((line, index) => (
@@ -307,7 +313,10 @@ export default function AiChatbotWidget() {
                     <span className="ai-chatbot__msg-avatar">
                       {config.icon_url ? <img src={config.icon_url} alt="" /> : <span aria-hidden>💬</span>}
                     </span>
-                    <span className="ai-chatbot__msg-name">{config.name}</span>
+                    <span className="ai-chatbot__msg-name">
+                      {config.name}
+                      <span className="ai-chatbot__beta ai-chatbot__beta--compact">Beta</span>
+                    </span>
                   </div>
                 ) : null}
                 <p className={`ai-chatbot__bubble ${line.role === "user" ? "is-user" : "is-bot"}`}>
@@ -385,18 +394,23 @@ export default function AiChatbotWidget() {
           </form>
         </div>
       ) : null}
-      <button
-        type="button"
-        className="ai-chatbot__fab"
-        aria-label={`${config.name} 열기`}
-        onClick={() => {
-          const next = !open;
-          setOpen(next);
-          if (next) trackSiteAnalytics("chatbot_open");
-        }}
-      >
-        {config.icon_url ? <img src={config.icon_url} alt="" /> : <span aria-hidden>💬</span>}
-      </button>
+      <div className="ai-chatbot__fab-wrap">
+        <button
+          type="button"
+          className="ai-chatbot__fab"
+          aria-label={`${config.name} 열기 (Beta)`}
+          onClick={() => {
+            const next = !open;
+            setOpen(next);
+            if (next) trackSiteAnalytics("chatbot_open");
+          }}
+        >
+          {config.icon_url ? <img src={config.icon_url} alt="" /> : <span aria-hidden>💬</span>}
+        </button>
+        <span className="ai-chatbot__fab-beta" aria-hidden>
+          Beta
+        </span>
+      </div>
     </div>
   );
 }

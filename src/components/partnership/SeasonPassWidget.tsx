@@ -161,19 +161,20 @@ export default function SeasonPassWidget() {
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-200">시즌패스</p>
-          <h3 className="mt-0.5 text-lg font-bold leading-tight">{state.season.title}</h3>
+          {state.season.ui_image_url ? (
+            <img
+              src={state.season.ui_image_url}
+              alt={state.season.title}
+              className="mt-1 h-10 max-w-[14rem] object-contain object-left"
+            />
+          ) : (
+            <h3 className="mt-0.5 text-lg font-bold leading-tight">{state.season.title}</h3>
+          )}
           <p className="mt-1 text-sm text-white/80">
             {userId ? `Lv.${state.currentLevel}` : "로그인 후 진행도가 표시됩니다"}
             {state.isPremium ? " · 프리미엄" : ""}
           </p>
         </div>
-        {state.season.premium_badge_url || state.season.ui_image_url ? (
-          <img
-            src={state.season.ui_image_url || state.season.premium_badge_url || ""}
-            alt=""
-            className="h-12 w-12 rounded-xl object-contain bg-white/10 p-1"
-          />
-        ) : null}
       </div>
 
       <div className="mt-3">

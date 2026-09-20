@@ -9,6 +9,7 @@ import {
   type SiteAnalyticsDaily,
   type SiteAnalyticsSummary,
 } from "@/lib/site-analytics";
+import { aggregateChatbotWords } from "@/lib/chatbot-word-analytics";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 
 export async function GET(request: NextRequest) {
@@ -25,7 +26,7 @@ export async function GET(request: NextRequest) {
   const range = analyticsRangeForPeriod(period, month);
   let query = admin
     .from("site_analytics_events")
-    .select("event_type, created_at")
+    .select("event_type, created_at, path")
     .gte("created_at", range.from)
     .order("created_at", { ascending: true })
     .limit(80000);
@@ -47,7 +48,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const rows = (data ?? []) as { event_type: string; created_at: string }[];
+  const rows = (data ?? []) as { event_type: string; created_at: string; path?: string | null }[];
   const dailyMap = new Map<string, SiteAnalyticsDaily>();
   for (const key of range.keys) {
     dailyMap.set(key, emptyDaily(key));
@@ -63,6 +64,7 @@ export async function GET(request: NextRequest) {
   let chatbotMessages = 0;
   let stampJoins = 0;
   let seasonPassJoins = 0;
+  const chatbotPaths: string[] = [];
 
   for (const row of rows) {
     const created = new Date(row.created_at);
@@ -88,6 +90,7 @@ export async function GET(request: NextRequest) {
     } else if (row.event_type === "chatbot_message") {
       bucket.chatbot_message += 1;
       chatbotMessages += 1;
+      if (row.path) chatbotPaths.push(row.path);
     } else if (row.event_type === "stamp_join") {
       bucket.stamp_join += 1;
       stampJoins += 1;
@@ -150,6 +153,7 @@ export async function GET(request: NextRequest) {
     stampRate: pageViews > 0 ? Math.round((stampJoins / pageViews) * 1000) / 10 : 0,
     seasonPassJoins,
     seasonPassRate: pageViews > 0 ? Math.round((seasonPassJoins / pageViews) * 1000) / 10 : 0,
+    chatbotWords: aggregateChatbotWords(chatbotPaths),
     daily: [...dailyMap.values()],
   };
 
