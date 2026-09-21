@@ -97,6 +97,7 @@ type MapEventMapSectionProps = {
   onFavoriteToggle?: (partnerId: string) => void;
   favoritesTerm?: string;
   markerSettings?: MapMarkerCustomSettings | null;
+  onSearchReset?: () => void;
 };
 
 type RewardModalState = {

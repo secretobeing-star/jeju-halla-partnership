@@ -47,6 +47,7 @@ type PartnerMainMapPanelProps = {
   favoriteCountdownEndAt?: string | null;
   detailButtonLabel?: string;
   markerSettings?: MapMarkerCustomSettings | null;
+  onSearchReset?: () => void;
 };
 
 export default function PartnerMainMapPanel({
@@ -65,6 +66,7 @@ export default function PartnerMainMapPanel({
   favoriteCountdownEndAt = null,
   detailButtonLabel,
   markerSettings = null,
+  onSearchReset,
 }: PartnerMainMapPanelProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const { clientId, loading: configLoading, available: naverJsAvailable, geocodeKeyFallback } =
@@ -130,14 +132,25 @@ export default function PartnerMainMapPanel({
         {title ? (
           <h2 className="min-w-0 text-sm font-semibold text-gray-900 sm:text-base">{title}</h2>
         ) : null}
-        <button
-          type="button"
-          onClick={() => setExpanded((prev) => !prev)}
-          className="shrink-0 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 sm:text-sm"
-          aria-expanded={expanded}
-        >
-          {expanded ? "접기" : "펼치기"}
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          {onSearchReset ? (
+            <button
+              type="button"
+              onClick={onSearchReset}
+              className="shrink-0 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 sm:text-sm"
+            >
+              검색 초기화
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => setExpanded((prev) => !prev)}
+            className="shrink-0 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 sm:text-sm"
+            aria-expanded={expanded}
+          >
+            {expanded ? "접기" : "펼치기"}
+          </button>
+        </div>
       </div>
 
       {expanded ? (

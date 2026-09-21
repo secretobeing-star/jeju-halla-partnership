@@ -1300,6 +1300,10 @@ export default function HomePage() {
         onFavoriteToggle={togglePartnerFavorite}
         favoritesTerm={partnerFavoritesDisplay.label}
         markerSettings={mapMarkerSettings}
+        onSearchReset={() => {
+          setSearchQuery("");
+          setCurrentPage(1);
+        }}
       />
     </>
   ) : null;
