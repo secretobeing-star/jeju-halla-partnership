@@ -38,8 +38,10 @@ export function createPartnerMapMiniCardOverlay({
   const overlay = new window.naver.maps.OverlayView() as MiniCardOverlayInstance;
 
   overlay.onAdd = function onAdd() {
-    const pane = overlay.getPanes().overlayMouseTarget ?? overlay.getPanes().floatPane;
-    pane.appendChild(element);
+    const host = mapContainer ?? overlay.getPanes().overlayMouseTarget ?? overlay.getPanes().floatPane;
+    if (host && element.parentElement !== host) {
+      host.appendChild(element);
+    }
   };
 
   overlay.draw = function draw() {
@@ -47,16 +49,23 @@ export function createPartnerMapMiniCardOverlay({
       return;
     }
 
-    if (placement === "center" && mapContainer) {
+    const padding = 8;
+    const mapElement = mapContainer ?? (overlay.getPanes().overlayLayer?.parentElement as HTMLElement | null);
+    const mapWidth = mapElement?.clientWidth ?? 0;
+    const mapHeight = mapElement?.clientHeight ?? 0;
+
+    if (mapWidth > 0) {
+      element.style.maxWidth = `${Math.max(140, mapWidth - padding * 2)}px`;
+      element.style.boxSizing = "border-box";
+    }
+
+    if (placement === "center" && mapElement) {
       const width = element.offsetWidth;
       const height = element.offsetHeight;
-      const mapWidth = mapContainer.clientWidth;
-      const mapHeight = mapContainer.clientHeight;
-
-      element.style.left = `${Math.max(8, (mapWidth - width) / 2)}px`;
+      element.style.left = `${Math.max(padding, (mapWidth - width) / 2)}px`;
       element.style.top = `${Math.max(
-        8,
-        Math.min(mapHeight - height - 8, mapHeight * centerVerticalRatio - height / 2),
+        padding,
+        Math.min(mapHeight - height - padding, mapHeight * centerVerticalRatio - height / 2),
       )}px`;
       return;
     }
@@ -69,10 +78,6 @@ export function createPartnerMapMiniCardOverlay({
     const offset = projection.fromCoordToOffset(position);
     const width = element.offsetWidth;
     const height = element.offsetHeight;
-    const mapElement = mapContainer;
-    const mapWidth = mapElement?.clientWidth ?? 0;
-    const mapHeight = mapElement?.clientHeight ?? 0;
-    const padding = 8;
 
     let left = offset.x - width / 2;
     let top = offset.y + anchorOffsetY - height;
@@ -86,7 +91,7 @@ export function createPartnerMapMiniCardOverlay({
     if (mapHeight > 0) {
       const maxTopInMap = mapHeight - height - padding;
       if (maxTopAboveMarker < padding) {
-        top = maxTopAboveMarker;
+        top = Math.max(padding, Math.min(maxTopAboveMarker, maxTopInMap));
       } else {
         top = Math.max(padding, Math.min(top, maxTopInMap, maxTopAboveMarker));
       }
@@ -109,6 +114,7 @@ export function createPartnerMapMiniCardOverlay({
   overlay.setMap(map);
   window.requestAnimationFrame(() => {
     overlay.draw?.();
+    window.requestAnimationFrame(() => overlay.draw?.());
   });
   return overlay;
 }
