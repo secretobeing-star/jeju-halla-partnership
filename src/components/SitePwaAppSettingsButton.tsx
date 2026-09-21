@@ -22,7 +22,6 @@ import {
 import {
   isPwaAppSettingsCategoryRegionEnabled,
   isPwaAppSettingsDarkModeEnabled,
-  isPwaAppSettingsFavoritesEnabled,
   isPwaAppSettingsFontSizeEnabled,
   isPwaAppSettingsLocationEnabled,
   isPwaAppSettingsNotificationEnabled,
@@ -48,7 +47,6 @@ import {
 } from "@/lib/site-twa-client";
 import { getSiteMemberSession, clearSiteMemberSession } from "@/lib/site-member-session";
 import { supabase } from "@/lib/supabase";
-import { getPartnerFavoritesLabel } from "@/lib/partner-favorites-display";
 import DeleteAccountConfirmDialog from "@/components/DeleteAccountConfirmDialog";
 
 type PermissionGuidePrompt = {
@@ -226,10 +224,9 @@ export default function SitePwaAppSettingsButton({
   const showFontSize = isPwaAppSettingsFontSizeEnabled(settings);
   const showPageBackground = isPwaAppSettingsPageBackgroundEnabled(settings);
   const showCategoryRegion = isPwaAppSettingsCategoryRegionEnabled(settings);
-  const showFavorites = isPwaAppSettingsFavoritesEnabled(settings);
   const showLab = showFontSize || showDarkMode || showPageBackground;
   const showPermissions = showNotification || showLocation;
-  const showMainScreen = showCategoryRegion || showFavorites;
+  const showMainScreen = showCategoryRegion;
   const pageBackgroundDefaultEnabled = settings.page_background_default_enabled ?? true;
 
   const [open, setOpen] = useState(false);
@@ -643,13 +640,6 @@ export default function SitePwaAppSettingsButton({
                 label="카테고리·지역"
                 checked={prefs.show_category_region ?? true}
                 onChange={(value) => updatePrefs({ show_category_region: value })}
-              />
-            ) : null}
-            {showFavorites ? (
-              <ToggleRow
-                label={getPartnerFavoritesLabel(settings)}
-                checked={prefs.show_partner_favorites ?? true}
-                onChange={(value) => updatePrefs({ show_partner_favorites: value })}
               />
             ) : null}
           </div>

@@ -1006,8 +1006,7 @@ export default function HomePage() {
     ],
   );
   const partnerFavoritesEnabled = partnerFavoritesDisplay.enabled;
-  const showPartnerFavoritesFilter =
-    partnerFavoritesEnabled && (userBetaPrefs.show_partner_favorites ?? true);
+  const showPartnerFavoritesFilter = partnerFavoritesEnabled;
 
   useEffect(() => {
     if (!showPartnerFavoritesFilter) {
@@ -1889,8 +1888,6 @@ export default function HomePage() {
               (settings.partner_category_section_enabled ?? true) &&
               (settings.main_category_region_user_toggle_enabled ?? true)
             }
-            favoritesToggleAvailable={partnerFavoritesEnabled}
-            favoritesToggleLabel={partnerFavoritesDisplay.label}
             noticeText={settings.settings_panel_notice_text}
             noticeUrl={settings.settings_panel_notice_url}
             noticeColor={settings.settings_panel_notice_color}

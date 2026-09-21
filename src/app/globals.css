@@ -7999,8 +7999,8 @@ html.dark-mode .site-partner-search__toggle:hover {
 .partner-card-image__overlay .partner-favorite-button:not(.partner-favorite-button--edge) {
   position: absolute;
   top: 0.5rem;
-  left: 0.5rem;
-  right: auto;
+  right: 0.5rem;
+  left: auto;
   z-index: 20;
   pointer-events: auto;
 }

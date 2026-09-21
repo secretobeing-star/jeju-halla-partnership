@@ -399,12 +399,6 @@ export function isPwaAppSettingsCategoryRegionEnabled(
   );
 }
 
-export function isPwaAppSettingsFavoritesEnabled(
-  settings: SitePwaAppDisplaySettingsSource | null | undefined,
-) {
-  return isPwaAppSettingsEnabled(settings) && (settings?.partner_favorites_enabled ?? true);
-}
-
 export function isPwaAppSettingsPageBackgroundEnabled(
   settings: SitePwaAppDisplaySettingsSource | null | undefined,
 ) {
@@ -424,7 +418,6 @@ export function hasPwaAppSettingsPanelContent(
     isPwaAppSettingsDarkModeEnabled(settings) ||
     isPwaAppSettingsFontSizeEnabled(settings) ||
     isPwaAppSettingsPageBackgroundEnabled(settings) ||
-    isPwaAppSettingsCategoryRegionEnabled(settings) ||
-    isPwaAppSettingsFavoritesEnabled(settings)
+    isPwaAppSettingsCategoryRegionEnabled(settings)
   );
 }
