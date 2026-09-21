@@ -6268,81 +6268,12 @@ html.dark-mode
   text-overflow: unset;
 }
 
-.site-top-nav__menu-group .site-top-nav__link-item--custom-visual .site-top-nav__link-label {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
-.site-top-nav__menu-group .site-top-nav__link-item--custom-visual .site-top-nav__link,
-.site-top-nav--has-background .site-top-nav__menu-group .site-top-nav__link-item--custom-visual .site-top-nav__link,
-.site-top-nav--floating-chips .site-top-nav__menu-group .site-top-nav__link-item--custom-visual .site-top-nav__link {
-  box-sizing: border-box;
-  gap: 0;
-  justify-content: center;
-  align-items: center;
-  width: 2.5rem;
-  height: 2.5rem;
-  min-width: 2.5rem;
-  min-height: 2.5rem;
-  padding: 0;
-  border: 1px solid #e5e7eb;
-  border-radius: 9999px;
-  background-color: #ffffff;
-  overflow: hidden;
-}
-
-html.dark-mode .site-top-nav__menu-group .site-top-nav__link-item--custom-visual .site-top-nav__link,
-html.dark-mode .site-top-nav--has-background .site-top-nav__menu-group .site-top-nav__link-item--custom-visual .site-top-nav__link,
-html.dark-mode .site-top-nav--floating-chips .site-top-nav__menu-group .site-top-nav__link-item--custom-visual .site-top-nav__link,
-.site-top-nav--has-background.site-top-nav--background-dark .site-top-nav__menu-group .site-top-nav__link-item--custom-visual .site-top-nav__link {
-  border-color: #374151;
-  background-color: #1f2937;
-  color: #f9fafb;
-}
-
-.site-top-nav__menu-group .site-top-nav__link-item--custom-visual .site-top-nav__link-icon-wrap {
-  display: flex;
-  width: 1.5rem;
-  height: 1.5rem;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  background: transparent;
-}
-
-.site-top-nav__menu-group .site-top-nav__link-item--custom-visual .site-top-nav__link-icon,
-.site-top-nav__menu-group .site-top-nav__link-item--custom-visual .site-top-nav__link-icon-fallback,
-.site-top-nav__menu-group .site-top-nav__link-item--custom-visual .site-top-nav__link-image {
-  width: 1.5rem;
-  height: 1.5rem;
-  max-width: 1.5rem;
-  max-height: 1.5rem;
-  border-radius: 0;
-  object-fit: contain;
-  background: transparent;
-}
-
-.site-top-nav__menu-group .site-top-nav__link-item--custom-visual .site-top-nav__link-icon-fallback {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: none;
-  color: inherit;
-}
-
 @media (max-width: 1279px) {
   .site-top-nav__links--inline {
     gap: 0.5rem;
   }
 
-  .site-top-nav__links--icon-chips .site-top-nav__link-label,
+  .site-top-nav__menu-group .site-top-nav__link-item--custom-visual .site-top-nav__link-label,
   .site-top-nav__menu-leading .site-top-nav__link-label {
     position: absolute;
     width: 1px;
@@ -6355,23 +6286,36 @@ html.dark-mode .site-top-nav--floating-chips .site-top-nav__menu-group .site-top
     border: 0;
   }
 
-  .site-top-nav__links--icon-chips .site-top-nav__link,
-  .site-top-nav__menu-leading .site-top-nav__link {
+  .site-top-nav__menu-leading .site-top-nav__link,
+  .site-top-nav__menu-group .site-top-nav__link-item--custom-visual .site-top-nav__link {
     gap: 0;
     justify-content: center;
     align-items: center;
-    padding: 0.4rem 0.45rem;
-    min-width: 2.25rem;
-    min-height: 2.25rem;
+    padding: 0;
   }
 
-  /* 모바일·PWA: 아이콘 바로가기만 같은 크기 흰 정원 */
-  .site-top-nav__links--icon-chips .site-top-nav__link,
+  .site-top-nav__menu-leading .site-top-nav__link-icon,
+  .site-top-nav__menu-leading .site-top-nav__link-icon-fallback,
+  .site-top-nav__menu-group .site-top-nav__link-item--custom-visual .site-top-nav__link-icon,
+  .site-top-nav__menu-group .site-top-nav__link-item--custom-visual .site-top-nav__link-icon-fallback {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+
+  .site-top-nav__menu-group .site-top-nav__link-item--custom-visual .site-top-nav__link-image,
+  .site-top-nav__menu-leading .site-top-nav__link-image {
+    max-height: 1.5rem;
+    max-width: 1.5rem;
+    object-fit: contain;
+  }
+
+  /* 아이콘 칩만 흰 정원. 제휴·게시판 글자 탭은 원래 위치·크기 유지 */
   .site-top-nav__menu-leading .site-top-nav__link,
-  .site-top-nav--has-background .site-top-nav__links--icon-chips .site-top-nav__link,
-  .site-top-nav--floating-chips .site-top-nav__links--icon-chips .site-top-nav__link,
+  .site-top-nav__menu-group .site-top-nav__link-item--custom-visual .site-top-nav__link,
   .site-top-nav--has-background .site-top-nav__menu-leading .site-top-nav__link,
-  .site-top-nav--floating-chips .site-top-nav__menu-leading .site-top-nav__link {
+  .site-top-nav--floating-chips .site-top-nav__menu-leading .site-top-nav__link,
+  .site-top-nav--has-background .site-top-nav__menu-group .site-top-nav__link-item--custom-visual .site-top-nav__link,
+  .site-top-nav--floating-chips .site-top-nav__menu-group .site-top-nav__link-item--custom-visual .site-top-nav__link {
     box-sizing: border-box;
     width: 2.5rem;
     height: 2.5rem;
@@ -6384,48 +6328,12 @@ html.dark-mode .site-top-nav--floating-chips .site-top-nav__menu-group .site-top
     overflow: hidden;
   }
 
-  .site-top-nav__links--icon-chips .site-top-nav__link-icon-wrap,
-  .site-top-nav__menu-leading .site-top-nav__link-icon-wrap {
-    display: flex;
-    width: 1.5rem;
-    height: 1.5rem;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-    background: transparent;
-  }
-
-  .site-top-nav__links--icon-chips .site-top-nav__link-icon,
-  .site-top-nav__links--icon-chips .site-top-nav__link-icon-fallback,
-  .site-top-nav__links--icon-chips .site-top-nav__link-image,
-  .site-top-nav__menu-leading .site-top-nav__link-icon,
-  .site-top-nav__menu-leading .site-top-nav__link-icon-fallback,
-  .site-top-nav__menu-leading .site-top-nav__link-image {
-    width: 1.5rem;
-    height: 1.5rem;
-    max-width: 1.5rem;
-    max-height: 1.5rem;
-    border-radius: 0;
-    object-fit: contain;
-    background: transparent;
-  }
-
-  .site-top-nav__links--icon-chips .site-top-nav__link-icon-fallback,
-  .site-top-nav__menu-leading .site-top-nav__link-icon-fallback {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background: none;
-    color: inherit;
-    font-size: 0.8rem;
-  }
-
-  html.dark-mode .site-top-nav__links--icon-chips .site-top-nav__link,
   html.dark-mode .site-top-nav__menu-leading .site-top-nav__link,
-  html.dark-mode .site-top-nav--has-background .site-top-nav__links--icon-chips .site-top-nav__link,
-  html.dark-mode .site-top-nav--floating-chips .site-top-nav__links--icon-chips .site-top-nav__link,
-  .site-top-nav--has-background.site-top-nav--background-dark .site-top-nav__links--icon-chips .site-top-nav__link,
-  .site-top-nav--has-background.site-top-nav--background-dark .site-top-nav__menu-leading .site-top-nav__link {
+  html.dark-mode .site-top-nav__menu-group .site-top-nav__link-item--custom-visual .site-top-nav__link,
+  html.dark-mode .site-top-nav--has-background .site-top-nav__menu-leading .site-top-nav__link,
+  html.dark-mode .site-top-nav--floating-chips .site-top-nav__menu-leading .site-top-nav__link,
+  .site-top-nav--has-background.site-top-nav--background-dark .site-top-nav__menu-leading .site-top-nav__link,
+  .site-top-nav--has-background.site-top-nav--background-dark .site-top-nav__menu-group .site-top-nav__link-item--custom-visual .site-top-nav__link {
     border-color: #374151;
     background-color: #1f2937;
     color: #f9fafb;
@@ -6722,55 +6630,10 @@ html.dark-mode .site-header-actions__panel-close:hover {
 .site-top-nav__menu-group {
   display: flex;
   flex: 0 1 auto;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 0.5rem;
   min-width: 0;
-  width: 100%;
-}
-
-.site-top-nav__links--icon-chips,
-.site-top-nav__links--text {
-  flex: 1 1 100%;
-  width: 100%;
-}
-
-.site-top-nav__links--text {
-  margin-top: 0.15rem;
-}
-
-.site-top-nav__links--text .site-top-nav__link-icon-wrap {
-  display: none;
-}
-
-.site-top-nav__links--text .site-top-nav__link {
-  width: auto;
-  height: auto;
-  min-width: 0;
-  min-height: 0;
-  gap: 0;
-  padding: 0.45rem 1.05rem;
-  border-radius: 9999px;
-}
-
-.site-top-nav__link-item--partners .site-top-nav__link {
-  background-color: #059669;
-  border-color: #059669;
-  color: #ffffff;
-}
-
-.site-top-nav--floating-chips:not(.site-top-nav--background-dark) .site-top-nav__link-item--partners .site-top-nav__link,
-.site-top-nav--has-background .site-top-nav__link-item--partners .site-top-nav__link {
-  background-color: #059669;
-  border-color: #059669;
-  color: #ffffff;
-}
-
-.site-top-nav__link-item--partners .site-top-nav__link:hover,
-.site-top-nav--floating-chips:not(.site-top-nav--background-dark) .site-top-nav__link-item--partners .site-top-nav__link:hover {
-  background-color: #047857;
-  border-color: #047857;
-  color: #ffffff;
 }
 
 .site-top-nav__links-inline {
@@ -6916,29 +6779,19 @@ html.pwa-v-tablet-lg .site-top-nav__search-wrap {
   }
 }
 
-/* 카테고리 칩 — 모바일 2열, sm+ 4열(4·4) */
+/* 카테고리 칩 — 예전처럼 글자 길이만큼 알약, 빈칸은 늘리지 않음 */
 .partner-category-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  justify-items: stretch;
-}
-
-@media (min-width: 640px) {
-  .partner-category-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.5rem;
 }
 
 .partner-category-chip {
-  width: 100%;
+  width: auto;
   min-width: 0;
-}
-
-/* 폴드·태블릿 — 카테고리 칩 줄바꿈 시 가운데 정렬 */
-@media (max-width: 1279px) {
-  .partner-category-grid {
-    justify-content: center;
-  }
+  flex: 0 0 auto;
 }
 
 /* 갤럭시 폴드 등 768~1279px */
@@ -7029,7 +6882,7 @@ html.pwa-v-tablet-lg .site-top-nav__search-wrap {
   flex: 1 1 100%;
   width: 100%;
   margin-left: 0;
-  justify-content: stretch;
+  justify-content: flex-end;
 }
 
 .partner-list-toolbar__controls-row--mobile-search .partner-list-toolbar__search-wrap {
@@ -7123,25 +6976,14 @@ html.pwa-v-tablet-lg .site-top-nav__search-wrap {
 }
 
 @media (max-width: 639px) {
-  .partner-list-toolbar__header {
+  .partner-list-toolbar__header,
+  .partner-list-toolbar__sort {
     padding-right: 4.35rem;
   }
 
   .partner-list-toolbar__sort {
-    justify-content: stretch;
+    justify-content: flex-start;
     margin-left: 0;
-    width: 100%;
-    flex-wrap: nowrap;
-    gap: 0.35rem;
-  }
-
-  .partner-list-toolbar__sort > * {
-    flex: 1 1 0;
-    min-width: 0;
-    justify-content: center;
-    padding-left: 0.3rem;
-    padding-right: 0.3rem;
-    text-align: center;
   }
 
   html.ios-device .partner-map-locate-button,
@@ -7151,9 +6993,9 @@ html.pwa-v-tablet-lg .site-top-nav__search-wrap {
   }
 
   .partner-list-refresh-btn {
-    min-width: 0;
-    padding-left: 0.3rem;
-    padding-right: 0.3rem;
+    min-width: 2.4rem;
+    padding-left: 0.6rem;
+    padding-right: 0.6rem;
   }
 }
 

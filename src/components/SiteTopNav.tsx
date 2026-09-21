@@ -12,9 +12,7 @@ import {
   getSiteNavNotifyMessage,
   isBoardPopupNavHref,
   isGiftInboxNavHref,
-  isPartnerListNavHref,
   isSiteNavActionHref,
-  isTextRowNavLink,
   resolveSiteNavBrandTitle,
   type SiteNavLinkItem,
 } from "@/lib/site-nav-links";
@@ -89,8 +87,7 @@ function NavLinkItem({
     onActivate(link);
   }
 
-  const hasCustomVisual =
-    !isTextRowNavLink(link) && Boolean(link.image_url?.trim() || link.icon_url?.trim());
+  const hasCustomVisual = Boolean(link.image_url?.trim() || link.icon_url?.trim());
 
   const content = link.image_url?.trim() ? (
     <>
@@ -189,8 +186,6 @@ function NavLinkItem({
       className={[
         "site-top-nav__link-item group relative",
         hasCustomVisual ? "site-top-nav__link-item--custom-visual" : "",
-        isPartnerListNavHref(link.href) ? "site-top-nav__link-item--partners" : "",
-        isBoardPopupNavHref(link.href) ? "site-top-nav__link-item--board" : "",
       ]
         .filter(Boolean)
         .join(" ")}
@@ -449,63 +444,34 @@ export default function SiteTopNav({
           <div className="site-top-nav__menu-row">
             {boardNavLinks.length > 0 || inlineNavLinks.length > 0 || menuLeading ? (
               <div className="site-top-nav__menu-group">
-                {boardNavLinks.some((link) => !isTextRowNavLink(link)) ||
-                inlineNavLinks.some((link) => !isTextRowNavLink(link)) ||
-                menuLeading ? (
-                  <nav
-                    aria-label="바로가기"
-                    className="site-top-nav__links site-top-nav__links--inline site-top-nav__links--icon-chips"
-                  >
-                    {boardNavLinks
-                      .filter((link) => !isTextRowNavLink(link))
-                      .map((link) => (
-                        <NavLinkItem
-                          key={`${link.label}-${link.href}`}
-                          link={link}
-                          showNewBadge={boardNavHasNewPosts && isBoardPopupNavHref(link.href)}
-                          {...navLinkItemProps}
-                        />
-                      ))}
-                    {menuLeading ? (
-                      <div className="site-top-nav__menu-leading">{menuLeading}</div>
-                    ) : null}
-                    {inlineNavLinks
-                      .filter((link) => !isTextRowNavLink(link))
-                      .map((link) => {
-                        const giftBadge =
-                          isGiftInboxNavHref(link.href) && giftPendingCount > 0;
-                        return (
-                          <NavLinkItem
-                            key={`${link.label}-${link.href}`}
-                            link={link}
-                            showNewBadge={giftBadge}
-                            badgeLabel={
-                              giftPendingCount > 9 ? "9+" : String(giftPendingCount)
-                            }
-                            {...navLinkItemProps}
-                          />
-                        );
-                      })}
-                  </nav>
-                ) : null}
-                {boardNavLinks.some(isTextRowNavLink) || inlineNavLinks.some(isTextRowNavLink) ? (
-                  <nav
-                    aria-label="주요 메뉴"
-                    className="site-top-nav__links site-top-nav__links--inline site-top-nav__links--text"
-                  >
-                    {boardNavLinks.filter(isTextRowNavLink).map((link) => (
+                <nav aria-label="주요 메뉴" className="site-top-nav__links site-top-nav__links--inline">
+                  {boardNavLinks.map((link) => (
+                    <NavLinkItem
+                      key={`${link.label}-${link.href}`}
+                      link={link}
+                      showNewBadge={boardNavHasNewPosts && isBoardPopupNavHref(link.href)}
+                      {...navLinkItemProps}
+                    />
+                  ))}
+                  {menuLeading ? (
+                    <div className="site-top-nav__menu-leading">{menuLeading}</div>
+                  ) : null}
+                  {inlineNavLinks.map((link) => {
+                    const giftBadge =
+                      isGiftInboxNavHref(link.href) && giftPendingCount > 0;
+                    return (
                       <NavLinkItem
                         key={`${link.label}-${link.href}`}
                         link={link}
-                        showNewBadge={boardNavHasNewPosts && isBoardPopupNavHref(link.href)}
+                        showNewBadge={giftBadge}
+                        badgeLabel={
+                          giftPendingCount > 9 ? "9+" : String(giftPendingCount)
+                        }
                         {...navLinkItemProps}
                       />
-                    ))}
-                    {inlineNavLinks.filter(isTextRowNavLink).map((link) => (
-                      <NavLinkItem key={`${link.label}-${link.href}`} link={link} {...navLinkItemProps} />
-                    ))}
-                  </nav>
-                ) : null}
+                    );
+                  })}
+                </nav>
               </div>
             ) : null}
             {showNavSearch ? (

@@ -1150,7 +1150,7 @@ export default function HomePage() {
             setShowFavoritesOnly((current) => !current);
             setCurrentPage(1);
           }}
-          className={`partner-favorites-filter-btn inline-flex items-center justify-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium sm:text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 ${
+          className={`partner-favorites-filter-btn inline-flex shrink-0 items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium sm:text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 ${
             showFavoritesOnly
               ? "bg-pink-500 text-white"
               : "border border-gray-300 bg-white text-gray-700 hover:border-pink-200 hover:text-pink-600"
@@ -1249,7 +1249,7 @@ export default function HomePage() {
 
   const categorySection = showCategoryRegionSection ? (
     <section className="partner-category-section mb-6 rounded-2xl bg-white p-4 shadow-sm sm:p-5">
-      <div className="partner-category-grid gap-2.5 sm:gap-3">
+      <div className="partner-category-grid gap-2">
         {categoryOptions.map((category) => {
           const isSelected = selectedCategory === category;
 
@@ -1259,7 +1259,7 @@ export default function HomePage() {
               type="button"
               onClick={() => setSelectedCategory(category)}
               className={[
-                "partner-category-chip rounded-xl px-2 py-2.5 text-xs font-medium transition sm:px-3 sm:text-sm",
+                "partner-category-chip rounded-full px-3.5 py-2 text-xs font-medium transition sm:px-4 sm:text-sm",
                 isSelected
                   ? "partner-category-chip--selected bg-emerald-500 text-white shadow-sm"
                   : "bg-gray-100 text-gray-600 hover:bg-gray-200",
@@ -1392,7 +1392,7 @@ export default function HomePage() {
             </div>
           ) : null}
           {partnerSortControls ? (
-            <div className="partner-list-toolbar__sort flex flex-wrap items-center justify-stretch gap-2">
+            <div className="partner-list-toolbar__sort flex flex-wrap items-center justify-end gap-2">
               {partnerSortControls}
             </div>
           ) : null}
