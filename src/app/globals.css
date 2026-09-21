@@ -6674,7 +6674,7 @@ html.dark-mode .site-header-actions__panel-close:hover {
   flex-shrink: 0;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 0.5rem;
   min-width: max-content;
   overflow: visible;
@@ -6790,14 +6790,16 @@ html.pwa-v-tablet-lg .site-top-nav__search-wrap {
   .site-top-nav__menu-row .site-top-nav__menu-group .site-top-nav__links,
   .site-top-nav__menu-row .site-top-nav__menu-group .site-top-nav__links--inline {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
     overflow: visible;
     padding-bottom: 0;
-    width: 100%;
+    width: auto;
     min-width: 0;
+    margin-left: auto;
+    margin-right: auto;
   }
 
   .site-top-nav__inner--with-header-actions .site-top-nav__menu-row {
@@ -6813,7 +6815,7 @@ html.pwa-v-tablet-lg .site-top-nav__search-wrap {
 
 /* 카테고리 칩 — 글자만큼만 차지하고 오른쪽은 비워 둠 */
 .partner-category-section {
-  width: 100%;
+  width: auto;
   max-width: 100%;
   padding: 0;
   background: transparent;
@@ -6825,9 +6827,9 @@ html.pwa-v-tablet-lg .site-top-nav__search-wrap {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 0.5rem;
-  width: 100%;
+  width: auto;
   max-width: 100%;
 }
 
@@ -7241,7 +7243,7 @@ html.pwa-v-tablet-lg .site-top-nav__search-wrap {
   }
 
   .site-top-nav__brand-row {
-    justify-content: center;
+    justify-content: flex-start;
   }
 
   .site-title-dropdown--nav {
