@@ -109,6 +109,7 @@ import { getPartnerCategories, partnerMatchesCategory } from "@/lib/partner-cate
 import PartnerCustomCategoryEditor from "@/components/PartnerCustomCategoryEditor";
 import {
   USER_CUSTOM_CATEGORIES_EVENT,
+  OPEN_USER_CUSTOM_CATEGORY_EDITOR_EVENT,
   USER_CUSTOM_CATEGORY_LIMITS,
   createUserCustomCategoryId,
   customCategoryValue,
@@ -762,6 +763,22 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
+    function onOpenEditor(event: Event) {
+      if (!getSiteMemberSession()?.student?.studentId?.trim()) {
+        return;
+      }
+      const categoryId = (event as CustomEvent<{ categoryId?: string | null }>).detail?.categoryId;
+      const category = categoryId
+        ? loadUserCustomCategories().find((item) => item.id === categoryId) ?? null
+        : null;
+      setEditingCustomCategory(category);
+      setCustomCategoryEditorOpen(true);
+    }
+    window.addEventListener(OPEN_USER_CUSTOM_CATEGORY_EDITOR_EVENT, onOpenEditor);
+    return () => window.removeEventListener(OPEN_USER_CUSTOM_CATEGORY_EDITOR_EVENT, onOpenEditor);
+  }, []);
+
+  useEffect(() => {
     if (partners.length === 0 || customCategories.length === 0) {
       return;
     }
@@ -1343,31 +1360,19 @@ export default function HomePage() {
           const value = customCategoryValue(category.id);
           const isSelected = selectedCategory === value;
           return (
-            <span key={category.id} className="partner-category-chip-wrap">
-              <button
-                type="button"
-                onClick={() => setSelectedCategory(value)}
-                className={[
-                  "partner-category-chip partner-category-chip--custom rounded-full px-3.5 py-2 text-xs font-medium transition sm:px-4 sm:text-sm",
-                  isSelected
-                    ? "partner-category-chip--selected bg-emerald-500 text-white shadow-sm"
-                    : "bg-emerald-50 text-emerald-800 hover:bg-emerald-100",
-                ].join(" ")}
-              >
-                {category.label}
-              </button>
-              <button
-                type="button"
-                className="partner-category-chip-edit"
-                aria-label={`${category.label} 수정`}
-                onClick={() => {
-                  setEditingCustomCategory(category);
-                  setCustomCategoryEditorOpen(true);
-                }}
-              >
-                수정
-              </button>
-            </span>
+            <button
+              key={category.id}
+              type="button"
+              onClick={() => setSelectedCategory(value)}
+              className={[
+                "partner-category-chip partner-category-chip--custom rounded-full px-3.5 py-2 text-xs font-medium transition sm:px-4 sm:text-sm",
+                isSelected
+                  ? "partner-category-chip--selected bg-emerald-500 text-white shadow-sm"
+                  : "bg-emerald-50 text-emerald-800 hover:bg-emerald-100",
+              ].join(" ")}
+            >
+              {category.label}
+            </button>
           );
         })
           : null}
@@ -1395,7 +1400,10 @@ export default function HomePage() {
           partners={partners}
         />
       ) : null}
+    </section>
+  ) : null;
 
+  const customCategoryEditor = (
       <PartnerCustomCategoryEditor
         open={customCategoryEditorOpen && memberStudentLoggedIn}
         partners={partners}
@@ -1437,8 +1445,7 @@ export default function HomePage() {
             : undefined
         }
       />
-    </section>
-  ) : null;
+  );
 
   // 🎯 지도 패널에 유효한 validFavoriteIds 전달
   const mainMapPanel =
@@ -2009,6 +2016,7 @@ export default function HomePage() {
           (settings.main_site_size_floating_enabled ?? false)
         }
       />
+      {customCategoryEditor}
       {pwaSplashVisible ? <SitePwaLoadingSplash {...pwaSplashProps} /> : null}
       <SiteAnalyticsBeacon />
       <AiChatbotWidget />

@@ -50,6 +50,7 @@ import { getSiteMemberSession, clearSiteMemberSession } from "@/lib/site-member-
 import { supabase } from "@/lib/supabase";
 import { getPartnerFavoritesLabel } from "@/lib/partner-favorites-display";
 import DeleteAccountConfirmDialog from "@/components/DeleteAccountConfirmDialog";
+import UserCustomCategoriesSettingsSection from "@/components/UserCustomCategoriesSettingsSection";
 
 type PermissionGuidePrompt = {
   kind: "notification" | "location";
@@ -652,6 +653,19 @@ export default function SitePwaAppSettingsButton({
                 onChange={(value) => updatePrefs({ show_partner_favorites: value })}
               />
             ) : null}
+            {memberLoggedIn ? (
+              <div className="site-pwa-app-settings__section site-pwa-app-settings__section--spaced">
+                <UserCustomCategoriesSettingsSection loggedIn={memberLoggedIn} />
+              </div>
+            ) : null}
+          </div>
+        ) : memberLoggedIn ? (
+          <div
+            className={`site-pwa-app-settings__section${
+              showLab ? " site-pwa-app-settings__section--spaced" : ""
+            }`}
+          >
+            <UserCustomCategoriesSettingsSection loggedIn={memberLoggedIn} />
           </div>
         ) : null}
         {showPermissions ? (

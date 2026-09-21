@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useAppBackHandler } from "@/lib/app-back-stack";
 import {
   USER_CUSTOM_CATEGORY_LIMITS,
@@ -33,8 +34,13 @@ export default function PartnerCustomCategoryEditor({
   const [label, setLabel] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [query, setQuery] = useState("");
+  const [mounted, setMounted] = useState(false);
 
   useAppBackHandler(open, onClose, "partner-custom-category-editor");
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!open) {
@@ -59,7 +65,7 @@ export default function PartnerCustomCategoryEditor({
 
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
 
-  if (!open) {
+  if (!mounted || !open) {
     return null;
   }
 
@@ -81,7 +87,7 @@ export default function PartnerCustomCategoryEditor({
 
   const canSave = Boolean(label.trim()) && selectedIds.length > 0;
 
-  return (
+  const dialog = (
     <div className="partner-custom-category-editor" role="dialog" aria-modal="true" aria-labelledby="custom-category-editor-title">
       <button type="button" className="partner-custom-category-editor__backdrop" aria-label="닫기" onClick={onClose} />
       <div className="partner-custom-category-editor__panel">
@@ -156,4 +162,6 @@ export default function PartnerCustomCategoryEditor({
       </div>
     </div>
   );
+
+  return createPortal(dialog, document.body);
 }

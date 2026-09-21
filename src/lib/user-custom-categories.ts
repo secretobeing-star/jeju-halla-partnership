@@ -1,5 +1,6 @@
 export const USER_CUSTOM_CATEGORY_PREFIX = "custom::";
 export const USER_CUSTOM_CATEGORIES_EVENT = "user-custom-categories-changed";
+export const OPEN_USER_CUSTOM_CATEGORY_EDITOR_EVENT = "open-user-custom-category-editor";
 
 const STORAGE_KEY = "jeju-halla-user-custom-categories";
 const MAX_CATEGORIES = 8;
@@ -97,6 +98,17 @@ export function loadUserCustomCategories(): UserCustomCategory[] {
   } catch {
     return [];
   }
+}
+
+export function openUserCustomCategoryEditor(categoryId?: string | null) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  window.dispatchEvent(
+    new CustomEvent(OPEN_USER_CUSTOM_CATEGORY_EDITOR_EVENT, {
+      detail: { categoryId: categoryId ?? null },
+    }),
+  );
 }
 
 export function saveUserCustomCategories(next: UserCustomCategory[]) {
