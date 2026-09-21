@@ -1248,8 +1248,8 @@ export default function HomePage() {
   );
 
   const categorySection = showCategoryRegionSection ? (
-    <section className="partner-category-section mb-6 rounded-2xl bg-white p-4 shadow-sm sm:p-5">
-      <div className="partner-category-grid gap-2">
+    <section className="partner-category-section mb-4">
+      <div className="partner-category-grid">
         {categoryOptions.map((category) => {
           const isSelected = selectedCategory === category;
 

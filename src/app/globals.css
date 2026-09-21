@@ -6779,17 +6779,29 @@ html.pwa-v-tablet-lg .site-top-nav__search-wrap {
   }
 }
 
-/* 카테고리 칩 — 예전처럼 글자 길이만큼 알약, 빈칸은 늘리지 않음 */
+/* 카테고리 칩 — 글자만큼만 차지하고 오른쪽은 비워 둠 */
+.partner-category-section {
+  width: auto;
+  max-width: 100%;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  border: 0;
+}
+
 .partner-category-grid {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-start;
   gap: 0.5rem;
+  width: auto;
+  max-width: 100%;
 }
 
 .partner-category-chip {
-  width: auto;
+  width: max-content;
+  max-width: 100%;
   min-width: 0;
   flex: 0 0 auto;
 }
@@ -7494,8 +7506,9 @@ html.dark-mode .partner-favorite-button[aria-pressed="true"] {
 }
 
 html.dark-mode .partner-category-section {
-  border: 1px solid #374151;
-  box-shadow: 0 1px 0 rgb(0 0 0 / 0.2);
+  background: transparent;
+  border: 0;
+  box-shadow: none;
 }
 
 html.dark-mode .partner-category-chip:not(.partner-category-chip--selected) {
