@@ -10,7 +10,6 @@ import PartnerReactionButtons from "@/components/PartnerReactionButtons";
 import PartnerReviews from "@/components/PartnerReviews";
 import {
   PARTNER_IMAGE_COMPACT_ASPECT_CLASS,
-  PARTNER_IMAGE_PLACEHOLDER_ASPECT_CLASS,
 } from "@/lib/partner-image-size";
 import { formatPartnerDateRange } from "@/lib/partner-date";
 import { getPartnerStatusStyle, getPartnerStatusText, getPartnerBenefitStyle } from "@/lib/partner-status";
@@ -138,7 +137,7 @@ export default function PartnerPostGrid({
           <PartnerFavoriteButton
             favorited={favorited}
             label={partner.name}
-            placement="edge"
+            placement="overlay"
             favoritesTerm={favoritesTerm}
             onToggle={() => onPartnerFavoriteToggle(partner.id)}
           />
@@ -163,6 +162,7 @@ export default function PartnerPostGrid({
             src={partner.image_url}
             alt={`${partner.name} 대표 이미지`}
             variant="compact"
+            overlay={favoriteButton}
             onDetailClick={openDetailFromImage}
             detailAriaLabel={`${partner.name} 상세 보기`}
           />
@@ -178,6 +178,7 @@ export default function PartnerPostGrid({
                 aria-label={`${partner.name} 상세 보기`}
               />
             ) : null}
+            {favoriteButton}
             이미지 없음
           </div>
         );
@@ -189,16 +190,11 @@ export default function PartnerPostGrid({
               isExpanded && !showDetailPopup ? "partner-card--expanded" : ""
             }${selectedPartnerId === partner.id ? " partner-card--split-selected" : ""}`}
           >
-            <div className="partner-card__media relative shrink-0">
+            <div className="partner-card__media relative z-[1] shrink-0 overflow-visible">
               {partnerImage}
-              {favoriteButton}
             </div>
 
-            <div
-              className={`partner-card__content flex flex-1 flex-col p-2.5 sm:p-3${
-                showFavoriteToggle ? " partner-card__content--with-favorite" : ""
-              }`}
-            >
+            <div className="partner-card__content flex flex-1 flex-col p-2.5 sm:p-3">
               <h2 className="partner-card__name line-clamp-2 text-sm font-bold leading-snug text-gray-900 sm:text-[0.9375rem]">
                 {favorited ? (
                   <span className="partner-card__favorite-badge mr-1 inline-flex align-middle text-pink-500">
@@ -216,6 +212,17 @@ export default function PartnerPostGrid({
                 </span>
                 {partner.address}
               </p>
+
+              {reactionsEnabled && onPartnerReactionChange ? (
+                <div className="mt-2">
+                  <PartnerReactionButtons
+                    partnerId={partner.id}
+                    likeCount={partner.like_count ?? 0}
+                    enabled={reactionsEnabled}
+                    onCountsChange={onPartnerReactionChange}
+                  />
+                </div>
+              ) : null}
 
               <button
                 type="button"
@@ -278,29 +285,19 @@ export default function PartnerPostGrid({
                   {partner.benefit}
                 </div>
 
-                {(reactionsEnabled || reviewsEnabled) && (
+                {reviewsEnabled && onPartnerReviewCountChange && hiddenReviewDisplay ? (
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {reactionsEnabled && onPartnerReactionChange && (
-                      <PartnerReactionButtons
-                        partnerId={partner.id}
-                        likeCount={partner.like_count ?? 0}
-                        enabled={reactionsEnabled}
-                        onCountsChange={onPartnerReactionChange}
-                      />
-                    )}
-                    {reviewsEnabled && onPartnerReviewCountChange && hiddenReviewDisplay && (
-                      <PartnerReviews
-                        partnerId={partner.id}
-                        reviewCount={partner.review_count ?? 0}
-                        enabled={reviewsEnabled}
-                        hiddenReviewDisplay={hiddenReviewDisplay}
-                        onReviewCountChange={onPartnerReviewCountChange}
-                        reportReasons={reportReasons}
-                        reportSuccessSettings={reportSuccessSettings}
-                      />
-                    )}
+                    <PartnerReviews
+                      partnerId={partner.id}
+                      reviewCount={partner.review_count ?? 0}
+                      enabled={reviewsEnabled}
+                      hiddenReviewDisplay={hiddenReviewDisplay}
+                      onReviewCountChange={onPartnerReviewCountChange}
+                      reportReasons={reportReasons}
+                      reportSuccessSettings={reportSuccessSettings}
+                    />
                   </div>
-                )}
+                ) : null}
 
                 <div className="mt-3 flex flex-col gap-2">
                   {mapOpenUrl && (

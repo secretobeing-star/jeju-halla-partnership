@@ -98,6 +98,9 @@ type MapEventMapSectionProps = {
   favoritesTerm?: string;
   markerSettings?: MapMarkerCustomSettings | null;
   onSearchReset?: () => void;
+  customCategoryBookmarkEnabled?: boolean;
+  customCategoryBookmarkedIds?: ReadonlySet<string>;
+  onCustomCategoryBookmark?: (partnerId: string) => void;
 };
 
 type RewardModalState = {

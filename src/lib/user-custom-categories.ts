@@ -1,6 +1,7 @@
 export const USER_CUSTOM_CATEGORY_PREFIX = "custom::";
 export const USER_CUSTOM_CATEGORIES_EVENT = "user-custom-categories-changed";
 export const OPEN_USER_CUSTOM_CATEGORY_EDITOR_EVENT = "open-user-custom-category-editor";
+export const OPEN_USER_CUSTOM_CATEGORY_ASSIGN_EVENT = "open-user-custom-category-assign";
 
 const STORAGE_KEY = "jeju-halla-user-custom-categories";
 const MAX_CATEGORIES = 8;
@@ -109,6 +110,44 @@ export function openUserCustomCategoryEditor(categoryId?: string | null) {
       detail: { categoryId: categoryId ?? null },
     }),
   );
+}
+
+export function openUserCustomCategoryAssign(partnerId: string) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  const id = partnerId.trim();
+  if (!id) {
+    return;
+  }
+  window.dispatchEvent(
+    new CustomEvent(OPEN_USER_CUSTOM_CATEGORY_ASSIGN_EVENT, {
+      detail: { partnerId: id },
+    }),
+  );
+}
+
+export function partnerIdsInCustomCategories(categories: readonly UserCustomCategory[]) {
+  return new Set(categories.flatMap((category) => category.partnerIds));
+}
+
+export function togglePartnerInUserCustomCategory(
+  categories: UserCustomCategory[],
+  categoryId: string,
+  partnerId: string,
+) {
+  return categories.map((category) => {
+    if (category.id !== categoryId) {
+      return category;
+    }
+    const hasPartner = category.partnerIds.includes(partnerId);
+    return {
+      ...category,
+      partnerIds: hasPartner
+        ? category.partnerIds.filter((id) => id !== partnerId)
+        : [...category.partnerIds, partnerId],
+    };
+  });
 }
 
 export function saveUserCustomCategories(next: UserCustomCategory[]) {

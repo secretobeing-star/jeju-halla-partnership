@@ -44,7 +44,7 @@ import {
   getSiteMemberSession,
   SITE_MEMBER_SESSION_EVENT,
 } from "@/lib/site-member-session";
-import { getSiteStudentAuthDisplay } from "@/lib/site-student-auth-settings";
+import { getSiteStudentAuthDisplay, SITE_STUDENT_NEED_LOGIN_EVENT } from "@/lib/site-student-auth-settings";
 import {
   resolveCardFrameCatalog,
   toPublicCardFrames,
@@ -107,15 +107,18 @@ import {
 } from "@/lib/site-notices";
 import { getPartnerCategories, partnerMatchesCategory } from "@/lib/partner-categories";
 import PartnerCustomCategoryEditor from "@/components/PartnerCustomCategoryEditor";
+import PartnerCustomCategoryAssignDialog from "@/components/PartnerCustomCategoryAssignDialog";
 import {
   USER_CUSTOM_CATEGORIES_EVENT,
   OPEN_USER_CUSTOM_CATEGORY_EDITOR_EVENT,
+  OPEN_USER_CUSTOM_CATEGORY_ASSIGN_EVENT,
   USER_CUSTOM_CATEGORY_LIMITS,
   createUserCustomCategoryId,
   customCategoryValue,
   loadUserCustomCategories,
   parseCustomCategoryId,
   partnerMatchesCustomCategory,
+  partnerIdsInCustomCategories,
   pruneUserCustomCategories,
   saveUserCustomCategories,
   type UserCustomCategory,
@@ -309,6 +312,9 @@ export default function HomePage() {
   const [customCategories, setCustomCategories] = useState<UserCustomCategory[]>([]);
   const [customCategoryEditorOpen, setCustomCategoryEditorOpen] = useState(false);
   const [editingCustomCategory, setEditingCustomCategory] = useState<UserCustomCategory | null>(null);
+  const [editorPresetPartnerIds, setEditorPresetPartnerIds] = useState<string[]>([]);
+  const [assignPartnerId, setAssignPartnerId] = useState<string | null>(null);
+  const [categoryGearOpen, setCategoryGearOpen] = useState(false);
   const [selectedYear, setSelectedYear] = useState<PartnerYearFilterValue>("전체");
   const [selectedRegions, setSelectedRegions] = useState<PartnerRegionFilters>(
     DEFAULT_PARTNER_REGION_FILTERS,
@@ -393,6 +399,10 @@ export default function HomePage() {
   const categoryOptions = useMemo(
     () => ["전체", ...getPartnerCategories(settings)],
     [settings.partner_categories],
+  );
+  const customCategoryBookmarkedIds = useMemo(
+    () => partnerIdsInCustomCategories(customCategories),
+    [customCategories],
   );
   const partnerCategories = useMemo(
     () => getPartnerCategories(settings),
@@ -779,6 +789,22 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
+    function onOpenAssign(event: Event) {
+      const partnerId = (event as CustomEvent<{ partnerId?: string }>).detail?.partnerId?.trim();
+      if (!partnerId) {
+        return;
+      }
+      if (!getSiteMemberSession()?.student?.studentId?.trim()) {
+        window.dispatchEvent(new Event(SITE_STUDENT_NEED_LOGIN_EVENT));
+        return;
+      }
+      setAssignPartnerId(partnerId);
+    }
+    window.addEventListener(OPEN_USER_CUSTOM_CATEGORY_ASSIGN_EVENT, onOpenAssign);
+    return () => window.removeEventListener(OPEN_USER_CUSTOM_CATEGORY_ASSIGN_EVENT, onOpenAssign);
+  }, []);
+
+  useEffect(() => {
     if (partners.length === 0 || customCategories.length === 0) {
       return;
     }
@@ -800,6 +826,9 @@ export default function HomePage() {
     }
     setCustomCategoryEditorOpen(false);
     setEditingCustomCategory(null);
+    setEditorPresetPartnerIds([]);
+    setAssignPartnerId(null);
+    setCategoryGearOpen(false);
     if (parseCustomCategoryId(selectedCategory)) {
       setSelectedCategory("전체");
     }
@@ -1335,6 +1364,54 @@ export default function HomePage() {
 
   const categorySection = showCategoryRegionSection ? (
     <section className="partner-category-section partner-category-section--boxed mb-4">
+      {memberStudentLoggedIn ? (
+        <div className="partner-category-section__gear-wrap">
+          <button
+            type="button"
+            className="partner-category-section__gear"
+            aria-label="내 카테고리 수정"
+            aria-expanded={categoryGearOpen}
+            onClick={() => setCategoryGearOpen((open) => !open)}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+          </button>
+          {categoryGearOpen ? (
+            <div className="partner-category-section__gear-menu" role="menu">
+              {customCategories.length === 0 ? (
+                <p>수정할 카테고리가 없습니다.</p>
+              ) : (
+                customCategories.map((category) => (
+                  <button
+                    key={category.id}
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setCategoryGearOpen(false);
+                      setEditingCustomCategory(category);
+                      setEditorPresetPartnerIds([]);
+                      setCustomCategoryEditorOpen(true);
+                    }}
+                  >
+                    {category.label} 수정
+                  </button>
+                ))
+              )}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
       <div className="partner-category-grid">
         {categoryOptions.map((category) => {
           const isSelected = selectedCategory === category;
@@ -1382,7 +1459,9 @@ export default function HomePage() {
             type="button"
             className="partner-category-chip partner-category-chip--add rounded-full px-3.5 py-2 text-xs font-medium sm:px-4 sm:text-sm"
             onClick={() => {
+              setCategoryGearOpen(false);
               setEditingCustomCategory(null);
+              setEditorPresetPartnerIds([]);
               setCustomCategoryEditorOpen(true);
             }}
           >
@@ -1404,13 +1483,16 @@ export default function HomePage() {
   ) : null;
 
   const customCategoryEditor = (
+    <>
       <PartnerCustomCategoryEditor
         open={customCategoryEditorOpen && memberStudentLoggedIn}
         partners={partners}
         initial={editingCustomCategory}
+        presetPartnerIds={editorPresetPartnerIds}
         onClose={() => {
           setCustomCategoryEditorOpen(false);
           setEditingCustomCategory(null);
+          setEditorPresetPartnerIds([]);
         }}
         onSave={({ label, partnerIds }) => {
           const nextCategory: UserCustomCategory = editingCustomCategory
@@ -1428,6 +1510,7 @@ export default function HomePage() {
           setSelectedCategory(customCategoryValue(nextCategory.id));
           setCustomCategoryEditorOpen(false);
           setEditingCustomCategory(null);
+          setEditorPresetPartnerIds([]);
           setCurrentPage(1);
         }}
         onDelete={
@@ -1441,10 +1524,27 @@ export default function HomePage() {
                 }
                 setCustomCategoryEditorOpen(false);
                 setEditingCustomCategory(null);
+                setEditorPresetPartnerIds([]);
               }
             : undefined
         }
       />
+      <PartnerCustomCategoryAssignDialog
+        open={Boolean(assignPartnerId) && memberStudentLoggedIn}
+        partnerId={assignPartnerId ?? ""}
+        partnerName={partners.find((partner) => partner.id === assignPartnerId)?.name ?? "제휴"}
+        onClose={() => setAssignPartnerId(null)}
+        onCreateNew={() => {
+          if (!assignPartnerId) {
+            return;
+          }
+          setEditingCustomCategory(null);
+          setEditorPresetPartnerIds([assignPartnerId]);
+          setAssignPartnerId(null);
+          setCustomCategoryEditorOpen(true);
+        }}
+      />
+    </>
   );
 
   // 🎯 지도 패널에 유효한 validFavoriteIds 전달
@@ -1469,6 +1569,15 @@ export default function HomePage() {
           setSelectedPartnerId(null);
           setCurrentPage(1);
         }}
+        customCategoryBookmarkEnabled
+        customCategoryBookmarkedIds={customCategoryBookmarkedIds}
+        onCustomCategoryBookmark={(partnerId) => {
+          if (!memberStudentLoggedIn) {
+            window.dispatchEvent(new Event(SITE_STUDENT_NEED_LOGIN_EVENT));
+            return;
+          }
+          setAssignPartnerId(partnerId);
+        }}
       />
     </>
   ) : null;
@@ -1491,6 +1600,15 @@ export default function HomePage() {
         favoritesTerm={partnerFavoritesDisplay.label}
         favorited={isFavorite(selectedPartner.id)}
         onFavoriteToggle={() => togglePartnerFavorite(selectedPartner.id)}
+        customCategoryEnabled
+        customCategoryBookmarked={customCategoryBookmarkedIds.has(selectedPartner.id)}
+        onCustomCategoryBookmark={() => {
+          if (!memberStudentLoggedIn) {
+            window.dispatchEvent(new Event(SITE_STUDENT_NEED_LOGIN_EVENT));
+            return;
+          }
+          setAssignPartnerId(selectedPartner.id);
+        }}
         reactionsEnabled={partnerReactionsEnabled}
         reviewsEnabled={partnerReviewsEnabled}
         hiddenReviewDisplay={hiddenReviewDisplay}

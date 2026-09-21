@@ -48,6 +48,9 @@ type PartnerMainMapPanelProps = {
   detailButtonLabel?: string;
   markerSettings?: MapMarkerCustomSettings | null;
   onSearchReset?: () => void;
+  customCategoryBookmarkEnabled?: boolean;
+  customCategoryBookmarkedIds?: ReadonlySet<string>;
+  onCustomCategoryBookmark?: (partnerId: string) => void;
 };
 
 export default function PartnerMainMapPanel({
@@ -67,6 +70,9 @@ export default function PartnerMainMapPanel({
   detailButtonLabel,
   markerSettings = null,
   onSearchReset,
+  customCategoryBookmarkEnabled = false,
+  customCategoryBookmarkedIds,
+  onCustomCategoryBookmark,
 }: PartnerMainMapPanelProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const [viewResetKey, setViewResetKey] = useState(0);
@@ -191,6 +197,9 @@ export default function PartnerMainMapPanel({
               detailButtonLabel={detailButtonLabel}
               markerSettings={markerSettings}
               viewResetKey={viewResetKey}
+              customCategoryBookmarkEnabled={customCategoryBookmarkEnabled}
+              customCategoryBookmarkedIds={customCategoryBookmarkedIds}
+              onCustomCategoryBookmark={onCustomCategoryBookmark}
             />
           ) : (
             <div className="partner-main-map__canvas partner-main-map__canvas--loading flex items-center justify-center px-4 text-center text-sm text-gray-500">

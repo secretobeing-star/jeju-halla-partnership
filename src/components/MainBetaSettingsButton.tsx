@@ -21,7 +21,6 @@ import {
 import { useAppBackHandler } from "@/lib/app-back-stack";
 import { getSiteMemberSession, clearSiteMemberSession } from "@/lib/site-member-session";
 import DeleteAccountConfirmDialog from "@/components/DeleteAccountConfirmDialog";
-import UserCustomCategoriesSettingsSection from "@/components/UserCustomCategoriesSettingsSection";
 
 const EXPERIMENTAL_SECTION_LABEL = "실험실";
 const EXPERIMENTAL_BADGE_LABEL = "Beta";
@@ -327,9 +326,7 @@ export default function MainBetaSettingsButton({
     pageBackgroundAvailable ||
     navBackgroundToggleAvailable ||
     navFloatingChipsToggleAvailable;
-  const hasPanelContent =
-    settingsPanelEnabled &&
-    (hasBetaFeatures || hasMainScreenToggles || Boolean(trimmedNotice) || memberLoggedIn);
+  const hasPanelContent = settingsPanelEnabled && (hasBetaFeatures || hasMainScreenToggles || Boolean(trimmedNotice));
 
   const refresh = useCallback(() => {
     setPrefs(loadUserBetaSettings());
@@ -560,11 +557,6 @@ export default function MainBetaSettingsButton({
                     onChange={(value) => update({ show_main_map: value })}
                   />
                 ) : null}
-              </div>
-            ) : null}
-            {memberLoggedIn ? (
-              <div className={`${hasBetaFeatures || hasMainScreenToggles ? "mt-3" : ""}`}>
-                <UserCustomCategoriesSettingsSection loggedIn={memberLoggedIn} />
               </div>
             ) : null}
             <NoticeSection text={trimmedNotice} url={trimmedNoticeUrl} color={noticeColor} />

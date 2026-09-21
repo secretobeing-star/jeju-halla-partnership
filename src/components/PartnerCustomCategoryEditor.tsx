@@ -18,6 +18,7 @@ type PartnerCustomCategoryEditorProps = {
   open: boolean;
   partners: PartnerOption[];
   initial?: UserCustomCategory | null;
+  presetPartnerIds?: string[];
   onClose: () => void;
   onSave: (category: { label: string; partnerIds: string[] }) => void;
   onDelete?: () => void;
@@ -27,6 +28,7 @@ export default function PartnerCustomCategoryEditor({
   open,
   partners,
   initial = null,
+  presetPartnerIds = [],
   onClose,
   onSave,
   onDelete,
@@ -47,9 +49,9 @@ export default function PartnerCustomCategoryEditor({
       return;
     }
     setLabel(initial?.label ?? "");
-    setSelectedIds(initial?.partnerIds ?? []);
+    setSelectedIds(initial?.partnerIds ?? presetPartnerIds);
     setQuery("");
-  }, [initial, open]);
+  }, [initial, open, presetPartnerIds]);
 
   const filteredPartners = useMemo(() => {
     const keyword = query.trim().toLowerCase();

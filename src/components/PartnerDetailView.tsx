@@ -38,6 +38,9 @@ type PartnerDetailViewProps = {
   onFavoriteToggle?: () => void;
   locateEnabled?: boolean;
   splitLayout?: boolean;
+  customCategoryEnabled?: boolean;
+  customCategoryBookmarked?: boolean;
+  onCustomCategoryBookmark?: () => void;
 };
 
 export default function PartnerDetailView({
@@ -60,6 +63,9 @@ export default function PartnerDetailView({
   onFavoriteToggle,
   locateEnabled = true,
   splitLayout = false,
+  customCategoryEnabled = false,
+  customCategoryBookmarked = false,
+  onCustomCategoryBookmark,
 }: PartnerDetailViewProps) {
   const instagramUrl = getInstagramUrl(partner.instagram_url);
   const detailText = partner.detail_description?.trim() ?? "";
@@ -112,7 +118,7 @@ export default function PartnerDetailView({
           </span>
           <PartnerLocalFranchiseBadge show={showLocalFranchiseBadge} />
         </div>
-        <div className="partner-detail-title-row mt-2 flex items-start justify-between gap-3">
+        <div className="partner-detail-title-row mt-2 flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
           <h2 className="partner-detail-view__name min-w-0 flex-1 text-xl font-bold leading-snug text-gray-900">
             {partner.name}
           </h2>
@@ -124,8 +130,21 @@ export default function PartnerDetailView({
             onFavoriteToggle={onFavoriteToggle}
             instagramUrl={instagramUrl}
             mapOpenUrl={mapOpenUrl}
+            customCategoryEnabled={customCategoryEnabled}
+            customCategoryBookmarked={customCategoryBookmarked}
+            onCustomCategoryBookmark={onCustomCategoryBookmark}
           />
         </div>
+        {reactionsEnabled && onPartnerReactionChange ? (
+          <div className="mt-2">
+            <PartnerReactionButtons
+              partnerId={partner.id}
+              likeCount={partner.like_count ?? 0}
+              enabled={reactionsEnabled}
+              onCountsChange={onPartnerReactionChange}
+            />
+          </div>
+        ) : null}
         <p className="partner-detail-view__address mt-1.5 text-sm leading-relaxed text-gray-700">
           <span className="sr-only">주소 </span>
           <span aria-hidden className="mr-0.5">
@@ -211,32 +230,20 @@ export default function PartnerDetailView({
         splitPanelMode={splitLayout}
       />
 
-      {(reactionsEnabled || reviewsEnabled) && (
+      {(reviewsEnabled && onPartnerReviewCountChange && hiddenReviewDisplay) && (
         <div className="partner-detail-view__reviews-wrap flex flex-col gap-3">
-          {reviewsEnabled && onPartnerReviewCountChange && hiddenReviewDisplay ? (
-            <h3 className="partner-detail-view__reviews-title">후기 · 댓글</h3>
-          ) : null}
-          {reactionsEnabled && onPartnerReactionChange && (
-            <PartnerReactionButtons
-              partnerId={partner.id}
-              likeCount={partner.like_count ?? 0}
-              enabled={reactionsEnabled}
-              onCountsChange={onPartnerReactionChange}
-            />
-          )}
-          {reviewsEnabled && onPartnerReviewCountChange && hiddenReviewDisplay && (
-            <PartnerReviews
-              partnerId={partner.id}
-              reviewCount={partner.review_count ?? 0}
-              enabled={reviewsEnabled}
-              hiddenReviewDisplay={hiddenReviewDisplay}
-              onReviewCountChange={onPartnerReviewCountChange}
-              defaultOpen
-              panelLayout={splitLayout}
-              reportReasons={reportReasons}
-              reportSuccessSettings={reportSuccessSettings}
-            />
-          )}
+          <h3 className="partner-detail-view__reviews-title">후기 · 댓글</h3>
+          <PartnerReviews
+            partnerId={partner.id}
+            reviewCount={partner.review_count ?? 0}
+            enabled={reviewsEnabled}
+            hiddenReviewDisplay={hiddenReviewDisplay}
+            onReviewCountChange={onPartnerReviewCountChange}
+            defaultOpen
+            panelLayout={splitLayout}
+            reportReasons={reportReasons}
+            reportSuccessSettings={reportSuccessSettings}
+          />
         </div>
       )}
     </>

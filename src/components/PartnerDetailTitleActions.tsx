@@ -14,6 +14,9 @@ type PartnerDetailTitleActionsProps = {
   onFavoriteToggle?: () => void;
   instagramUrl?: string | null;
   mapOpenUrl?: string | null;
+  customCategoryEnabled?: boolean;
+  customCategoryBookmarked?: boolean;
+  onCustomCategoryBookmark?: () => void;
 };
 
 function ActionIconButton({
@@ -81,6 +84,24 @@ function HeartIcon({ filled }: { filled: boolean }) {
   );
 }
 
+function BookmarkIcon({ filled }: { filled: boolean }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      className="h-4 w-4"
+      aria-hidden
+      fill={filled ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M6 4.5A1.5 1.5 0 0 1 7.5 3h9A1.5 1.5 0 0 1 18 4.5v16.2l-6-3.3-6 3.3Z" />
+    </svg>
+  );
+}
+
 function InstagramIcon() {
   return (
     <svg
@@ -128,17 +149,21 @@ export default function PartnerDetailTitleActions({
   onFavoriteToggle,
   instagramUrl = null,
   mapOpenUrl = null,
+  customCategoryEnabled = false,
+  customCategoryBookmarked = false,
+  onCustomCategoryBookmark,
 }: PartnerDetailTitleActionsProps) {
   const showFavorite = favoritesEnabled && onFavoriteToggle;
+  const showBookmark = customCategoryEnabled && Boolean(onCustomCategoryBookmark);
   const showInstagram = Boolean(instagramUrl);
   const showMap = Boolean(mapOpenUrl);
 
-  if (!showFavorite && !showInstagram && !showMap) {
+  if (!showFavorite && !showBookmark && !showInstagram && !showMap) {
     return null;
   }
 
   return (
-    <div className="partner-detail-title-actions flex shrink-0 items-center gap-1.5">
+    <div className="partner-detail-title-actions flex shrink-0 flex-wrap items-center justify-end gap-1.5">
       {showFavorite ? (
         <ActionIconButton
           label={
@@ -155,6 +180,24 @@ export default function PartnerDetailTitleActions({
           }
         >
           <HeartIcon filled={favorited} />
+        </ActionIconButton>
+      ) : null}
+      {showBookmark ? (
+        <ActionIconButton
+          label={
+            customCategoryBookmarked
+              ? `${partnerName} 내 카테고리에서 수정`
+              : `${partnerName} 내 카테고리에 추가`
+          }
+          favorited={customCategoryBookmarked}
+          onClick={onCustomCategoryBookmark}
+          className={
+            customCategoryBookmarked
+              ? "border-amber-400 bg-amber-50 text-amber-600 hover:bg-amber-100"
+              : "border-gray-300 bg-white text-gray-500 hover:border-amber-300 hover:text-amber-600"
+          }
+        >
+          <BookmarkIcon filled={customCategoryBookmarked} />
         </ActionIconButton>
       ) : null}
       {showInstagram ? (

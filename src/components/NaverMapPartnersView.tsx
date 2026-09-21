@@ -16,6 +16,7 @@ import {
   updatePartnerMapMarkerFavorite,
   updatePartnerMapMiniCardFavorite,
   upsertPartnerMapCountdownBadge,
+  updatePartnerMapMiniCardBookmark,
   type MapMarkerCustomSettings,
   type NaverMapPartnerMarker,
 } from "@/lib/naver-map-partner-ui";
@@ -94,6 +95,9 @@ type NaverMapPartnersViewProps = {
   detailButtonLabel?: string;
   markerSettings?: MapMarkerCustomSettings | null;
   viewResetKey?: number;
+  customCategoryBookmarkEnabled?: boolean;
+  customCategoryBookmarkedIds?: ReadonlySet<string>;
+  onCustomCategoryBookmark?: (partnerId: string) => void;
 };
 
 export default function NaverMapPartnersView({
@@ -113,6 +117,9 @@ export default function NaverMapPartnersView({
   detailButtonLabel,
   markerSettings: initialMarkerSettings = null,
   viewResetKey = 0,
+  customCategoryBookmarkEnabled = false,
+  customCategoryBookmarkedIds,
+  onCustomCategoryBookmark,
 }: NaverMapPartnersViewProps) {
   const mapElementRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<naver.maps.Map | null>(null);
@@ -124,6 +131,9 @@ export default function NaverMapPartnersView({
   const mapListenersRef = useRef<unknown[]>([]);
   const onPartnerClickRef = useRef(onPartnerClick);
   const onFavoriteToggleRef = useRef(onFavoriteToggle);
+  const onCustomCategoryBookmarkRef = useRef(onCustomCategoryBookmark);
+  const customCategoryBookmarkEnabledRef = useRef(customCategoryBookmarkEnabled);
+  const customCategoryBookmarkedIdsRef = useRef(customCategoryBookmarkedIds);
   const stampActionRef = useRef(stampAction);
   const detailButtonLabelRef = useRef(detailButtonLabel);
   const favoriteCountdownEndAtRef = useRef(favoriteCountdownEndAt);
@@ -196,6 +206,23 @@ export default function NaverMapPartnersView({
   useEffect(() => {
     onFavoriteToggleRef.current = onFavoriteToggle;
   }, [onFavoriteToggle]);
+
+  useEffect(() => {
+    onCustomCategoryBookmarkRef.current = onCustomCategoryBookmark;
+    customCategoryBookmarkEnabledRef.current = customCategoryBookmarkEnabled;
+    customCategoryBookmarkedIdsRef.current = customCategoryBookmarkedIds;
+    const openCard = miniCardElementRef.current;
+    const openPartnerId = selectedPartnerIdRef.current;
+    if (openCard && openPartnerId) {
+      const partnerName =
+        openCard.querySelector(".partner-map-mini-card__title")?.textContent ?? "";
+      updatePartnerMapMiniCardBookmark(
+        openCard,
+        Boolean(customCategoryBookmarkedIds?.has(openPartnerId)),
+        partnerName,
+      );
+    }
+  }, [customCategoryBookmarkedIds, customCategoryBookmarkEnabled, onCustomCategoryBookmark]);
 
   useEffect(() => {
     markerSettingsRef.current = effectiveMarkerSettings;
@@ -503,6 +530,13 @@ export default function NaverMapPartnersView({
         onFavoriteToggle: favoritesEnabledRef.current
           ? () => {
               onFavoriteToggleRef.current?.(partner.id);
+            }
+          : undefined,
+        customCategoryBookmarkEnabled: customCategoryBookmarkEnabledRef.current,
+        customCategoryBookmarked: Boolean(customCategoryBookmarkedIdsRef.current?.has(partner.id)),
+        onCustomCategoryBookmark: customCategoryBookmarkEnabledRef.current
+          ? () => {
+              onCustomCategoryBookmarkRef.current?.(partner.id);
             }
           : undefined,
         stamp: showStampButton

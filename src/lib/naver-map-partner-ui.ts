@@ -246,6 +246,12 @@ const PARTNER_MAP_FAVORITE_OUTLINE_HTML =
 const PARTNER_MAP_CLOSE_ICON_HTML =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>';
 
+const PARTNER_MAP_BOOKMARK_OUTLINE_HTML =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4.5A1.5 1.5 0 0 1 7.5 3h9A1.5 1.5 0 0 1 18 4.5v16.2l-6-3.3-6 3.3Z"/></svg>';
+
+const PARTNER_MAP_BOOKMARK_FILLED_HTML =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 4.5A1.5 1.5 0 0 1 7.5 3h9A1.5 1.5 0 0 1 18 4.5v16.2l-6-3.3-6 3.3Z"/></svg>';
+
 export function updatePartnerMapMarkerFavorite(
   markerShell: HTMLElement,
   favorited: boolean,
@@ -328,6 +334,38 @@ export function updatePartnerMapMiniCardFavorite(
   applyPartnerMapMiniCardFavoriteState(button, favorited, options);
 }
 
+function applyPartnerMapMiniCardBookmarkState(
+  button: HTMLButtonElement,
+  bookmarked: boolean,
+  partnerName?: string,
+) {
+  const name = partnerName?.trim() || "";
+  button.classList.toggle("partner-map-mini-card__bookmark-btn--on", bookmarked);
+  button.setAttribute("aria-pressed", bookmarked ? "true" : "false");
+  button.setAttribute(
+    "aria-label",
+    name
+      ? bookmarked
+        ? `${name} 내 카테고리에서 수정`
+        : `${name} 내 카테고리에 추가`
+      : "내 카테고리",
+  );
+  button.title = "내 카테고리";
+  button.innerHTML = bookmarked ? PARTNER_MAP_BOOKMARK_FILLED_HTML : PARTNER_MAP_BOOKMARK_OUTLINE_HTML;
+}
+
+export function updatePartnerMapMiniCardBookmark(
+  card: HTMLElement,
+  bookmarked: boolean,
+  partnerName?: string,
+) {
+  const button = card.querySelector<HTMLButtonElement>(".partner-map-mini-card__bookmark-btn");
+  if (!button) {
+    return;
+  }
+  applyPartnerMapMiniCardBookmarkState(button, bookmarked, partnerName);
+}
+
 function formatPartnerMapBenefitText(text: string): string {
   const trimmed = text.trim();
   if (!trimmed) {
@@ -347,6 +385,9 @@ export function createPartnerMapMiniCardElement(
     favoritesTerm?: string;
     onClose?: () => void;
     onFavoriteToggle?: () => void;
+    customCategoryBookmarkEnabled?: boolean;
+    customCategoryBookmarked?: boolean;
+    onCustomCategoryBookmark?: () => void;
     stamp?: {
       visible: boolean;
       disabled: boolean;
@@ -390,6 +431,23 @@ export function createPartnerMapMiniCardElement(
       partnerName: partner.name,
       favoritesTerm: options.favoritesTerm,
     });
+  }
+
+  if (options?.customCategoryBookmarkEnabled && options.onCustomCategoryBookmark) {
+    const bookmarkButton = document.createElement("button");
+    bookmarkButton.type = "button";
+    bookmarkButton.className = "partner-map-mini-card__icon-btn partner-map-mini-card__bookmark-btn";
+    bookmarkButton.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      options.onCustomCategoryBookmark?.();
+    });
+    applyPartnerMapMiniCardBookmarkState(
+      bookmarkButton,
+      Boolean(options.customCategoryBookmarked),
+      partner.name,
+    );
+    toolbar.appendChild(bookmarkButton);
   }
 
   const closeButton = document.createElement("button");
