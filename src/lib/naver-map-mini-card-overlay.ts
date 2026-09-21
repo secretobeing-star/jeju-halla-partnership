@@ -50,7 +50,11 @@ export function createPartnerMapMiniCardOverlay({
     }
 
     const padding = 8;
-    const mapElement = mapContainer ?? (overlay.getPanes().overlayLayer?.parentElement as HTMLElement | null);
+    const panes = overlay.getPanes();
+    const mapElement =
+      mapContainer ??
+      (panes.overlayMouseTarget?.parentElement as HTMLElement | null) ??
+      (panes.floatPane?.parentElement as HTMLElement | null);
     const mapWidth = mapElement?.clientWidth ?? 0;
     const mapHeight = mapElement?.clientHeight ?? 0;
 
