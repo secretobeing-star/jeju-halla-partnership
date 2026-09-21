@@ -36,6 +36,8 @@ export function createPartnerMapMiniCardOverlay({
   element.style.zIndex = "120";
 
   const overlay = new window.naver.maps.OverlayView() as MiniCardOverlayInstance;
+  const followListeners: unknown[] = [];
+  const followListeners: unknown[] = [];
 
   overlay.onAdd = function onAdd() {
     const host = mapContainer ?? overlay.getPanes().overlayMouseTarget ?? overlay.getPanes().floatPane;
@@ -108,6 +110,10 @@ export function createPartnerMapMiniCardOverlay({
   };
 
   overlay.onRemove = function onRemove() {
+    for (const listener of followListeners) {
+      window.naver?.maps?.Event.removeListener(listener);
+    }
+    followListeners.length = 0;
     element.remove();
   };
 
@@ -116,6 +122,11 @@ export function createPartnerMapMiniCardOverlay({
   };
 
   overlay.setMap(map);
+  followListeners.push(
+    window.naver.maps.Event.addListener(map, "bounds_changed", () => overlay.draw?.()),
+    window.naver.maps.Event.addListener(map, "idle", () => overlay.draw?.()),
+    window.naver.maps.Event.addListener(map, "zoom_changed", () => overlay.draw?.()),
+  );
   window.requestAnimationFrame(() => {
     overlay.draw?.();
     window.requestAnimationFrame(() => overlay.draw?.());
