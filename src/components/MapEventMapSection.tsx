@@ -435,6 +435,13 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     setActiveTabId(nextTabId);
   };
 
+  const handleMapSearchReset = () => {
+    if (activeTabId !== DEFAULT_TAB_ID) {
+      handleTabChange(DEFAULT_TAB_ID);
+    }
+    props.onSearchReset?.();
+  };
+
   useEffect(() => {
     if (isDefaultTab || !activeEvent) {
       setShowIntroModal(false);
@@ -1069,6 +1076,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
             <PartnerMainMapPanel
               key={`${activeTabId}:${tabMarkerSettings?.topIconImg ?? ""}:${tabMarkerSettings?.borderColor ?? ""}`}
               {...props}
+              onSearchReset={props.onSearchReset ? handleMapSearchReset : undefined}
               markerSettings={tabMarkerSettings}
               partners={visiblePartners}
               favoriteCountdownEndAt={activeEvent?.end_at ?? null}

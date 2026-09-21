@@ -5053,6 +5053,9 @@ html.dark-mode .partner-map-locate-button:hover:not(:disabled) {
 
 .map-event-tabs {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
   gap: 0.5rem;
   overflow-x: auto;
   padding-bottom: 0.5rem;
