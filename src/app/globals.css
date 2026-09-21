@@ -6342,7 +6342,8 @@ html.dark-mode .site-top-nav--floating-chips .site-top-nav__menu-group .site-top
     gap: 0.5rem;
   }
 
-  .site-top-nav__menu-group .site-top-nav__link-label {
+  .site-top-nav__links--icon-chips .site-top-nav__link-label,
+  .site-top-nav__menu-leading .site-top-nav__link-label {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -6354,7 +6355,8 @@ html.dark-mode .site-top-nav--floating-chips .site-top-nav__menu-group .site-top
     border: 0;
   }
 
-  .site-top-nav__menu-group .site-top-nav__link {
+  .site-top-nav__links--icon-chips .site-top-nav__link,
+  .site-top-nav__menu-leading .site-top-nav__link {
     gap: 0;
     justify-content: center;
     align-items: center;
@@ -6363,10 +6365,13 @@ html.dark-mode .site-top-nav--floating-chips .site-top-nav__menu-group .site-top
     min-height: 2.25rem;
   }
 
-  /* 모바일·PWA: 메뉴 아이콘 같은 크기 흰 정원 */
-  .site-top-nav__menu-group .site-top-nav__link,
-  .site-top-nav--has-background .site-top-nav__menu-group .site-top-nav__link,
-  .site-top-nav--floating-chips .site-top-nav__menu-group .site-top-nav__link {
+  /* 모바일·PWA: 아이콘 바로가기만 같은 크기 흰 정원 */
+  .site-top-nav__links--icon-chips .site-top-nav__link,
+  .site-top-nav__menu-leading .site-top-nav__link,
+  .site-top-nav--has-background .site-top-nav__links--icon-chips .site-top-nav__link,
+  .site-top-nav--floating-chips .site-top-nav__links--icon-chips .site-top-nav__link,
+  .site-top-nav--has-background .site-top-nav__menu-leading .site-top-nav__link,
+  .site-top-nav--floating-chips .site-top-nav__menu-leading .site-top-nav__link {
     box-sizing: border-box;
     width: 2.5rem;
     height: 2.5rem;
@@ -6379,7 +6384,8 @@ html.dark-mode .site-top-nav--floating-chips .site-top-nav__menu-group .site-top
     overflow: hidden;
   }
 
-  .site-top-nav__menu-group .site-top-nav__link-icon-wrap {
+  .site-top-nav__links--icon-chips .site-top-nav__link-icon-wrap,
+  .site-top-nav__menu-leading .site-top-nav__link-icon-wrap {
     display: flex;
     width: 1.5rem;
     height: 1.5rem;
@@ -6389,9 +6395,12 @@ html.dark-mode .site-top-nav--floating-chips .site-top-nav__menu-group .site-top
     background: transparent;
   }
 
-  .site-top-nav__menu-group .site-top-nav__link-icon,
-  .site-top-nav__menu-group .site-top-nav__link-icon-fallback,
-  .site-top-nav__menu-group .site-top-nav__link-image {
+  .site-top-nav__links--icon-chips .site-top-nav__link-icon,
+  .site-top-nav__links--icon-chips .site-top-nav__link-icon-fallback,
+  .site-top-nav__links--icon-chips .site-top-nav__link-image,
+  .site-top-nav__menu-leading .site-top-nav__link-icon,
+  .site-top-nav__menu-leading .site-top-nav__link-icon-fallback,
+  .site-top-nav__menu-leading .site-top-nav__link-image {
     width: 1.5rem;
     height: 1.5rem;
     max-width: 1.5rem;
@@ -6401,7 +6410,8 @@ html.dark-mode .site-top-nav--floating-chips .site-top-nav__menu-group .site-top
     background: transparent;
   }
 
-  .site-top-nav__menu-group .site-top-nav__link-icon-fallback {
+  .site-top-nav__links--icon-chips .site-top-nav__link-icon-fallback,
+  .site-top-nav__menu-leading .site-top-nav__link-icon-fallback {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -6410,10 +6420,12 @@ html.dark-mode .site-top-nav--floating-chips .site-top-nav__menu-group .site-top
     font-size: 0.8rem;
   }
 
-  html.dark-mode .site-top-nav__menu-group .site-top-nav__link,
-  html.dark-mode .site-top-nav--has-background .site-top-nav__menu-group .site-top-nav__link,
-  html.dark-mode .site-top-nav--floating-chips .site-top-nav__menu-group .site-top-nav__link,
-  .site-top-nav--has-background.site-top-nav--background-dark .site-top-nav__menu-group .site-top-nav__link {
+  html.dark-mode .site-top-nav__links--icon-chips .site-top-nav__link,
+  html.dark-mode .site-top-nav__menu-leading .site-top-nav__link,
+  html.dark-mode .site-top-nav--has-background .site-top-nav__links--icon-chips .site-top-nav__link,
+  html.dark-mode .site-top-nav--floating-chips .site-top-nav__links--icon-chips .site-top-nav__link,
+  .site-top-nav--has-background.site-top-nav--background-dark .site-top-nav__links--icon-chips .site-top-nav__link,
+  .site-top-nav--has-background.site-top-nav--background-dark .site-top-nav__menu-leading .site-top-nav__link {
     border-color: #374151;
     background-color: #1f2937;
     color: #f9fafb;
@@ -6710,10 +6722,55 @@ html.dark-mode .site-header-actions__panel-close:hover {
 .site-top-nav__menu-group {
   display: flex;
   flex: 0 1 auto;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
   min-width: 0;
+  width: 100%;
+}
+
+.site-top-nav__links--icon-chips,
+.site-top-nav__links--text {
+  flex: 1 1 100%;
+  width: 100%;
+}
+
+.site-top-nav__links--text {
+  margin-top: 0.15rem;
+}
+
+.site-top-nav__links--text .site-top-nav__link-icon-wrap {
+  display: none;
+}
+
+.site-top-nav__links--text .site-top-nav__link {
+  width: auto;
+  height: auto;
+  min-width: 0;
+  min-height: 0;
+  gap: 0;
+  padding: 0.45rem 1.05rem;
+  border-radius: 9999px;
+}
+
+.site-top-nav__link-item--partners .site-top-nav__link {
+  background-color: #059669;
+  border-color: #059669;
+  color: #ffffff;
+}
+
+.site-top-nav--floating-chips:not(.site-top-nav--background-dark) .site-top-nav__link-item--partners .site-top-nav__link,
+.site-top-nav--has-background .site-top-nav__link-item--partners .site-top-nav__link {
+  background-color: #059669;
+  border-color: #059669;
+  color: #ffffff;
+}
+
+.site-top-nav__link-item--partners .site-top-nav__link:hover,
+.site-top-nav--floating-chips:not(.site-top-nav--background-dark) .site-top-nav__link-item--partners .site-top-nav__link:hover {
+  background-color: #047857;
+  border-color: #047857;
+  color: #ffffff;
 }
 
 .site-top-nav__links-inline {
@@ -6972,7 +7029,7 @@ html.pwa-v-tablet-lg .site-top-nav__search-wrap {
   flex: 1 1 100%;
   width: 100%;
   margin-left: 0;
-  justify-content: flex-end;
+  justify-content: stretch;
 }
 
 .partner-list-toolbar__controls-row--mobile-search .partner-list-toolbar__search-wrap {
@@ -7066,14 +7123,25 @@ html.pwa-v-tablet-lg .site-top-nav__search-wrap {
 }
 
 @media (max-width: 639px) {
-  .partner-list-toolbar__header,
-  .partner-list-toolbar__sort {
+  .partner-list-toolbar__header {
     padding-right: 4.35rem;
   }
 
   .partner-list-toolbar__sort {
-    justify-content: flex-start;
+    justify-content: stretch;
     margin-left: 0;
+    width: 100%;
+    flex-wrap: nowrap;
+    gap: 0.35rem;
+  }
+
+  .partner-list-toolbar__sort > * {
+    flex: 1 1 0;
+    min-width: 0;
+    justify-content: center;
+    padding-left: 0.3rem;
+    padding-right: 0.3rem;
+    text-align: center;
   }
 
   html.ios-device .partner-map-locate-button,
@@ -7083,9 +7151,9 @@ html.pwa-v-tablet-lg .site-top-nav__search-wrap {
   }
 
   .partner-list-refresh-btn {
-    min-width: 2.4rem;
-    padding-left: 0.6rem;
-    padding-right: 0.6rem;
+    min-width: 0;
+    padding-left: 0.3rem;
+    padding-right: 0.3rem;
   }
 }
 

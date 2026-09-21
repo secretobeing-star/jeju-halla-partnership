@@ -52,6 +52,7 @@ export function subscribePublicSiteReload(onReload: () => void) {
 
   let reloadTimer: number | null = null;
   let lastServerAt = 0;
+  let lastBuild = "";
   const scheduleReload = () => {
     if (reloadTimer != null) {
       window.clearTimeout(reloadTimer);
@@ -83,8 +84,22 @@ export function subscribePublicSiteReload(onReload: () => void) {
       const response = await fetch(`/api/public-reload?t=${Date.now()}`, {
         cache: "no-store",
       });
-      const payload = (await response.json().catch(() => ({}))) as { at?: number };
+      const payload = (await response.json().catch(() => ({}))) as {
+        at?: number;
+        build?: string;
+      };
       const at = Number(payload.at) || 0;
+      const build = String(payload.build ?? "").trim();
+      if (build) {
+        if (!lastBuild) {
+          lastBuild = build;
+        } else if (build !== lastBuild) {
+          lastBuild = build;
+          lastServerAt = at || lastServerAt;
+          scheduleReload();
+          return;
+        }
+      }
       if (!lastServerAt) {
         lastServerAt = at;
         return;

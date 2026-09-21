@@ -58,6 +58,30 @@ export function isGoldShopNavItem(item: Pick<SiteNavLinkItem, "href" | "label">)
   return isGoldShopNavHref(item.href) || label.includes("골드상점");
 }
 
+export function isPartnerListNavHref(href: string) {
+  return href.trim().toLowerCase().includes("partner-list");
+}
+
+export function isIconChipNavLink(item: Pick<SiteNavLinkItem, "href" | "label">) {
+  return (
+    isGiftInboxNavHref(item.href) ||
+    isFrameInventoryNavHref(item.href) ||
+    isSeasonPassNavItem(item) ||
+    isGoldShopNavItem(item)
+  );
+}
+
+/** 제휴·게시판처럼 글자가 보여야 하는 메뉴. 아이콘 원 줄에 올리지 않습니다. */
+export function isTextRowNavLink(item: SiteNavLinkItem) {
+  if (isBoardPopupNavHref(item.href) || isPartnerListNavHref(item.href)) {
+    return true;
+  }
+  if (isIconChipNavLink(item)) {
+    return false;
+  }
+  return !item.image_url?.trim() && !item.icon_url?.trim();
+}
+
 /** 상단 메뉴 클릭 시 페이지 이동 대신 앱 액션(모달)을 여는 링크 */
 export function isSiteNavActionHref(href: string) {
   return (

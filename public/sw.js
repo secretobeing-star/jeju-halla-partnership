@@ -1,14 +1,14 @@
-const CACHE_NAME = 'halla-pass-v5';
+const CACHE_NAME = 'halla-pass-v6';
 
 // 1. 서비스 워커 설치 시 즉시 대기 상태 해제
 self.addEventListener("install", (event) => {
-  console.log("서비스 워커 설치 중 (v5)");
+  console.log("서비스 워커 설치 중 (v6)");
   self.skipWaiting();
 });
 
 // 2. 서비스 워커 활성화 시 구버전 캐시 자동 삭제
 self.addEventListener("activate", (event) => {
-  console.log("서비스 워커 활성화 및 구버전 캐시 청소 (v5)");
+  console.log("서비스 워커 활성화 및 구버전 캐시 청소 (v6)");
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(

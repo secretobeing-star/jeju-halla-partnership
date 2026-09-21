@@ -1150,7 +1150,7 @@ export default function HomePage() {
             setShowFavoritesOnly((current) => !current);
             setCurrentPage(1);
           }}
-          className={`partner-favorites-filter-btn inline-flex shrink-0 items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium sm:text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 ${
+          className={`partner-favorites-filter-btn inline-flex items-center justify-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium sm:text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 ${
             showFavoritesOnly
               ? "bg-pink-500 text-white"
               : "border border-gray-300 bg-white text-gray-700 hover:border-pink-200 hover:text-pink-600"
@@ -1392,7 +1392,7 @@ export default function HomePage() {
             </div>
           ) : null}
           {partnerSortControls ? (
-            <div className="partner-list-toolbar__sort flex flex-wrap items-center justify-end gap-2">
+            <div className="partner-list-toolbar__sort flex flex-wrap items-center justify-stretch gap-2">
               {partnerSortControls}
             </div>
           ) : null}

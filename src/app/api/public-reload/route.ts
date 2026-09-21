@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuthMiddleware } from "@/lib/admin-auth-guard";
-import { bumpPublicReloadAt, readPublicReloadAt } from "@/lib/public-reload-server";
+import { bumpPublicReloadAt, syncPublicReloadForDeploy } from "@/lib/public-reload-server";
 
 export const dynamic = "force-dynamic";
 
 const noStore = { "Cache-Control": "no-store, max-age=0" };
 
 export async function GET() {
-  const at = await readPublicReloadAt();
-  return NextResponse.json({ at }, { headers: noStore });
+  const { at, build } = await syncPublicReloadForDeploy();
+  return NextResponse.json({ at, build }, { headers: noStore });
 }
 
 export async function POST(request: NextRequest) {
