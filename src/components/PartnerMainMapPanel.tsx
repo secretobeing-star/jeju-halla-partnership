@@ -69,6 +69,7 @@ export default function PartnerMainMapPanel({
   onSearchReset,
 }: PartnerMainMapPanelProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
+  const [viewResetKey, setViewResetKey] = useState(0);
   const { clientId, loading: configLoading, available: naverJsAvailable, geocodeKeyFallback } =
     useNaverMapConfig();
 
@@ -136,11 +137,15 @@ export default function PartnerMainMapPanel({
           {onSearchReset ? (
             <button
               type="button"
-              onClick={onSearchReset}
+              onClick={() => {
+                setViewResetKey((current) => current + 1);
+                onPartnerSelect?.("");
+                onSearchReset();
+              }}
               className="shrink-0 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 sm:text-sm"
-              aria-label="지도 검색 초기화"
+              aria-label="검색 초기화"
             >
-              지도 검색 초기화
+              검색 초기화
             </button>
           ) : null}
           <button
@@ -185,6 +190,7 @@ export default function PartnerMainMapPanel({
               favoriteCountdownEndAt={favoriteCountdownEndAt}
               detailButtonLabel={detailButtonLabel}
               markerSettings={markerSettings}
+              viewResetKey={viewResetKey}
             />
           ) : (
             <div className="partner-main-map__canvas partner-main-map__canvas--loading flex items-center justify-center px-4 text-center text-sm text-gray-500">

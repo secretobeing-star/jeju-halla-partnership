@@ -1,5 +1,4 @@
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
-import { creditStudentGold } from "@/lib/season-pass-server";
 import { findPushSubscriptionsByKeys } from "@/lib/stamp-ready-push";
 import { resolvePushSiteOrigin, resolvePushVisuals } from "@/lib/push-asset-url";
 import { sendWebPushNotification } from "@/lib/web-push-server";
@@ -9,9 +8,9 @@ import {
 } from "@/lib/student-card-frames";
 import {
   DEFAULT_LOGIN_REWARD,
-  getKstDateTime,
   hasLoginRewardGrant,
   isLoginRewardWindowOpen,
+  loginRewardCampaignDate,
   mapLoginRewardSettings,
   serializeLoginRewardWeekdays,
   type LoginRewardSettings,
@@ -143,7 +142,10 @@ export async function claimDailyLoginReward(
     return { claimed: false as const, reason: error instanceof Error ? error.message : "코스튬을 찾을 수 없습니다." };
   }
 
-  const claimedOn = getKstDateTime().ymd;
+  const claimedOn = loginRewardCampaignDate(settings);
+  if (!claimedOn) {
+    return { claimed: false as const, reason: "not-yet" };
+  }
   const { error } = await admin.from("site_login_reward_claims").insert({
     student_id: studentId,
     claimed_on: claimedOn,
@@ -165,6 +167,19 @@ export async function claimDailyLoginReward(
   }
 
   const inboxRows: Array<Record<string, unknown>> = [];
+  if (settings.goldAmount >= 1) {
+    inboxRows.push({
+      student_id: studentId,
+      reward_type: "gold",
+      frame_id: null,
+      coupon_code: null,
+      gold_amount: settings.goldAmount,
+      title: `접속 보상 · 골드 ${settings.goldAmount.toLocaleString("ko-KR")}개`,
+      message: "접속 보상입니다. 선물함에서 받아 주세요.",
+      status: "pending",
+      created_by: "login-reward",
+    });
+  }
   if (settings.costumeFrameId) {
     inboxRows.push({
       student_id: studentId,
@@ -173,7 +188,7 @@ export async function claimDailyLoginReward(
       coupon_code: null,
       gold_amount: null,
       title: `접속 보상 · ${costumeName}`,
-      message: "오늘의 접속 보상으로 지급된 코스튬입니다.",
+      message: "접속 보상입니다. 선물함에서 받아 주세요.",
       status: "pending",
       created_by: "login-reward",
     });
@@ -186,25 +201,25 @@ export async function claimDailyLoginReward(
       coupon_code: settings.couponCode,
       gold_amount: null,
       title: "접속 보상 · 쿠폰",
-      message: "오늘의 접속 보상으로 지급된 쿠폰입니다.",
+      message: "접속 보상입니다. 선물함에서 받아 주세요.",
       status: "pending",
       created_by: "login-reward",
     });
   }
 
   try {
-    if (inboxRows.length > 0) {
-      const { error: inboxError } = await admin.from("site_student_rewards").insert(inboxRows);
-      if (inboxError) {
-        throw new Error(
-          inboxError.message.includes("site_student_rewards")
-            ? "보상 테이블이 없습니다. supabase/site-student-rewards.sql 을 실행해 주세요."
-            : inboxError.message,
-        );
-      }
+    if (inboxRows.length === 0) {
+      throw new Error("지급할 보상이 없습니다.");
     }
-    if (settings.goldAmount >= 1) {
-      await creditStudentGold(studentId, settings.goldAmount);
+    const { error: inboxError } = await admin.from("site_student_rewards").insert(inboxRows);
+    if (inboxError) {
+      throw new Error(
+        inboxError.message.includes("site_student_rewards")
+          ? "보상 테이블이 없습니다. supabase/site-student-rewards.sql 을 실행해 주세요."
+          : inboxError.message.includes("gold_amount") || inboxError.message.includes("coupon_code")
+            ? "보상 종류 컬럼이 없습니다. supabase/site-student-rewards.sql 을 다시 실행해 주세요."
+            : inboxError.message,
+      );
     }
   } catch (grantError) {
     await admin.from("site_login_reward_claims").delete().eq("student_id", studentId).eq("claimed_on", claimedOn);
@@ -263,9 +278,12 @@ export async function dispatchScheduledLoginRewards() {
     return { skipped: true as const, reason: "not-yet" };
   }
 
-  const today = getKstDateTime().ymd;
-  if (settings.lastDispatchedOn === today) {
-    return { skipped: true as const, reason: "already-dispatched", date: today };
+  const campaignDate = loginRewardCampaignDate(settings);
+  if (!campaignDate) {
+    return { skipped: true as const, reason: "not-yet" };
+  }
+  if (settings.lastDispatchedOn === campaignDate) {
+    return { skipped: true as const, reason: "already-dispatched", date: campaignDate };
   }
 
   const admin = createSupabaseAdmin();
@@ -275,16 +293,16 @@ export async function dispatchScheduledLoginRewards() {
 
   const { data: locked, error: lockError } = await admin
     .from("site_login_reward_settings")
-    .update({ last_dispatched_on: today, updated_at: new Date().toISOString() })
+    .update({ last_dispatched_on: campaignDate, updated_at: new Date().toISOString() })
     .eq("id", 1)
-    .or(`last_dispatched_on.is.null,last_dispatched_on.neq.${today}`)
+    .or(`last_dispatched_on.is.null,last_dispatched_on.neq.${campaignDate}`)
     .select("id")
     .maybeSingle();
   if (lockError) {
     return { skipped: true as const, reason: lockError.message };
   }
   if (!locked) {
-    return { skipped: true as const, reason: "already-dispatched", date: today };
+    return { skipped: true as const, reason: "already-dispatched", date: campaignDate };
   }
 
   let costumeName = "";
@@ -303,10 +321,10 @@ export async function dispatchScheduledLoginRewards() {
     else if (result.reason === "already") already += 1;
   }
 
-  const push = await broadcastLoginRewardPush(settings, today, costumeName);
+  const push = await broadcastLoginRewardPush(settings, campaignDate, costumeName);
   return {
     skipped: false as const,
-    date: today,
+    date: campaignDate,
     students: studentIds.length,
     claimed,
     already,

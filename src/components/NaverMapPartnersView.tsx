@@ -93,6 +93,7 @@ type NaverMapPartnersViewProps = {
   favoriteCountdownEndAt?: string | null;
   detailButtonLabel?: string;
   markerSettings?: MapMarkerCustomSettings | null;
+  viewResetKey?: number;
 };
 
 export default function NaverMapPartnersView({
@@ -111,6 +112,7 @@ export default function NaverMapPartnersView({
   favoriteCountdownEndAt = null,
   detailButtonLabel,
   markerSettings: initialMarkerSettings = null,
+  viewResetKey = 0,
 }: NaverMapPartnersViewProps) {
   const mapElementRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<naver.maps.Map | null>(null);
@@ -223,6 +225,50 @@ export default function NaverMapPartnersView({
     favoritesEnabledRef.current = favoritesEnabled;
     favoritesTermRef.current = favoritesTerm;
   }, [favoritePartnerIds, favoritesEnabled, favoritesTerm]);
+
+  useEffect(() => {
+    if (!viewResetKey) {
+      return;
+    }
+
+    miniCardOverlayRef.current?.close();
+    miniCardOverlayRef.current = null;
+    miniCardElementRef.current = null;
+    selectedPartnerIdRef.current = null;
+    for (const element of markerElementsRef.current.values()) {
+      getPartnerMapMarkerButton(element)?.classList.remove("partner-map-marker--selected");
+    }
+
+    const map = mapRef.current;
+    if (!map || !window.naver?.maps) {
+      return;
+    }
+
+    const markers = markersRef.current;
+    if (markers.length === 0) {
+      map.setCenter(new window.naver.maps.LatLng(JEJU_CENTER.latitude, JEJU_CENTER.longitude));
+      map.setZoom(EMPTY_ZOOM);
+      return;
+    }
+
+    if (markers.length === 1) {
+      const position = markers[0].getPosition?.();
+      if (position) {
+        map.setCenter(position);
+        map.setZoom(SINGLE_ZOOM);
+      }
+      return;
+    }
+
+    const bounds = new window.naver.maps.LatLngBounds();
+    for (const marker of markers) {
+      const position = marker.getPosition?.();
+      if (position) {
+        bounds.extend(position);
+      }
+    }
+    map.fitBounds(bounds, FIT_BOUNDS_MARGIN);
+  }, [viewResetKey]);
 
   useEffect(() => {
     if (!mapReady || !favoritesEnabled) {

@@ -300,9 +300,10 @@ ${context}`;
     }
   }
 
+  const missedQuery = structured.missedPartnerQuery?.trim();
   void admin.from("site_analytics_events").insert({
     event_type: "chatbot_message",
-    path: `q:${question.slice(0, 180)}`,
+    path: `q:${(missedQuery || question).slice(0, 180)}`,
   });
 
   return NextResponse.json({

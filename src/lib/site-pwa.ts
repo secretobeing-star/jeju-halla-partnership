@@ -373,6 +373,8 @@ export type SitePwaAppDisplaySettingsSource = SitePwaSettingsSource & {
   page_background_default_enabled?: boolean;
   partner_category_section_enabled?: boolean;
   main_category_region_user_toggle_enabled?: boolean;
+  partner_favorites_enabled?: boolean;
+  partner_favorites_label?: string | null;
 };
 
 export function isPwaAppSettingsDarkModeEnabled(
@@ -397,6 +399,12 @@ export function isPwaAppSettingsCategoryRegionEnabled(
   );
 }
 
+export function isPwaAppSettingsFavoritesEnabled(
+  settings: SitePwaAppDisplaySettingsSource | null | undefined,
+) {
+  return isPwaAppSettingsEnabled(settings) && (settings?.partner_favorites_enabled ?? true);
+}
+
 export function isPwaAppSettingsPageBackgroundEnabled(
   settings: SitePwaAppDisplaySettingsSource | null | undefined,
 ) {
@@ -416,6 +424,7 @@ export function hasPwaAppSettingsPanelContent(
     isPwaAppSettingsDarkModeEnabled(settings) ||
     isPwaAppSettingsFontSizeEnabled(settings) ||
     isPwaAppSettingsPageBackgroundEnabled(settings) ||
-    isPwaAppSettingsCategoryRegionEnabled(settings)
+    isPwaAppSettingsCategoryRegionEnabled(settings) ||
+    isPwaAppSettingsFavoritesEnabled(settings)
   );
 }

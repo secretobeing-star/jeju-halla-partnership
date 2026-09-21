@@ -1560,7 +1560,7 @@ video.bottom-pc-ad-image {
   }
 
   .site-main-content-wrap {
-    padding-top: 0;
+    padding-top: 0.75rem;
   }
 
   .site-maintenance-banner {
@@ -5049,15 +5049,16 @@ html.dark-mode .partner-map-locate-button:hover:not(:disabled) {
 
 .map-event-shell {
   margin-bottom: 1.5rem;
+  overflow: visible;
 }
 
 .map-event-tabs {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 0.5rem;
-  overflow-x: auto;
+  overflow: visible;
   padding-bottom: 0.5rem;
   margin-bottom: 0.5rem;
 }
@@ -6820,12 +6821,25 @@ html.pwa-v-tablet-lg .site-top-nav__search-wrap {
 
 /* 카테고리 칩 — 글자만큼만 차지하고 왼쪽 정렬 */
 .partner-category-section {
-  width: auto;
+  width: 100%;
   max-width: 100%;
   padding: 0;
   background: transparent;
   box-shadow: none;
   border: 0;
+}
+
+.partner-category-section--boxed {
+  box-sizing: border-box;
+  padding: 0.9rem 1rem 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 1rem;
+  background-color: #ffffff;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.05);
+}
+
+.partner-category-section--boxed .partner-region-filter-panel {
+  margin-top: 0.85rem;
 }
 
 .partner-category-grid {
@@ -6834,7 +6848,7 @@ html.pwa-v-tablet-lg .site-top-nav__search-wrap {
   align-items: center;
   justify-content: flex-start;
   gap: 0.5rem;
-  width: auto;
+  width: 100%;
   max-width: 100%;
 }
 
@@ -6843,6 +6857,186 @@ html.pwa-v-tablet-lg .site-top-nav__search-wrap {
   max-width: 100%;
   min-width: 0;
   flex: 0 0 auto;
+}
+
+.partner-category-chip-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.partner-category-chip--add {
+  border: 1px dashed #a7f3d0;
+  background-color: #ecfdf5;
+  color: #047857;
+}
+
+.partner-category-chip--add:hover {
+  background-color: #d1fae5;
+}
+
+.partner-category-chip-edit {
+  border: 0;
+  background: transparent;
+  color: #059669;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0 0.15rem;
+}
+
+.partner-custom-category-editor {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.partner-custom-category-editor__backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgb(15 23 42 / 0.45);
+}
+
+.partner-custom-category-editor__panel {
+  position: relative;
+  z-index: 1;
+  width: min(32rem, 100%);
+  max-height: min(88vh, 40rem);
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 1rem 1rem 1.15rem;
+  border-radius: 1.1rem 1.1rem 0 0;
+  background: #fff;
+  box-shadow: 0 -8px 30px rgb(15 23 42 / 0.18);
+}
+
+.partner-custom-category-editor__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.partner-custom-category-editor__header h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.partner-custom-category-editor__close,
+.partner-custom-category-editor__actions button {
+  border: 1px solid #e5e7eb;
+  border-radius: 0.65rem;
+  background: #f9fafb;
+  color: #374151;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 0.45rem 0.75rem;
+}
+
+.partner-custom-category-editor__hint,
+.partner-custom-category-editor__count,
+.partner-custom-category-editor__empty {
+  margin: 0;
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.partner-custom-category-editor__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #4b5563;
+}
+
+.partner-custom-category-editor__field input {
+  border: 1px solid #e5e7eb;
+  border-radius: 0.65rem;
+  background: #fff;
+  padding: 0.55rem 0.7rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #111827;
+}
+
+.partner-custom-category-editor__list {
+  min-height: 8rem;
+  max-height: 16rem;
+  overflow: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+  padding: 0.35rem;
+}
+
+.partner-custom-category-editor__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  padding: 0.5rem 0.45rem;
+  border-radius: 0.55rem;
+}
+
+.partner-custom-category-editor__item span {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.partner-custom-category-editor__item strong {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.partner-custom-category-editor__item em {
+  font-style: normal;
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.partner-custom-category-editor__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.45rem;
+}
+
+.partner-custom-category-editor__actions .partner-custom-category-editor__delete {
+  margin-right: auto;
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.partner-custom-category-editor__actions button:disabled {
+  opacity: 0.5;
+}
+
+html.dark-mode .partner-custom-category-editor__panel {
+  background: #111827;
+}
+
+html.dark-mode .partner-custom-category-editor__header h3,
+html.dark-mode .partner-custom-category-editor__item strong,
+html.dark-mode .partner-custom-category-editor__field input {
+  color: #f9fafb;
+}
+
+html.dark-mode .partner-custom-category-editor__field input,
+html.dark-mode .partner-custom-category-editor__list,
+html.dark-mode .partner-custom-category-editor__close,
+html.dark-mode .partner-custom-category-editor__actions button {
+  border-color: #374151;
+  background: #1f2937;
+  color: #e5e7eb;
 }
 
 /* 갤럭시 폴드 등 768~1279px */
@@ -7547,6 +7741,12 @@ html.dark-mode .partner-favorite-button[aria-pressed="true"] {
 html.dark-mode .partner-category-section {
   background: transparent;
   border: 0;
+  box-shadow: none;
+}
+
+html.dark-mode .partner-category-section--boxed {
+  background-color: #111827;
+  border-color: #374151;
   box-shadow: none;
 }
 

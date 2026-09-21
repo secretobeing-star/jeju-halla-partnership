@@ -57,6 +57,10 @@ export default function LoginRewardAdminPanel({ settings }: LoginRewardAdminPane
 
   async function handleSave(event: FormEvent) {
     event.preventDefault();
+    if (reward.enabled && !reward.startDate) {
+      setMessage("시작일과 시각을 설정해 주세요. 학생당 1회만 지급됩니다.");
+      return;
+    }
     setSaving(true);
     setMessage(null);
     try {
@@ -89,7 +93,7 @@ export default function LoginRewardAdminPanel({ settings }: LoginRewardAdminPane
   return (
     <AdminCollapsibleSection
       title="접속 보상"
-      description="학번 로그인 시 하루 한 번 골드·코스튬·쿠폰을 주고, 푸시 알림을 보낼 수 있습니다. 예약하면 지정한 날짜·시각에 푸시를 보내고 그 시각 이후 보상을 지급합니다."
+      description="설정한 시작일·시각부터 학생당 1회만 선물함으로 보냅니다. 매일 반복하지 않습니다. 종료일을 두면 그 날짜까지만 받을 수 있습니다."
     >
       <p className="mb-3 text-xs text-gray-500">
         DB: <code className="rounded bg-gray-100 px-1">supabase/site-login-reward.sql</code>
@@ -118,7 +122,7 @@ export default function LoginRewardAdminPanel({ settings }: LoginRewardAdminPane
               }
               className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-emerald-500"
             />
-            <span className="mt-1 block text-xs font-normal text-gray-500">0이면 골드는 지급하지 않습니다.</span>
+            <span className="mt-1 block text-xs font-normal text-gray-500">0이면 골드는 보내지 않습니다. 보낸 골드는 선물함에서 받아야 들어갑니다.</span>
           </label>
           <label className="block text-sm font-medium text-gray-700">
             지급 코스튬 (선택)
@@ -156,8 +160,8 @@ export default function LoginRewardAdminPanel({ settings }: LoginRewardAdminPane
             <div className="flex rounded-lg border border-gray-200 bg-white p-0.5 text-xs">
               {(
                 [
-                  { id: "on_login" as const, label: "로그인 즉시" },
-                  { id: "scheduled" as const, label: "날짜·시각 예약" },
+                  { id: "on_login" as const, label: "시각 이후 로그인 1회" },
+                  { id: "scheduled" as const, label: "시각에 일괄 1회" },
                 ]
               ).map((item) => (
                 <button
@@ -177,6 +181,7 @@ export default function LoginRewardAdminPanel({ settings }: LoginRewardAdminPane
                 시작일
                 <input
                   type="date"
+                  required
                   value={reward.startDate}
                   onChange={(event) => setReward((prev) => ({ ...prev, startDate: event.target.value }))}
                   className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 outline-none focus:border-emerald-500"
@@ -231,11 +236,9 @@ export default function LoginRewardAdminPanel({ settings }: LoginRewardAdminPane
               </div>
               <p className="mt-1 text-xs text-gray-500">
                 {reward.weekdays.length === 0
-                  ? "요일을 고르지 않으면 매일 발송합니다."
-                  : `선택한 요일만 발송합니다.`}
-                {reward.scheduleMode === "scheduled"
-                  ? ` 예약 시각 ${formatLoginRewardTime(reward)} 이후 지급·푸시가 나갑니다.`
-                  : " 로그인 즉시 지급합니다. 시작·종료일·요일만 제한에 쓰입니다."}
+                  ? "요일을 고르지 않으면 시작일부터 종료일까지 받을 수 있습니다."
+                  : `선택한 요일에만 받을 수 있습니다.`}
+                {` 시작일 ${reward.startDate || "(미설정)"} ${formatLoginRewardTime(reward)} 이후, 학생당 1회만 선물함으로 갑니다.`}
               </p>
             </div>
           </div>

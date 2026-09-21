@@ -23,8 +23,8 @@ export const DEFAULT_LOGIN_REWARD: LoginRewardSettings = {
   costumeFrameId: "",
   couponCode: "",
   pushEnabled: true,
-  pushTitle: "오늘의 접속 보상",
-  pushBody: "접속 보상이 지급되었습니다. 확인해 보세요!",
+  pushTitle: "접속 보상",
+  pushBody: "접속 보상이 선물함에 도착했습니다. 선물함에서 받아 주세요!",
   scheduleMode: "on_login",
   sendHour: 9,
   sendMinute: 0,
@@ -90,6 +90,10 @@ export function hasLoginRewardGrant(settings: LoginRewardSettings): boolean {
   return settings.goldAmount >= 1 || Boolean(settings.costumeFrameId) || Boolean(settings.couponCode);
 }
 
+export function loginRewardCampaignDate(settings: LoginRewardSettings) {
+  return settings.startDate;
+}
+
 export function getKstDateTime(date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "Asia/Seoul",
@@ -115,7 +119,8 @@ export function getKstDateTime(date = new Date()) {
 
 export function isLoginRewardDay(settings: LoginRewardSettings, now = new Date()) {
   const { ymd, weekday } = getKstDateTime(now);
-  if (settings.startDate && ymd < settings.startDate) return false;
+  if (!settings.startDate) return false;
+  if (ymd < settings.startDate) return false;
   if (settings.endDate && ymd > settings.endDate) return false;
   if (settings.weekdays.length > 0 && !settings.weekdays.includes(weekday)) return false;
   return true;
@@ -123,10 +128,13 @@ export function isLoginRewardDay(settings: LoginRewardSettings, now = new Date()
 
 export function isLoginRewardWindowOpen(settings: LoginRewardSettings, now = new Date()) {
   if (!settings.enabled || !hasLoginRewardGrant(settings)) return false;
+  if (!settings.startDate) return false;
   if (!isLoginRewardDay(settings, now)) return false;
-  if (settings.scheduleMode !== "scheduled") return true;
-  const { hour, minute } = getKstDateTime(now);
-  return hour * 60 + minute >= settings.sendHour * 60 + settings.sendMinute;
+  const { ymd, hour, minute } = getKstDateTime(now);
+  if (ymd === settings.startDate) {
+    return hour * 60 + minute >= settings.sendHour * 60 + settings.sendMinute;
+  }
+  return true;
 }
 
 export function formatLoginRewardTime(settings: LoginRewardSettings) {

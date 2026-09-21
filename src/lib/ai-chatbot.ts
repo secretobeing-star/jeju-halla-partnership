@@ -63,6 +63,7 @@ export type ChatbotReply = {
   moreIntent?: ChatbotIntent;
   cards?: ChatbotPartnerCard[];
   taught?: boolean;
+  missedPartnerQuery?: string;
 };
 
 export type ChatbotLiveEventLine = {
@@ -1460,7 +1461,9 @@ function paginateCards(
   const slice = cards.slice(offset, offset + CARD_PAGE);
   const nextOffset = offset + CARD_PAGE;
   if (slice.length === 0) {
-    return { text: emptyText };
+    const missed =
+      intent.type === "partner_search" && intent.query?.trim() ? intent.query.trim() : undefined;
+    return { text: emptyText, missedPartnerQuery: missed };
   }
   return {
     text: foundText,

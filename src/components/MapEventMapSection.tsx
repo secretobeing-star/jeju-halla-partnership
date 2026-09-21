@@ -436,8 +436,8 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   };
 
   const handleMapSearchReset = () => {
-    if (activeTabId !== DEFAULT_TAB_ID) {
-      handleTabChange(DEFAULT_TAB_ID);
+    if (props.onPartnerSelect) {
+      props.onPartnerSelect("");
     }
     props.onSearchReset?.();
   };

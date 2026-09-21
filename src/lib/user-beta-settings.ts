@@ -17,6 +17,7 @@ export type UserBetaSettings = {
   site_nav_floating_chips: boolean | null;
   show_category_region: boolean | null;
   show_main_map: boolean | null;
+  show_partner_favorites: boolean | null;
 };
 
 const STORAGE_KEY = "jeju-halla-user-beta-settings";
@@ -33,6 +34,7 @@ const DEFAULT_USER_BETA_SETTINGS: UserBetaSettings = {
   site_nav_floating_chips: null,
   show_category_region: null,
   show_main_map: null,
+  show_partner_favorites: null,
 };
 
 function parseUserBetaSettings(parsed: Partial<UserBetaSettings>): UserBetaSettings {
@@ -66,6 +68,9 @@ function parseUserBetaSettings(parsed: Partial<UserBetaSettings>): UserBetaSetti
       : null,
     show_main_map: Object.prototype.hasOwnProperty.call(parsed, "show_main_map")
       ? Boolean(parsed.show_main_map)
+      : null,
+    show_partner_favorites: Object.prototype.hasOwnProperty.call(parsed, "show_partner_favorites")
+      ? Boolean(parsed.show_partner_favorites)
       : null,
   };
 }

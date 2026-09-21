@@ -40,6 +40,8 @@ type MainBetaSettingsButtonProps = {
   navFloatingChipsDefaultEnabled?: boolean;
   defaultBoardPosition?: MainBoardPosition;
   categoryRegionToggleAvailable?: boolean;
+  favoritesToggleAvailable?: boolean;
+  favoritesToggleLabel?: string;
   mainMapToggleAvailable?: boolean;
   noticeText?: string | null;
   noticeUrl?: string | null;
@@ -274,6 +276,8 @@ export default function MainBetaSettingsButton({
   navFloatingChipsDefaultEnabled = true,
   defaultBoardPosition = "above",
   categoryRegionToggleAvailable = false,
+  favoritesToggleAvailable = false,
+  favoritesToggleLabel = "즐겨찾기",
   mainMapToggleAvailable = false,
   noticeText,
   noticeUrl,
@@ -312,7 +316,8 @@ export default function MainBetaSettingsButton({
     prefs.site_nav_background ?? navBackgroundDefaultEnabled;
   const effectiveNavFloatingChips =
     prefs.site_nav_floating_chips ?? navFloatingChipsDefaultEnabled;
-  const hasMainScreenToggles = categoryRegionToggleAvailable || mainMapToggleAvailable;
+  const hasMainScreenToggles =
+    categoryRegionToggleAvailable || favoritesToggleAvailable || mainMapToggleAvailable;
   const hasBetaFeatures =
     fontSizeAvailable ||
     darkModeAvailable ||
@@ -536,6 +541,13 @@ export default function MainBetaSettingsButton({
                     label="카테고리·지역"
                     checked={prefs.show_category_region ?? true}
                     onChange={(value) => update({ show_category_region: value })}
+                  />
+                ) : null}
+                {favoritesToggleAvailable ? (
+                  <ToggleRow
+                    label={favoritesToggleLabel}
+                    checked={prefs.show_partner_favorites ?? true}
+                    onChange={(value) => update({ show_partner_favorites: value })}
                   />
                 ) : null}
                 {mainMapToggleAvailable ? (

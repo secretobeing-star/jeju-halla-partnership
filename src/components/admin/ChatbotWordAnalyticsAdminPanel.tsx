@@ -62,7 +62,7 @@ export default function ChatbotWordAnalyticsAdminPanel({ onMessage }: ChatbotWor
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-gray-500">
-          말한 문장에서 실제로 나온 단어만 셉니다. 질문 전체를 한 덩어리로 모으지 않습니다.
+          말한 문장에서 나온 단어를 셉니다. 제휴를 찾지 못했을 때는 그때 말한 이름(예: 개발자)이 보입니다.
         </p>
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex rounded-lg border border-gray-200 p-0.5 text-xs">

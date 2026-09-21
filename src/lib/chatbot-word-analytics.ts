@@ -106,7 +106,8 @@ function addWord(target: Set<string>, value: string) {
 function spokenPart(value: string) {
   return value
     .replace(/[^0-9a-zA-Z가-힣]/g, "")
-    .replace(/(해주세요|찾아줘|찾아봐|보여줘|알려줘|열어줘|해줘|주세요)$/g, "");
+    .replace(/(해주세요|찾아줘|찾아봐|보여줘|알려줘|열어줘|해줘|주세요)$/g, "")
+    .replace(/(을|를|이|가|은|는|의|에서|에게|한테)$/g, "");
 }
 
 /** 말한 문장에서 실제로 나온 단어만 고릅니다. 질문 전체를 한 덩어리로 세지 않습니다. */
@@ -118,6 +119,10 @@ export function tokenizeSpokenWords(raw: string): string[] {
   const lower = text.toLowerCase();
   const spoken = [...SPOKEN_WORDS].sort((a, b) => b.length - a.length);
   const used = new Array(lower.length).fill(false);
+
+  for (const quoted of text.matchAll(/[「『“"']([^」』”"']{2,24})[」』”"']/g)) {
+    addWord(found, spokenPart(quoted[1] ?? ""));
+  }
 
   for (const word of spoken) {
     const needle = word.toLowerCase();
@@ -134,7 +139,7 @@ export function tokenizeSpokenWords(raw: string): string[] {
     }
   }
 
-  for (const part of text.split(/[\s,./!?~·]+/).filter(Boolean)) {
+  for (const part of text.split(/[\s,./!?~·「」『』“”"']+/).filter(Boolean)) {
     addWord(found, spokenPart(part));
   }
 

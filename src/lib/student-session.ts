@@ -15,7 +15,14 @@ function claimDailyLoginRewardClient(studentId: string, sessionToken: string) {
       studentId,
       clientKey: clientKey !== "server" ? clientKey : "",
     }),
-  }).catch(() => {});
+  })
+    .then((response) => response.json().catch(() => null))
+    .then((payload) => {
+      if (payload && payload.claimed === true) {
+        window.dispatchEvent(new Event("site-gift-inbox-refresh"));
+      }
+    })
+    .catch(() => {});
 }
 
 let ensurePromise: Promise<boolean> | null = null;

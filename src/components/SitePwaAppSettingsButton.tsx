@@ -22,6 +22,7 @@ import {
 import {
   isPwaAppSettingsCategoryRegionEnabled,
   isPwaAppSettingsDarkModeEnabled,
+  isPwaAppSettingsFavoritesEnabled,
   isPwaAppSettingsFontSizeEnabled,
   isPwaAppSettingsLocationEnabled,
   isPwaAppSettingsNotificationEnabled,
@@ -47,6 +48,7 @@ import {
 } from "@/lib/site-twa-client";
 import { getSiteMemberSession, clearSiteMemberSession } from "@/lib/site-member-session";
 import { supabase } from "@/lib/supabase";
+import { getPartnerFavoritesLabel } from "@/lib/partner-favorites-display";
 import DeleteAccountConfirmDialog from "@/components/DeleteAccountConfirmDialog";
 
 type PermissionGuidePrompt = {
@@ -224,8 +226,10 @@ export default function SitePwaAppSettingsButton({
   const showFontSize = isPwaAppSettingsFontSizeEnabled(settings);
   const showPageBackground = isPwaAppSettingsPageBackgroundEnabled(settings);
   const showCategoryRegion = isPwaAppSettingsCategoryRegionEnabled(settings);
+  const showFavorites = isPwaAppSettingsFavoritesEnabled(settings);
   const showLab = showFontSize || showDarkMode || showPageBackground;
   const showPermissions = showNotification || showLocation;
+  const showMainScreen = showCategoryRegion || showFavorites;
   const pageBackgroundDefaultEnabled = settings.page_background_default_enabled ?? true;
 
   const [open, setOpen] = useState(false);
@@ -453,7 +457,7 @@ export default function SitePwaAppSettingsButton({
     closePermissionGuidePrompt();
   }
 
-  if (!showPermissions && !showLab && !showCategoryRegion) {
+  if (!showPermissions && !showLab && !showMainScreen) {
     return null;
   }
 
@@ -627,24 +631,33 @@ export default function SitePwaAppSettingsButton({
             ) : null}
           </div>
         ) : null}
-        {showCategoryRegion ? (
+        {showMainScreen ? (
           <div
             className={`site-pwa-app-settings__section${
               showLab ? " site-pwa-app-settings__section--spaced" : ""
             }`}
           >
             <p className="site-pwa-app-settings__section-label">메인 화면</p>
-            <ToggleRow
-              label="카테고리·지역"
-              checked={prefs.show_category_region ?? true}
-              onChange={(value) => updatePrefs({ show_category_region: value })}
-            />
+            {showCategoryRegion ? (
+              <ToggleRow
+                label="카테고리·지역"
+                checked={prefs.show_category_region ?? true}
+                onChange={(value) => updatePrefs({ show_category_region: value })}
+              />
+            ) : null}
+            {showFavorites ? (
+              <ToggleRow
+                label={getPartnerFavoritesLabel(settings)}
+                checked={prefs.show_partner_favorites ?? true}
+                onChange={(value) => updatePrefs({ show_partner_favorites: value })}
+              />
+            ) : null}
           </div>
         ) : null}
         {showPermissions ? (
           <div
             className={`site-pwa-app-settings__section${
-              showLab || showCategoryRegion ? " site-pwa-app-settings__section--spaced" : ""
+              showLab || showMainScreen ? " site-pwa-app-settings__section--spaced" : ""
             }`}
           >
             <p className="site-pwa-app-settings__section-label">앱 권한</p>

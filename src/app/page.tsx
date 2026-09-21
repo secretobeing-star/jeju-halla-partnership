@@ -106,6 +106,19 @@ import {
   normalizeNoticeCarouselAutoInterval,
 } from "@/lib/site-notices";
 import { getPartnerCategories, partnerMatchesCategory } from "@/lib/partner-categories";
+import PartnerCustomCategoryEditor from "@/components/PartnerCustomCategoryEditor";
+import {
+  USER_CUSTOM_CATEGORIES_EVENT,
+  USER_CUSTOM_CATEGORY_LIMITS,
+  createUserCustomCategoryId,
+  customCategoryValue,
+  loadUserCustomCategories,
+  parseCustomCategoryId,
+  partnerMatchesCustomCategory,
+  pruneUserCustomCategories,
+  saveUserCustomCategories,
+  type UserCustomCategory,
+} from "@/lib/user-custom-categories";
 import { getPartnerSearchKeywordGroups } from "@/lib/partner-search-keywords";
 import { partnerMatchesSearchQuery } from "@/lib/partner-search";
 import type { PartnerSearchKeywordGroup } from "@/lib/partner-search-keywords";
@@ -159,6 +172,7 @@ type PartnerListFilterContext = {
   partnerCategories: readonly string[];
   searchKeywordGroups: readonly PartnerSearchKeywordGroup[];
   selectedCategory: string;
+  customCategories: readonly UserCustomCategory[];
   selectedYear: PartnerYearFilterValue;
   selectedRegions: PartnerRegionFilters;
   regionFilterEnabled: boolean;
@@ -170,9 +184,16 @@ type PartnerListFilterContext = {
 
 function filterAndSortPartners(source: Partner[], ctx: PartnerListFilterContext): Partner[] {
   const filtered = source.filter((partner) => {
+    const customMatch = partnerMatchesCustomCategory(
+      partner.id,
+      ctx.selectedCategory,
+      ctx.customCategories,
+    );
     const matchesCategory =
-      ctx.selectedCategory === "전체" ||
-      partnerMatchesCategory(partner.category, ctx.selectedCategory);
+      customMatch === null
+        ? ctx.selectedCategory === "전체" ||
+          partnerMatchesCategory(partner.category, ctx.selectedCategory)
+        : customMatch;
 
     if (!matchesCategory) return false;
 
@@ -284,6 +305,9 @@ export default function HomePage() {
   const [partnersRefreshing, setPartnersRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("전체");
+  const [customCategories, setCustomCategories] = useState<UserCustomCategory[]>([]);
+  const [customCategoryEditorOpen, setCustomCategoryEditorOpen] = useState(false);
+  const [editingCustomCategory, setEditingCustomCategory] = useState<UserCustomCategory | null>(null);
   const [selectedYear, setSelectedYear] = useState<PartnerYearFilterValue>("전체");
   const [selectedRegions, setSelectedRegions] = useState<PartnerRegionFilters>(
     DEFAULT_PARTNER_REGION_FILTERS,
@@ -729,10 +753,51 @@ export default function HomePage() {
   }, [settingsReady]);
 
   useEffect(() => {
-    if (selectedCategory !== "전체" && !categoryOptions.includes(selectedCategory)) {
+    function refreshCustomCategories() {
+      setCustomCategories(loadUserCustomCategories());
+    }
+    refreshCustomCategories();
+    window.addEventListener(USER_CUSTOM_CATEGORIES_EVENT, refreshCustomCategories);
+    return () => window.removeEventListener(USER_CUSTOM_CATEGORIES_EVENT, refreshCustomCategories);
+  }, []);
+
+  useEffect(() => {
+    if (partners.length === 0 || customCategories.length === 0) {
+      return;
+    }
+    const validIds = new Set(partners.map((partner) => partner.id));
+    const pruned = pruneUserCustomCategories(customCategories, validIds);
+    const changed = pruned.some(
+      (category, index) => category.partnerIds.length !== customCategories[index]?.partnerIds.length,
+    );
+    if (!changed) {
+      return;
+    }
+    saveUserCustomCategories(pruned);
+    setCustomCategories(pruned);
+  }, [customCategories, partners]);
+
+  useEffect(() => {
+    if (memberStudentLoggedIn) {
+      return;
+    }
+    setCustomCategoryEditorOpen(false);
+    setEditingCustomCategory(null);
+    if (parseCustomCategoryId(selectedCategory)) {
       setSelectedCategory("전체");
     }
-  }, [categoryOptions, selectedCategory]);
+  }, [memberStudentLoggedIn, selectedCategory]);
+
+  useEffect(() => {
+    if (selectedCategory === "전체" || categoryOptions.includes(selectedCategory)) {
+      return;
+    }
+    const customId = parseCustomCategoryId(selectedCategory);
+    if (customId && memberStudentLoggedIn && customCategories.some((item) => item.id === customId)) {
+      return;
+    }
+    setSelectedCategory("전체");
+  }, [categoryOptions, customCategories, memberStudentLoggedIn, selectedCategory]);
 
   useEffect(() => {
     if (
@@ -794,6 +859,7 @@ export default function HomePage() {
       partnerCategories,
       searchKeywordGroups,
       selectedCategory,
+      customCategories,
       selectedYear,
       selectedRegions,
       regionFilterEnabled,
@@ -807,6 +873,7 @@ export default function HomePage() {
       partnerCategories,
       searchKeywordGroups,
       selectedCategory,
+      customCategories,
       selectedYear,
       selectedRegions,
       regionFilterEnabled,
@@ -893,12 +960,14 @@ export default function HomePage() {
     ],
   );
   const partnerFavoritesEnabled = partnerFavoritesDisplay.enabled;
+  const showPartnerFavoritesFilter =
+    partnerFavoritesEnabled && (userBetaPrefs.show_partner_favorites ?? true);
 
   useEffect(() => {
-    if (!partnerFavoritesEnabled) {
+    if (!showPartnerFavoritesFilter) {
       setShowFavoritesOnly(false);
     }
-  }, [partnerFavoritesEnabled]);
+  }, [showPartnerFavoritesFilter]);
 
   useEffect(() => {
     const updateViewportSize = () => {
@@ -1143,7 +1212,7 @@ export default function HomePage() {
 
   const partnerSortControls = (
     <>
-      {partnerFavoritesEnabled ? (
+      {showPartnerFavoritesFilter ? (
         <button
           type="button"
           onClick={() => {
@@ -1248,7 +1317,7 @@ export default function HomePage() {
   );
 
   const categorySection = showCategoryRegionSection ? (
-    <section className="partner-category-section mb-4">
+    <section className="partner-category-section partner-category-section--boxed mb-4">
       <div className="partner-category-grid">
         {categoryOptions.map((category) => {
           const isSelected = selectedCategory === category;
@@ -1269,6 +1338,52 @@ export default function HomePage() {
             </button>
           );
         })}
+        {memberStudentLoggedIn
+          ? customCategories.map((category) => {
+          const value = customCategoryValue(category.id);
+          const isSelected = selectedCategory === value;
+          return (
+            <span key={category.id} className="partner-category-chip-wrap">
+              <button
+                type="button"
+                onClick={() => setSelectedCategory(value)}
+                className={[
+                  "partner-category-chip partner-category-chip--custom rounded-full px-3.5 py-2 text-xs font-medium transition sm:px-4 sm:text-sm",
+                  isSelected
+                    ? "partner-category-chip--selected bg-emerald-500 text-white shadow-sm"
+                    : "bg-emerald-50 text-emerald-800 hover:bg-emerald-100",
+                ].join(" ")}
+              >
+                {category.label}
+              </button>
+              <button
+                type="button"
+                className="partner-category-chip-edit"
+                aria-label={`${category.label} 수정`}
+                onClick={() => {
+                  setEditingCustomCategory(category);
+                  setCustomCategoryEditorOpen(true);
+                }}
+              >
+                수정
+              </button>
+            </span>
+          );
+        })
+          : null}
+        {memberStudentLoggedIn &&
+        customCategories.length < USER_CUSTOM_CATEGORY_LIMITS.maxCategories ? (
+          <button
+            type="button"
+            className="partner-category-chip partner-category-chip--add rounded-full px-3.5 py-2 text-xs font-medium sm:px-4 sm:text-sm"
+            onClick={() => {
+              setEditingCustomCategory(null);
+              setCustomCategoryEditorOpen(true);
+            }}
+          >
+            + 내 카테고리
+          </button>
+        ) : null}
       </div>
 
       {regionFilterEnabled ? (
@@ -1280,6 +1395,48 @@ export default function HomePage() {
           partners={partners}
         />
       ) : null}
+
+      <PartnerCustomCategoryEditor
+        open={customCategoryEditorOpen && memberStudentLoggedIn}
+        partners={partners}
+        initial={editingCustomCategory}
+        onClose={() => {
+          setCustomCategoryEditorOpen(false);
+          setEditingCustomCategory(null);
+        }}
+        onSave={({ label, partnerIds }) => {
+          const nextCategory: UserCustomCategory = editingCustomCategory
+            ? { ...editingCustomCategory, label, partnerIds }
+            : {
+                id: createUserCustomCategoryId(),
+                label,
+                partnerIds,
+              };
+          const next = editingCustomCategory
+            ? customCategories.map((item) => (item.id === nextCategory.id ? nextCategory : item))
+            : [...customCategories, nextCategory];
+          saveUserCustomCategories(next);
+          setCustomCategories(next);
+          setSelectedCategory(customCategoryValue(nextCategory.id));
+          setCustomCategoryEditorOpen(false);
+          setEditingCustomCategory(null);
+          setCurrentPage(1);
+        }}
+        onDelete={
+          editingCustomCategory
+            ? () => {
+                const next = customCategories.filter((item) => item.id !== editingCustomCategory.id);
+                saveUserCustomCategories(next);
+                setCustomCategories(next);
+                if (selectedCategory === customCategoryValue(editingCustomCategory.id)) {
+                  setSelectedCategory("전체");
+                }
+                setCustomCategoryEditorOpen(false);
+                setEditingCustomCategory(null);
+              }
+            : undefined
+        }
+      />
     </section>
   ) : null;
 
@@ -1302,6 +1459,7 @@ export default function HomePage() {
         markerSettings={mapMarkerSettings}
         onSearchReset={() => {
           setSearchQuery("");
+          setSelectedPartnerId(null);
           setCurrentPage(1);
         }}
       />
@@ -1606,6 +1764,8 @@ export default function HomePage() {
               (settings.partner_category_section_enabled ?? true) &&
               (settings.main_category_region_user_toggle_enabled ?? true)
             }
+            favoritesToggleAvailable={partnerFavoritesEnabled}
+            favoritesToggleLabel={partnerFavoritesDisplay.label}
             noticeText={settings.settings_panel_notice_text}
             noticeUrl={settings.settings_panel_notice_url}
             noticeColor={settings.settings_panel_notice_color}
