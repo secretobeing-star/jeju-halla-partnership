@@ -1621,6 +1621,9 @@ export default function HomePage() {
     );
   };
 
+  const showYearFilter = yearFilterEnabled && yearOptions.length > 0;
+  const hasPartnerSortControls =
+    showPartnerFavoritesFilter || showPartnerSort || partnerListRefreshEnabled;
   const partnerListToolbar = showPartnerListToolbar ? (
     <div className="partner-list-toolbar site-main-width mx-auto mb-4">
       <div className="partner-list-toolbar__header flex flex-wrap items-start justify-between gap-3">
@@ -1631,20 +1634,27 @@ export default function HomePage() {
             <span className="flex-1" aria-hidden />
           )}
         </div>
-        <div className="partner-list-toolbar__right ml-auto flex flex-col items-end gap-2">
-          {yearFilterEnabled && yearOptions.length > 0 ? (
-            <PartnerYearFilterDropdown
-              value={selectedYear}
-              years={yearOptions}
-              onChange={(year) => {
-                setSelectedYear(year);
-                setCurrentPage(1);
-              }}
-            />
-          ) : null}
-        </div>
+        {showYearFilter || hasPartnerSortControls ? (
+          <div className="partner-list-toolbar__right">
+            {showYearFilter ? (
+              <PartnerYearFilterDropdown
+                value={selectedYear}
+                years={yearOptions}
+                onChange={(year) => {
+                  setSelectedYear(year);
+                  setCurrentPage(1);
+                }}
+              />
+            ) : null}
+            {hasPartnerSortControls ? (
+              <div className="partner-list-toolbar__sort">
+                {partnerSortControls}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </div>
-      {showToolbarSearch || partnerSortControls ? (
+      {showToolbarSearch ? (
         <div
           className={[
             "partner-list-toolbar__controls-row",
@@ -1653,35 +1663,28 @@ export default function HomePage() {
             .filter(Boolean)
             .join(" ")}
         >
-          {showToolbarSearch ? (
-            <div
-              className={[
-                "partner-list-toolbar__search-wrap",
-                isCompactNavViewport ? "partner-list-toolbar__search-wrap--mobile" : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-            >
-              <SitePartnerSearch
-                showLeadingIcon={!isCompactNavViewport}
-                iconAside={isCompactNavViewport}
-                searchQuery={searchQuery}
-                onSearchQueryChange={setSearchQuery}
-                placeholder={navSearchPlaceholder}
-                inputId={
-                  isCompactNavViewport
-                    ? "partner-list-search-mobile"
-                    : "partner-list-search"
-                }
-                inputClassName="site-top-nav__search partner-list-toolbar__search"
-              />
-            </div>
-          ) : null}
-          {partnerSortControls ? (
-            <div className="partner-list-toolbar__sort flex flex-wrap items-center justify-end gap-2">
-              {partnerSortControls}
-            </div>
-          ) : null}
+          <div
+            className={[
+              "partner-list-toolbar__search-wrap",
+              isCompactNavViewport ? "partner-list-toolbar__search-wrap--mobile" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          >
+            <SitePartnerSearch
+              showLeadingIcon={!isCompactNavViewport}
+              iconAside={isCompactNavViewport}
+              searchQuery={searchQuery}
+              onSearchQueryChange={setSearchQuery}
+              placeholder={navSearchPlaceholder}
+              inputId={
+                isCompactNavViewport
+                  ? "partner-list-search-mobile"
+                  : "partner-list-search"
+              }
+              inputClassName="site-top-nav__search partner-list-toolbar__search"
+            />
+          </div>
         </div>
       ) : null}
     </div>

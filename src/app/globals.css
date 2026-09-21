@@ -7412,7 +7412,7 @@ html.dark-mode .partner-category-section__gear {
   order: 1;
   flex: 1 1 100%;
   width: 100%;
-  margin-left: 0;
+  margin-left: auto;
   justify-content: flex-end;
 }
 
@@ -7497,7 +7497,7 @@ html.dark-mode .partner-category-section__gear {
   width: 100%;
 }
 
-.partner-list-toolbar__sort {
+.partner-list-toolbar__right {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -7506,15 +7506,23 @@ html.dark-mode .partner-category-section__gear {
   margin-left: auto;
 }
 
+.partner-list-toolbar__sort {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
 @media (max-width: 639px) {
-  .partner-list-toolbar__header,
-  .partner-list-toolbar__sort {
+  .partner-list-toolbar__right {
     padding-right: 4.35rem;
+    justify-content: flex-end;
+    margin-left: auto;
   }
 
   .partner-list-toolbar__sort {
-    justify-content: flex-start;
-    margin-left: 0;
+    justify-content: flex-end;
   }
 
   html.ios-device .partner-map-locate-button,
