@@ -74,7 +74,7 @@ export default function PartnerReactionButtons({
             : "border-emerald-200 bg-emerald-50 text-emerald-700"
         } disabled:opacity-60`}
       >
-        좋아요 {likeCount}
+        추천 {likeCount}
       </button>
     </div>
   );

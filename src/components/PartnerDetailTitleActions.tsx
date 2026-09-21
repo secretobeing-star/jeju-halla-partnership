@@ -163,7 +163,7 @@ export default function PartnerDetailTitleActions({
   }
 
   return (
-    <div className="partner-detail-title-actions flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+    <div className="partner-detail-title-actions flex shrink-0 items-center gap-1.5">
       {showFavorite ? (
         <ActionIconButton
           label={

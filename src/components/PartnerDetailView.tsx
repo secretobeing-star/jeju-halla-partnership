@@ -118,7 +118,7 @@ export default function PartnerDetailView({
           </span>
           <PartnerLocalFranchiseBadge show={showLocalFranchiseBadge} />
         </div>
-        <div className="partner-detail-title-row mt-2 flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
+        <div className="partner-detail-title-row mt-2 flex items-start justify-between gap-3">
           <h2 className="partner-detail-view__name min-w-0 flex-1 text-xl font-bold leading-snug text-gray-900">
             {partner.name}
           </h2>
@@ -135,16 +135,6 @@ export default function PartnerDetailView({
             onCustomCategoryBookmark={onCustomCategoryBookmark}
           />
         </div>
-        {reactionsEnabled && onPartnerReactionChange ? (
-          <div className="mt-2">
-            <PartnerReactionButtons
-              partnerId={partner.id}
-              likeCount={partner.like_count ?? 0}
-              enabled={reactionsEnabled}
-              onCountsChange={onPartnerReactionChange}
-            />
-          </div>
-        ) : null}
         <p className="partner-detail-view__address mt-1.5 text-sm leading-relaxed text-gray-700">
           <span className="sr-only">주소 </span>
           <span aria-hidden className="mr-0.5">
@@ -230,20 +220,32 @@ export default function PartnerDetailView({
         splitPanelMode={splitLayout}
       />
 
-      {(reviewsEnabled && onPartnerReviewCountChange && hiddenReviewDisplay) && (
+      {(reactionsEnabled || reviewsEnabled) && (
         <div className="partner-detail-view__reviews-wrap flex flex-col gap-3">
-          <h3 className="partner-detail-view__reviews-title">후기 · 댓글</h3>
-          <PartnerReviews
-            partnerId={partner.id}
-            reviewCount={partner.review_count ?? 0}
-            enabled={reviewsEnabled}
-            hiddenReviewDisplay={hiddenReviewDisplay}
-            onReviewCountChange={onPartnerReviewCountChange}
-            defaultOpen
-            panelLayout={splitLayout}
-            reportReasons={reportReasons}
-            reportSuccessSettings={reportSuccessSettings}
-          />
+          {reviewsEnabled && onPartnerReviewCountChange && hiddenReviewDisplay ? (
+            <h3 className="partner-detail-view__reviews-title">후기 · 댓글</h3>
+          ) : null}
+          {reactionsEnabled && onPartnerReactionChange && (
+            <PartnerReactionButtons
+              partnerId={partner.id}
+              likeCount={partner.like_count ?? 0}
+              enabled={reactionsEnabled}
+              onCountsChange={onPartnerReactionChange}
+            />
+          )}
+          {reviewsEnabled && onPartnerReviewCountChange && hiddenReviewDisplay && (
+            <PartnerReviews
+              partnerId={partner.id}
+              reviewCount={partner.review_count ?? 0}
+              enabled={reviewsEnabled}
+              hiddenReviewDisplay={hiddenReviewDisplay}
+              onReviewCountChange={onPartnerReviewCountChange}
+              defaultOpen
+              panelLayout={splitLayout}
+              reportReasons={reportReasons}
+              reportSuccessSettings={reportSuccessSettings}
+            />
+          )}
         </div>
       )}
     </>

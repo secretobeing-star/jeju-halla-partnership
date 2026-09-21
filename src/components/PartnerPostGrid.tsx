@@ -213,17 +213,6 @@ export default function PartnerPostGrid({
                 {partner.address}
               </p>
 
-              {reactionsEnabled && onPartnerReactionChange ? (
-                <div className="mt-2">
-                  <PartnerReactionButtons
-                    partnerId={partner.id}
-                    likeCount={partner.like_count ?? 0}
-                    enabled={reactionsEnabled}
-                    onCountsChange={onPartnerReactionChange}
-                  />
-                </div>
-              ) : null}
-
               <button
                 type="button"
                 onClick={handleMoreClick}
@@ -285,19 +274,29 @@ export default function PartnerPostGrid({
                   {partner.benefit}
                 </div>
 
-                {reviewsEnabled && onPartnerReviewCountChange && hiddenReviewDisplay ? (
+                {(reactionsEnabled || reviewsEnabled) && (
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <PartnerReviews
-                      partnerId={partner.id}
-                      reviewCount={partner.review_count ?? 0}
-                      enabled={reviewsEnabled}
-                      hiddenReviewDisplay={hiddenReviewDisplay}
-                      onReviewCountChange={onPartnerReviewCountChange}
-                      reportReasons={reportReasons}
-                      reportSuccessSettings={reportSuccessSettings}
-                    />
+                    {reactionsEnabled && onPartnerReactionChange && (
+                      <PartnerReactionButtons
+                        partnerId={partner.id}
+                        likeCount={partner.like_count ?? 0}
+                        enabled={reactionsEnabled}
+                        onCountsChange={onPartnerReactionChange}
+                      />
+                    )}
+                    {reviewsEnabled && onPartnerReviewCountChange && hiddenReviewDisplay && (
+                      <PartnerReviews
+                        partnerId={partner.id}
+                        reviewCount={partner.review_count ?? 0}
+                        enabled={reviewsEnabled}
+                        hiddenReviewDisplay={hiddenReviewDisplay}
+                        onReviewCountChange={onPartnerReviewCountChange}
+                        reportReasons={reportReasons}
+                        reportSuccessSettings={reportSuccessSettings}
+                      />
+                    )}
                   </div>
-                ) : null}
+                )}
 
                 <div className="mt-3 flex flex-col gap-2">
                   {mapOpenUrl && (

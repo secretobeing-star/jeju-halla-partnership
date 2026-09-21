@@ -7978,18 +7978,6 @@ html.dark-mode .site-partner-search__toggle:hover {
   pointer-events: auto;
 }
 
-.partner-detail-title-row {
-  overflow: visible;
-}
-
-.partner-detail-title-actions,
-.board-post-popup-dialog .partner-detail-title-actions,
-.board-post-popup-dialog .partner-detail-title-action,
-.board-post-popup-dialog .partner-favorite-button,
-.partner-card-image__overlay .partner-favorite-button {
-  pointer-events: auto !important;
-}
-
 .partner-favorite-button--edge {
   position: absolute;
   right: 0.625rem;
@@ -8011,7 +7999,8 @@ html.dark-mode .site-partner-search__toggle:hover {
 .partner-card-image__overlay .partner-favorite-button:not(.partner-favorite-button--edge) {
   position: absolute;
   top: 0.5rem;
-  right: 0.5rem;
+  left: 0.5rem;
+  right: auto;
   z-index: 20;
   pointer-events: auto;
 }
