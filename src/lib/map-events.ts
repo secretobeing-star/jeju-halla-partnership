@@ -6,7 +6,17 @@ export const DEFAULT_BENEFIT_BTN_LABEL_KEY = "default_benefit_btn_label";
 export const EVENT_STAMP_BTN_LABEL_KEY = "event_stamp_btn_label";
 export const STAMP_BUTTON_LABEL_KEY = "stamp_button_label";
 
-export const DEFAULT_MAP_TAB_NAME = "제휴처";
+export const DEFAULT_MAP_TAB_NAME = "제휴";
+const EXAMPLE_MAP_TAB_NAMES = new Set(["제휴처", "🌿 제휴처"]);
+
+export function resolveMapTabName(value?: string | null) {
+  const trimmed = value?.trim() || "";
+  if (!trimmed || EXAMPLE_MAP_TAB_NAMES.has(trimmed)) {
+    return DEFAULT_MAP_TAB_NAME;
+  }
+  return trimmed;
+}
+
 export const DEFAULT_BENEFIT_BTN_LABEL = "자세히 보기";
 export const DEFAULT_STAMP_BTN_LABEL = "도장 찍기";
 export const DEFAULT_RADIUS_METERS = 30;
@@ -263,10 +273,9 @@ export function configFromRows(
   stampButtonLabel?: string | null
 ): MapAppConfig {
   const map = new Map(rows.map((row) => [row.key ?? "", row.value ?? ""]));
-  const tab =
-    map.get(DEFAULT_TAB_NAME_KEY)?.trim() ||
-    map.get(DEFAULT_MAP_TAB_NAME_KEY)?.trim() ||
-    DEFAULT_MAP_TAB_NAME;
+  const tab = resolveMapTabName(
+    map.get(DEFAULT_TAB_NAME_KEY)?.trim() || map.get(DEFAULT_MAP_TAB_NAME_KEY)?.trim(),
+  );
   const marker =
     map.get(DEFAULT_MARKER_IMG_KEY)?.trim() ||
     map.get(DEFAULT_MAP_MARKER_IMG_KEY)?.trim() ||

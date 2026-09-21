@@ -96,6 +96,7 @@ declare namespace naver.maps {
     title?: string;
     icon?: HtmlIcon;
     zIndex?: number;
+    clickable?: boolean;
   }
 
   interface InfoWindowOptions {

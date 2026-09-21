@@ -26,7 +26,13 @@ export function getMainPartnerMapDisplay(
 ): MainPartnerMapDisplay {
   return {
     enabled: settings?.main_partner_map_enabled ?? false,
-    title: settings?.main_partner_map_title?.trim() || null,
+    title: (() => {
+      const title = settings?.main_partner_map_title?.trim() || "";
+      if (!title || title === "제휴처" || title === "🌿 제휴처") {
+        return null;
+      }
+      return title;
+    })(),
     defaultExpanded: settings?.main_partner_map_default_expanded ?? true,
     position: normalizeMainPartnerMapPosition(settings?.main_partner_map_position),
   };

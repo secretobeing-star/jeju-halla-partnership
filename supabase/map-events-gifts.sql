@@ -19,9 +19,9 @@ alter table public.user_event_progress
 
 insert into public.app_configs (key, value)
 values
-  ('default_map_tab_name', '🌿 제휴처'),
+  ('default_map_tab_name', '제휴'),
   ('default_map_marker_img', ''),
-  ('default_tab_name', '🌿 제휴처'),
+  ('default_tab_name', '제휴'),
   ('default_marker_img', ''),
   ('default_benefit_btn_label', '자세히 보기'),
   ('event_stamp_btn_label', '도장 찍기')

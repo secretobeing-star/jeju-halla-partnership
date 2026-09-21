@@ -3,14 +3,22 @@ import type { SiteSettings } from "@/lib/supabase";
 export const DEFAULT_PARTNER_FAVORITES_LABEL = "즐겨찾기";
 export const DEFAULT_PARTNER_FAVORITES_EMPTY_MESSAGE = "등록된 항목이 없습니다.";
 
+type PartnerFavoritesLabelSource = {
+  partner_favorites_label?: string | null;
+};
+
+type PartnerFavoritesEmptyMessageSource = {
+  partner_favorites_empty_message?: string | null;
+};
+
 export function getPartnerFavoritesLabel(
-  settings?: Pick<SiteSettings, "partner_favorites_label"> | null,
+  settings?: PartnerFavoritesLabelSource | null,
 ): string {
   return settings?.partner_favorites_label?.trim() || DEFAULT_PARTNER_FAVORITES_LABEL;
 }
 
 export function getPartnerFavoritesEmptyMessage(
-  settings?: Pick<SiteSettings, "partner_favorites_empty_message"> | null,
+  settings?: PartnerFavoritesEmptyMessageSource | null,
 ): string {
   return (
     settings?.partner_favorites_empty_message?.trim() || DEFAULT_PARTNER_FAVORITES_EMPTY_MESSAGE

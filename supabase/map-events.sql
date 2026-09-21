@@ -8,7 +8,7 @@ create table if not exists public.app_configs (
 
 insert into public.app_configs (key, value)
 values
-  ('default_map_tab_name', '🌿 제휴처'),
+  ('default_map_tab_name', '제휴'),
   ('default_map_marker_img', '')
 on conflict (key) do nothing;
 

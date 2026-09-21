@@ -5,8 +5,8 @@ import {
   DEFAULT_BENEFIT_BTN_LABEL,
   DEFAULT_BENEFIT_BTN_LABEL_KEY,
   DEFAULT_MAP_MARKER_IMG_KEY,
-  DEFAULT_MAP_TAB_NAME,
   DEFAULT_MAP_TAB_NAME_KEY,
+  resolveMapTabName,
   DEFAULT_MARKER_IMG_KEY,
   DEFAULT_STAMP_BTN_LABEL,
   DEFAULT_TAB_NAME_KEY,
@@ -76,7 +76,7 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
 
-  const tab = body.default_map_tab_name?.trim() || DEFAULT_MAP_TAB_NAME;
+  const tab = resolveMapTabName(body.default_map_tab_name);
   const marker = body.default_map_marker_img?.trim() || "";
   const benefit = body.default_benefit_btn_label?.trim() || DEFAULT_BENEFIT_BTN_LABEL;
   const stamp = body.event_stamp_btn_label?.trim() || DEFAULT_STAMP_BTN_LABEL;
