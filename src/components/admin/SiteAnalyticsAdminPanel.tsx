@@ -228,7 +228,7 @@ export default function SiteAnalyticsAdminPanel({ onMessage }: SiteAnalyticsAdmi
 
           <AdminCollapsibleSection
             title="AI 챗봇"
-            description="열기·질문 횟수와 함께, 질문에 많이 나온 단어를 볼 수 있습니다."
+            description="열기는 말풍선 버튼을 누른 횟수입니다. 말은 보내기·더보기로 답이 나온 횟수입니다. 말한 단어는 「AI 챗봇 단어 분석」에서 봅니다."
           >
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
@@ -236,7 +236,7 @@ export default function SiteAnalyticsAdminPanel({ onMessage }: SiteAnalyticsAdmi
                 <p className="mt-1 text-2xl font-semibold text-gray-900">{formatCount(summary.chatbotOpens)}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-500">질문</p>
+                <p className="text-xs text-gray-500">말</p>
                 <p className="mt-1 text-2xl font-semibold text-gray-900">
                   {formatCount(summary.chatbotMessages)}
                 </p>
@@ -250,38 +250,14 @@ export default function SiteAnalyticsAdminPanel({ onMessage }: SiteAnalyticsAdmi
               color="#7c3aed"
               metric="챗봇 열기"
             />
-            <p className="mt-3 text-xs font-medium text-gray-500">질문</p>
+            <p className="mt-3 text-xs font-medium text-gray-500">말</p>
             <AnalyticsMiniChart
               className="mt-1"
               daily={summary.daily}
               value={(item) => item.chatbot_message}
               color="#db2777"
-              metric="챗봇 질문"
+              metric="챗봇 말"
             />
-            <p className="mt-4 text-xs font-medium text-gray-500">많이 나온 단어</p>
-            {(summary.chatbotWords ?? []).length === 0 ? (
-              <p className="mt-2 text-sm text-gray-500">아직 질문 단어가 없습니다. 배포 이후 질문이 쌓이면 여기에 보입니다.</p>
-            ) : (
-              <ul className="mt-2 space-y-1.5">
-                {(summary.chatbotWords ?? []).map((item) => {
-                  const max = summary.chatbotWords[0]?.count || 1;
-                  return (
-                    <li key={item.word} className="flex items-center gap-2 text-sm">
-                      <span className="w-28 shrink-0 truncate font-medium text-gray-800">{item.word}</span>
-                      <span className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-gray-100">
-                        <span
-                          className="block h-full rounded-full bg-violet-500"
-                          style={{ width: `${Math.max(8, Math.round((item.count / max) * 100))}%` }}
-                        />
-                      </span>
-                      <span className="w-10 shrink-0 text-right text-xs text-gray-500">
-                        {formatCount(item.count)}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
           </AdminCollapsibleSection>
         </>
       ) : (

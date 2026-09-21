@@ -160,6 +160,7 @@ export const ADMIN_NAV_GROUPS: ReadonlyArray<{
     label: "분석",
     items: [
       { kind: "item", key: "site-analytics", permission: "settings", label: "사이트 분석" },
+      { kind: "item", key: "chatbot-word-analytics", permission: "settings", label: "AI 챗봇 단어 분석" },
       { kind: "item", key: "gold-analytics", permission: "settings", label: "골드 사용 분석" },
     ],
   },
@@ -260,6 +261,7 @@ export type AdminNavKey =
   | "site-main"
   | "ai-chatbot"
   | "site-analytics"
+  | "chatbot-word-analytics"
   | "gold-analytics"
   | "user-settings"
   | "partners"

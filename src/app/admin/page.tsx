@@ -36,6 +36,7 @@ import MapEventAdminPanel from "@/components/admin/MapEventAdminPanel";
 import GoldShopAdminPanel from "@/components/admin/GoldShopAdminPanel";
 import AiChatbotAdminPanel from "@/components/admin/AiChatbotAdminPanel";
 import SiteAnalyticsAdminPanel from "@/components/admin/SiteAnalyticsAdminPanel";
+import ChatbotWordAnalyticsAdminPanel from "@/components/admin/ChatbotWordAnalyticsAdminPanel";
 import GoldAnalyticsAdminPanel from "@/components/admin/GoldAnalyticsAdminPanel";
 import SeasonPassAdminPanel from "@/components/admin/SeasonPassAdminPanel";
 import Pagination from "@/components/Pagination";
@@ -3315,6 +3316,16 @@ export default function AdminPage() {
               <p className="text-sm text-emerald-700">{settingsMessage}</p>
             ) : null}
             <SiteAnalyticsAdminPanel onMessage={setSettingsMessage} />
+          </div>
+        )}
+
+        {hasAdminNavAccess(adminAccess, "chatbot-word-analytics") &&
+          activeNav === "chatbot-word-analytics" && (
+          <div className="space-y-4">
+            {settingsMessage ? (
+              <p className="text-sm text-emerald-700">{settingsMessage}</p>
+            ) : null}
+            <ChatbotWordAnalyticsAdminPanel onMessage={setSettingsMessage} />
           </div>
         )}
 
