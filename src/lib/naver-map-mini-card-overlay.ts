@@ -37,7 +37,6 @@ export function createPartnerMapMiniCardOverlay({
 
   const overlay = new window.naver.maps.OverlayView() as MiniCardOverlayInstance;
   const followListeners: unknown[] = [];
-  const followListeners: unknown[] = [];
 
   overlay.onAdd = function onAdd() {
     const host = mapContainer ?? overlay.getPanes().overlayMouseTarget ?? overlay.getPanes().floatPane;
