@@ -7515,14 +7515,19 @@ html.dark-mode .partner-category-section__gear {
 }
 
 @media (max-width: 639px) {
+  .partner-list-toolbar__header {
+    align-items: stretch;
+  }
+
   .partner-list-toolbar__right {
-    padding-right: 4.35rem;
+    width: 100%;
+    margin-left: 0;
     justify-content: flex-end;
-    margin-left: auto;
   }
 
   .partner-list-toolbar__sort {
     justify-content: flex-end;
+    margin-left: auto;
   }
 
   html.ios-device .partner-map-locate-button,
