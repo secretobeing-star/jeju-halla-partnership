@@ -4,7 +4,7 @@ export type MapRoutePoint = {
 };
 
 type NaverDirectionsResponse = {
-  code?: number;
+  code?: number | string;
   message?: string;
   route?: Record<string, unknown>;
 };
@@ -21,12 +21,18 @@ function getNaverMapsKeys() {
 
 function parseCoordPair(item: unknown): MapRoutePoint | null {
   if (Array.isArray(item) && item.length >= 2) {
-    const longitude = Number(item[0]);
-    const latitude = Number(item[1]);
-    if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
-      return { latitude, longitude };
+    const first = Number(item[0]);
+    const second = Number(item[1]);
+    if (!Number.isFinite(first) || !Number.isFinite(second)) {
+      return null;
     }
-    return null;
+
+    // Naver path is [lng, lat]. If values are swapped, recover.
+    if (Math.abs(first) <= 90 && Math.abs(second) > 90 && Math.abs(second) <= 180) {
+      return { latitude: first, longitude: second };
+    }
+
+    return { latitude: second, longitude: first };
   }
 
   if (!item || typeof item !== "object") {
@@ -123,16 +129,16 @@ function snapPathToMarker(path: MapRoutePoint[], start: MapRoutePoint, goal: Map
   return snapped;
 }
 
-function isUsableRoute(path: MapRoutePoint[], start: MapRoutePoint, goal: MapRoutePoint) {
-  if (path.length >= 3) {
-    return true;
+async function fetchJson(url: string, init?: RequestInit, timeoutMs = 4000) {
+  const response = await fetch(url, {
+    ...init,
+    cache: "no-store",
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+  if (!response.ok) {
+    return null;
   }
-
-  if (path.length < 2) {
-    return false;
-  }
-
-  return distanceMeters(start, goal) <= 120;
+  return (await response.json()) as unknown;
 }
 
 async function fetchNaverRoute(
@@ -145,46 +151,92 @@ async function fetchNaverRoute(
     return [];
   }
 
-  const hosts = [
-    "https://maps.apigw.ntruss.com",
-    "https://naveropenapi.apigw.ntruss.com",
+  const path = mode === "walking" ? "/map-direction/v1/walking" : "/map-direction/v1/driving";
+  const urls = [
+    `https://maps.apigw.ntruss.com${path}`,
+    `https://naveropenapi.apigw.ntruss.com${path}`,
   ];
-  const prefixes = mode === "walking"
-    ? ["/map-direction/v1/walking", "/map-direction-15/v1/walking"]
-    : ["/map-direction/v1/driving", "/map-direction-15/v1/driving"];
+
+  const headers = {
+    Accept: "application/json",
+    "x-ncp-apigw-api-key-id": clientId,
+    "x-ncp-apigw-api-key": clientSecret,
+    "X-NCP-APIGW-API-KEY-ID": clientId,
+    "X-NCP-APIGW-API-KEY": clientSecret,
+  };
+
+  for (const base of urls) {
+    const endpoint = new URL(base);
+    endpoint.searchParams.set("start", `${start.longitude},${start.latitude}`);
+    endpoint.searchParams.set("goal", `${goal.longitude},${goal.latitude}`);
+    if (mode === "driving") {
+      endpoint.searchParams.set("option", "traoptimal");
+    }
+
+    try {
+      const payload = (await fetchJson(endpoint.toString(), { headers }, 4500)) as
+        | NaverDirectionsResponse
+        | null;
+      if (!payload) {
+        continue;
+      }
+      if (payload.code != null && Number(payload.code) !== 0) {
+        continue;
+      }
+      const points = extractPath(payload);
+      if (points.length >= 2) {
+        return snapPathToMarker(points, start, goal);
+      }
+    } catch {
+      // try next host
+    }
+  }
+
+  return [];
+}
+
+async function fetchOsrmRoute(
+  start: MapRoutePoint,
+  goal: MapRoutePoint,
+  profile: "driving" | "foot",
+): Promise<MapRoutePoint[]> {
+  const hosts = [
+    "https://router.project-osrm.org",
+    "https://routing.openstreetmap.de/routed-car",
+  ];
+  const pathProfile = profile === "foot" ? "foot" : "driving";
 
   for (const host of hosts) {
-    for (const prefix of prefixes) {
-      const endpoint = new URL(`${host}${prefix}`);
-      endpoint.searchParams.set("start", `${start.longitude},${start.latitude}`);
-      endpoint.searchParams.set("goal", `${goal.longitude},${goal.latitude}`);
-      if (mode === "driving") {
-        endpoint.searchParams.set("option", "traoptimal");
+    if (host.includes("routed-car") && profile === "foot") {
+      continue;
+    }
+
+    const endpoint = `${host}/route/v1/${pathProfile}/${start.longitude},${start.latitude};${goal.longitude},${goal.latitude}?overview=full&geometries=geojson`;
+    try {
+      const payload = (await fetchJson(endpoint, { headers: { Accept: "application/json" } }, 5000)) as {
+        code?: string;
+        routes?: Array<{ geometry?: { coordinates?: Array<[number, number]> } }>;
+      } | null;
+      if (!payload || payload.code !== "Ok") {
+        continue;
+      }
+      const coordinates = payload.routes?.[0]?.geometry?.coordinates;
+      if (!Array.isArray(coordinates) || coordinates.length < 2) {
+        continue;
       }
 
-      try {
-        const response = await fetch(endpoint.toString(), {
-          headers: {
-            Accept: "application/json",
-            "X-NCP-APIGW-API-KEY-ID": clientId,
-            "X-NCP-APIGW-API-KEY": clientSecret,
-          },
-          cache: "no-store",
-        });
-        if (!response.ok) {
-          continue;
+      const points: MapRoutePoint[] = [];
+      for (const item of coordinates) {
+        const point = parseCoordPair(item);
+        if (point) {
+          points.push(point);
         }
-        const payload = (await response.json()) as NaverDirectionsResponse;
-        if (payload.code != null && payload.code !== 0) {
-          continue;
-        }
-        const points = extractPath(payload);
-        if (isUsableRoute(points, start, goal)) {
-          return snapPathToMarker(points, start, goal);
-        }
-      } catch {
-        // try next endpoint
       }
+      if (points.length >= 2) {
+        return snapPathToMarker(points, start, goal);
+      }
+    } catch {
+      // try next host
     }
   }
 
@@ -203,6 +255,16 @@ export async function getMapRoutePath(
   const walking = await fetchNaverRoute(start, goal, "walking");
   if (walking.length >= 2) {
     return { path: walking, mode: "walking" };
+  }
+
+  const osrmDriving = await fetchOsrmRoute(start, goal, "driving");
+  if (osrmDriving.length >= 2) {
+    return { path: osrmDriving, mode: "driving" };
+  }
+
+  const osrmWalking = await fetchOsrmRoute(start, goal, "foot");
+  if (osrmWalking.length >= 2) {
+    return { path: osrmWalking, mode: "walking" };
   }
 
   throw new Error("경로를 찾지 못했습니다.");
