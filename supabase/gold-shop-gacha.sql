@@ -65,6 +65,12 @@ alter table if exists public.gold_shop_gacha_boxes
 alter table if exists public.gold_shop_gacha_boxes
   add column if not exists ends_at timestamptz;
 
+alter table if exists public.gold_shop_gacha_boxes
+  add column if not exists rare1_fx_url text;
+
+alter table if exists public.gold_shop_gacha_boxes
+  add column if not exists rare2_fx_url text;
+
 alter table public.gold_shop_gacha_boxes enable row level security;
 alter table public.gold_shop_gacha_rewards enable row level security;
 alter table public.gold_shop_gacha_pulls enable row level security;

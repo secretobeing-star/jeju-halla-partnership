@@ -635,16 +635,37 @@
 }
 
 .season-pass-shop__title {
-  display: block;
-  padding: 0.28rem 0.35rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.08rem;
+  padding: 0.2rem 0.3rem 0.24rem;
   background: linear-gradient(180deg, #ffe27a, #f0c43a);
   color: #5a3a10;
   font-size: 0.78rem;
   font-weight: 800;
   text-align: center;
-  white-space: nowrap;
+  overflow: hidden;
+}
+
+.season-pass-shop__title > span {
+  display: block;
+  width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.season-pass-shop__period {
+  display: block;
+  width: 100%;
+  color: #8b3a1a;
+  font-size: 0.52rem;
+  font-weight: 700;
+  font-style: normal;
+  line-height: 1.2;
+  white-space: normal;
 }
 
 .season-pass-shop__art {
@@ -1297,9 +1318,14 @@
 
 .season-pass-shop-receipt__actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
   gap: 0.55rem;
   padding: 0.75rem 0.9rem 0.95rem;
+}
+
+.season-pass-shop-receipt__actions.is-choice button {
+  min-width: 6.4rem;
 }
 
 .season-pass-shop-receipt__actions button {
@@ -1331,8 +1357,8 @@
 }
 
 .season-pass-gacha-overlay.is-result {
-  align-items: stretch;
-  justify-content: flex-start;
+  align-items: center;
+  justify-content: center;
   overflow: hidden;
   padding: max(0.45rem, env(safe-area-inset-top, 0px))
     max(0.7rem, env(safe-area-inset-right, 0px))
@@ -1346,7 +1372,7 @@
   width: min(38rem, 100%);
   max-height: 100%;
   min-height: 0;
-  flex: 1;
+  flex: 0 1 auto;
   flex-direction: column;
   margin: 0 auto;
   padding: 0.15rem 0 0;
@@ -1416,6 +1442,16 @@
   animation: season-gacha-rare-pulse 1.4s ease-in-out infinite;
 }
 
+.season-pass-gacha-multi__fx {
+  pointer-events: none;
+  position: absolute;
+  inset: -22%;
+  z-index: 2;
+  width: auto !important;
+  height: auto !important;
+  object-fit: contain;
+}
+
 .season-pass-gacha-multi__spark {
   pointer-events: none;
   position: absolute;
@@ -1482,7 +1518,7 @@
   background: linear-gradient(180deg, #e8f4ff, #93c5fd);
 }
 
-.season-pass-gacha-multi__art img,
+.season-pass-gacha-multi__art img:not(.season-pass-gacha-multi__fx),
 .season-pass-gacha-multi__art span {
   width: 100%;
   height: 100%;

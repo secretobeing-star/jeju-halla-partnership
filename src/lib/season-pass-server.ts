@@ -1325,7 +1325,7 @@ export async function purchaseGoldShopItem(userIdRaw: string, shopItemIdRaw: str
 export async function pullGoldShopGacha(
   userIdRaw: string,
   boxIdRaw: string,
-  options?: { giftId?: string; count?: number },
+  options?: { giftId?: string; count?: number; hold?: boolean },
 ) {
   const userId = userIdRaw.trim();
   const giftId = options?.giftId?.trim() || "";
@@ -1409,7 +1409,9 @@ export async function pullGoldShopGacha(
     }
     gold = await adjustGold(admin, userId, season, -spend, "shop_spend");
 
-    if (box.open_place === "inventory") {
+    const holdToInbox =
+      box.open_place === "inventory" || (box.open_place === "choice" && Boolean(options?.hold));
+    if (holdToInbox) {
       const rows = Array.from({ length: count }, () => ({
         user_id: userId,
         reward_id: null,
@@ -1554,6 +1556,8 @@ export async function pullGoldShopGacha(
     fxEnabled: target.fx_enabled,
     idleImageUrl: target.idle_image_url,
     burstImageUrl: target.burst_image_url,
+    rare1FxUrl: target.rare1_fx_url,
+    rare2FxUrl: target.rare2_fx_url,
     layoutCount: target.layout_count,
     prizes,
   };

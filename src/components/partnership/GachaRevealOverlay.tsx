@@ -23,10 +23,30 @@ export type GachaRevealState = {
   fxEnabled: boolean;
   idleImageUrl: string | null;
   burstImageUrl: string | null;
+  rare1FxUrl: string | null;
+  rare2FxUrl: string | null;
   burstSrc: string | null;
   remainingPulls?: number;
   againLabel?: string;
 };
+
+function gachaFxUrls(source: {
+  rare1_fx_url?: string | null;
+  rare2_fx_url?: string | null;
+  rare1FxUrl?: string | null;
+  rare2FxUrl?: string | null;
+}) {
+  return {
+    rare1FxUrl: String(source.rare1FxUrl ?? source.rare1_fx_url ?? "").trim() || null,
+    rare2FxUrl: String(source.rare2FxUrl ?? source.rare2_fx_url ?? "").trim() || null,
+  };
+}
+
+function sparkUrlForRank(play: Pick<GachaRevealState, "rare1FxUrl" | "rare2FxUrl">, rank?: number) {
+  if (rank === 1) return play.rare1FxUrl || play.rare2FxUrl;
+  if (rank === 2) return play.rare2FxUrl || play.rare1FxUrl;
+  return null;
+}
 
 export function gachaRevealOpening(
   box: {
@@ -36,6 +56,8 @@ export function gachaRevealOpening(
     fx_enabled?: boolean;
     idle_image_url?: string | null;
     burst_image_url?: string | null;
+    rare1_fx_url?: string | null;
+    rare2_fx_url?: string | null;
   },
   options?: { remainingPulls?: number; againLabel?: string },
 ): GachaRevealState {
@@ -52,6 +74,7 @@ export function gachaRevealOpening(
     fxEnabled: fxOn,
     idleImageUrl: box.idle_image_url ?? null,
     burstImageUrl,
+    ...gachaFxUrls(box),
     burstSrc: burstImageUrl,
     remainingPulls: options?.remainingPulls,
     againLabel: options?.againLabel,
@@ -69,6 +92,8 @@ export function gachaRevealFromPull(
     fxEnabled?: boolean;
     idleImageUrl?: string | null;
     burstImageUrl?: string | null;
+    rare1FxUrl?: string | null;
+    rare2FxUrl?: string | null;
     held?: boolean;
     count?: number;
     layoutCount?: number;
@@ -102,6 +127,7 @@ export function gachaRevealFromPull(
     fxEnabled: fxOn,
     idleImageUrl: result.idleImageUrl ?? null,
     burstImageUrl,
+    ...gachaFxUrls(result),
     burstSrc: burstImageUrl,
     remainingPulls: options?.remainingPulls,
     againLabel: options?.againLabel,
@@ -120,6 +146,8 @@ export function applyGachaPullResult(current: GachaRevealState | null, next: Gac
       remainingPulls: next.remainingPulls,
       bulkCount: next.bulkCount,
       againLabel: next.againLabel ?? current.againLabel,
+      rare1FxUrl: next.rare1FxUrl ?? current.rare1FxUrl,
+      rare2FxUrl: next.rare2FxUrl ?? current.rare2FxUrl,
     };
   }
   return { ...next, stage: "result" };
@@ -207,14 +235,20 @@ export default function GachaRevealOverlay({ play, onChange, onClose, onPullAgai
         <div className="season-pass-gacha-multi" role="dialog" aria-modal="true" aria-label="뽑기 결과">
           <div className="season-pass-gacha-multi__glow" aria-hidden />
           <ul className="season-pass-gacha-multi__prizes">
-            {play.prizes.map((prize, index) => (
+            {play.prizes.map((prize, index) => {
+              const sparkUrl = sparkUrlForRank(play, prize.rareRank);
+              return (
               <li
                 key={`${prize.name}-${index}`}
                 className={`is-${prize.kind || "item"}${prize.rareRank === 1 ? " is-rare-1" : prize.rareRank === 2 ? " is-rare-2" : ""}`}
               >
                 <span className="season-pass-gacha-multi__art">
                   {prize.rareRank === 1 || prize.rareRank === 2 ? (
-                    <i className="season-pass-gacha-multi__spark" aria-hidden />
+                    sparkUrl ? (
+                      <img className="season-pass-gacha-multi__fx" src={sparkUrl} alt="" />
+                    ) : (
+                      <i className="season-pass-gacha-multi__spark" aria-hidden />
+                    )
                   ) : null}
                   {prize.imageUrl ? (
                     <img src={prize.imageUrl} alt="" />
@@ -233,11 +267,11 @@ export default function GachaRevealOverlay({ play, onChange, onClose, onPullAgai
                     : prize.kind === "coupon"
                       ? "쿠폰"
                       : "코스튬"}
-                  {prize.rareRank === 1 ? " · 최고희귀" : prize.rareRank === 2 ? " · 희귀" : ""}
                   {prize.gifted ? " · 선물함 지급" : ""}
                 </em>
               </li>
-            ))}
+              );
+            })}
           </ul>
           <div className="season-pass-gacha-multi__actions">
             {canAgain ? (

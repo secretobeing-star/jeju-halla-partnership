@@ -15,7 +15,7 @@ export type GoldShopGachaReward = {
   sort_order: number;
 };
 
-export type GachaOpenPlace = "shop" | "inventory";
+export type GachaOpenPlace = "shop" | "inventory" | "choice";
 
 export type GoldShopGachaBox = {
   id: string;
@@ -27,6 +27,8 @@ export type GoldShopGachaBox = {
   fx_enabled: boolean;
   idle_image_url: string | null;
   burst_image_url: string | null;
+  rare1_fx_url: string | null;
+  rare2_fx_url: string | null;
   open_place: GachaOpenPlace;
   layout_count: number;
   confirm_popup: boolean;
@@ -38,7 +40,8 @@ export type GoldShopGachaBox = {
 };
 
 export function asGachaOpenPlace(value: unknown): GachaOpenPlace {
-  return value === "inventory" ? "inventory" : "shop";
+  if (value === "inventory" || value === "choice") return value;
+  return "shop";
 }
 
 export function asGachaRewardKind(value: unknown): GachaRewardKind {
@@ -75,6 +78,8 @@ export function mapGachaBox(
     fx_enabled: row.fx_enabled !== false,
     idle_image_url: String(row.idle_image_url ?? "").trim() || null,
     burst_image_url: String(row.burst_image_url ?? "").trim() || null,
+    rare1_fx_url: String(row.rare1_fx_url ?? "").trim() || null,
+    rare2_fx_url: String(row.rare2_fx_url ?? "").trim() || null,
     open_place: asGachaOpenPlace(row.open_place),
     layout_count: Math.max(1, Math.min(20, Math.floor(Number(row.layout_count) || 1))),
     confirm_popup: row.confirm_popup !== false,

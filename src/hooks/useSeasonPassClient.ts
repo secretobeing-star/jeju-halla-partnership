@@ -356,7 +356,7 @@ export function useSeasonPassClient() {
     }
   }
 
-  async function buyGacha(boxId: string, count = 1) {
+  async function buyGacha(boxId: string, count = 1, options?: { hold?: boolean }) {
     if (!userId) {
       openClaimNotice("구매할 수 없습니다", "로그인 후 구매할 수 있습니다.");
       return null;
@@ -367,7 +367,7 @@ export function useSeasonPassClient() {
       const response = await studentAuthFetch("/api/season-pass/gacha-pull", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, boxId, count }),
+        body: JSON.stringify({ userId, boxId, count, hold: Boolean(options?.hold) }),
       });
       const payload = (await response.json()) as {
         gold?: number;
@@ -381,6 +381,8 @@ export function useSeasonPassClient() {
         fxEnabled?: boolean;
         idleImageUrl?: string | null;
         burstImageUrl?: string | null;
+        rare1FxUrl?: string | null;
+        rare2FxUrl?: string | null;
         count?: number;
         layoutCount?: number;
         prizes?: Array<{

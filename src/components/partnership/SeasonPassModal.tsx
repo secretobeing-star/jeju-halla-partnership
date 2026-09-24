@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { formatGachaSaleRange, isGachaBoxOnSale, type GoldShopGachaBox } from "@/lib/gold-shop-gacha";
+import { formatGachaSaleRange, isGachaBoxOnSale, type GachaOpenPlace, type GoldShopGachaBox } from "@/lib/gold-shop-gacha";
 import type {
   GoldShopFilterId,
   GoldShopItem,
@@ -464,16 +464,19 @@ function GoldShopBoard({ client }: { client: ReturnType<typeof useSeasonPassClie
     await buyShopItem(id);
   }
 
-  async function startGacha(box: GoldShopGachaBox, count = 1) {
+  async function startGacha(box: GoldShopGachaBox, count = 1, place: GachaOpenPlace = box.open_place) {
     const pullCount = Math.max(1, Math.min(Math.max(1, box.layout_count || 1), Math.floor(count) || 1));
     const cost = box.price_gold * pullCount;
+    const hold = place === "inventory";
     if (gold < cost) {
       setPendingGacha(box);
       setPendingGachaCount(pullCount);
       return;
     }
-    setGachaPlay(gachaRevealOpening(box));
-    const result = await buyGacha(box.id, pullCount);
+    if (!hold) {
+      setGachaPlay(gachaRevealOpening(box));
+    }
+    const result = await buyGacha(box.id, pullCount, { hold });
     if (!result) {
       setGachaPlay(null);
       return;
@@ -491,6 +494,8 @@ function GoldShopBoard({ client }: { client: ReturnType<typeof useSeasonPassClie
             ...result,
             idleImageUrl: result.idleImageUrl ?? box.idle_image_url,
             burstImageUrl: result.burstImageUrl ?? box.burst_image_url,
+            rare1FxUrl: result.rare1FxUrl ?? box.rare1_fx_url,
+            rare2FxUrl: result.rare2FxUrl ?? box.rare2_fx_url,
           },
           box,
         ),
@@ -499,24 +504,26 @@ function GoldShopBoard({ client }: { client: ReturnType<typeof useSeasonPassClie
   }
 
   function requestGacha(box: GoldShopGachaBox, count: number) {
-    if (box.confirm_popup === false) {
-      void startGacha(box, count);
+    const needsChoice = box.open_place === "choice";
+    if (!needsChoice && box.confirm_popup === false) {
+      void startGacha(box, count, box.open_place);
       return;
     }
     setPendingGacha(box);
     setPendingGachaCount(Math.max(1, count));
   }
 
-  async function confirmGacha() {
+  async function confirmGacha(place: GachaOpenPlace = pendingGacha?.open_place === "inventory" ? "inventory" : "shop") {
     if (!pendingGacha) return;
     const box = pendingGacha;
     const count = pendingGachaCount;
     if (gold < box.price_gold * count) return;
     setPendingGacha(null);
-    await startGacha(box, count);
+    await startGacha(box, count, place);
   }
 
   const pendingBox = pendingGacha;
+  const gachaChoice = pendingGacha?.open_place === "choice";
   const pendingImage =
     pending?.reward?.image_url ||
     (pending?.item_kind === "premium" ? state.season?.premium_pass_image_url : null) ||
@@ -565,7 +572,12 @@ function GoldShopBoard({ client }: { client: ReturnType<typeof useSeasonPassClie
               return (
                 <li key={box.id}>
                   <div className="season-pass-shop__card">
-                    <span className="season-pass-shop__title">{box.name}</span>
+                    <span className="season-pass-shop__title">
+                      {formatGachaSaleRange(box.starts_at, box.ends_at) ? (
+                        <small className="season-pass-shop__period">{formatGachaSaleRange(box.starts_at, box.ends_at)}</small>
+                      ) : null}
+                      <span>{box.name}</span>
+                    </span>
                     <span className="season-pass-shop__art">
                       {discount > 0 ? <b>{discount}%</b> : null}
                       {badge ? <em className={discount > 0 ? "is-secondary" : ""}>{badge}</em> : null}
@@ -576,9 +588,6 @@ function GoldShopBoard({ client }: { client: ReturnType<typeof useSeasonPassClie
                       {discount > 0 ? <s>{box.original_price_gold.toLocaleString("ko-KR")}</s> : null}
                       {box.price_gold > 0 ? box.price_gold.toLocaleString("ko-KR") : "-"}
                     </span>
-                    {formatGachaSaleRange(box.starts_at, box.ends_at) ? (
-                      <span className="season-pass-shop__status">{formatGachaSaleRange(box.starts_at, box.ends_at)}</span>
-                    ) : null}
                     <div className={`season-pass-shop__actions ${bulk > 1 ? "" : "is-single"}`}>
                       <button
                         type="button"
@@ -739,32 +748,66 @@ function GoldShopBoard({ client }: { client: ReturnType<typeof useSeasonPassClie
                   <p className="season-pass-shop-receipt__note">
                     {canAfford
                       ? pendingGacha
-                        ? "* 확률 상자는 뽑은 뒤 취소할 수 없습니다.\n내용을 신중히 확인하신 후 뽑아 주세요."
+                        ? gachaChoice
+                          ? "* 상점에서 바로 뽑거나, 선물함으로 보내 나중에 뽑을 수 있습니다.\n확률 상자는 뽑은 뒤 취소할 수 없습니다."
+                          : pendingGacha.open_place === "inventory"
+                            ? "* 상자를 선물함으로 보냅니다. 선물함에서 열어 뽑을 수 있습니다."
+                            : "* 확률 상자는 뽑은 뒤 취소할 수 없습니다.\n내용을 신중히 확인하신 후 뽑아 주세요."
                         : "* 상점에서 구매한 상품은 취소가 되지 않습니다.\n내용을 신중히 확인하신 후 구매해 주세요."
                       : "* 골드가 부족하여 구입할 수 없습니다.\n필요한 골드를 모은 뒤 다시 시도해 주세요."}
                   </p>
                 </div>
-                <div className="season-pass-shop-receipt__actions">
+                <div className={`season-pass-shop-receipt__actions${gachaChoice && canAfford ? " is-choice" : ""}`}>
                   {canAfford ? (
-                    <>
-                      <button
-                        type="button"
-                        className="is-primary"
-                        disabled={busy !== null}
-                        onClick={() => void (pendingGacha ? confirmGacha() : confirmBuy())}
-                      >
-                        확인
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPending(null);
-                          setPendingGacha(null);
-                        }}
-                      >
-                        취소
-                      </button>
-                    </>
+                    pendingGacha && gachaChoice ? (
+                      <>
+                        <button
+                          type="button"
+                          className="is-primary"
+                          disabled={busy !== null}
+                          onClick={() => void confirmGacha("shop")}
+                        >
+                          상점에서 뽑기
+                        </button>
+                        <button
+                          type="button"
+                          className="is-primary"
+                          disabled={busy !== null}
+                          onClick={() => void confirmGacha("inventory")}
+                        >
+                          선물함에서 뽑기
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPending(null);
+                            setPendingGacha(null);
+                          }}
+                        >
+                          취소
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          className="is-primary"
+                          disabled={busy !== null}
+                          onClick={() => void (pendingGacha ? confirmGacha() : confirmBuy())}
+                        >
+                          확인
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPending(null);
+                            setPendingGacha(null);
+                          }}
+                        >
+                          취소
+                        </button>
+                      </>
+                    )
                   ) : (
                     <button
                       type="button"

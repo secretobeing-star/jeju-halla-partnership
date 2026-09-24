@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import AdminCollapsibleSection from "@/components/admin/AdminCollapsibleSection";
 import { adminApiFetch, getAdminAccessToken } from "@/lib/admin-api";
 import {
+  asGachaOpenPlace,
   gachaProbabilityTotal,
   type GachaRewardKind,
   type GoldShopGachaBox,
@@ -85,7 +86,7 @@ export default function GoldShopGachaAdminPanel({ onMessage, costumes }: GoldSho
     try {
       await adminApiFetch("/api/admin/gold-shop-gacha", {
         method: "POST",
-        body: JSON.stringify({ entity: "box", name: "새 확률 상자", price_gold: 0, fx_enabled: true }),
+        body: JSON.stringify({ entity: "box", name: "새 확률 상자", price_gold: 0, fx_enabled: true, open_place: "choice" }),
       });
       onMessage("확률 상자를 추가했습니다.");
       await load();
@@ -111,6 +112,8 @@ export default function GoldShopGachaAdminPanel({ onMessage, costumes }: GoldSho
           fx_enabled: box.fx_enabled,
           idle_image_url: box.idle_image_url,
           burst_image_url: box.burst_image_url,
+          rare1_fx_url: box.rare1_fx_url,
+          rare2_fx_url: box.rare2_fx_url,
           open_place: box.open_place,
           layout_count: box.layout_count,
           confirm_popup: box.confirm_popup,
@@ -318,12 +321,11 @@ export default function GoldShopGachaAdminPanel({ onMessage, costumes }: GoldSho
               <select
                 className="mt-1 w-full rounded border px-2 py-1.5 text-sm text-gray-900"
                 value={selected.open_place}
-                onChange={(event) =>
-                  patchBox({ open_place: event.target.value === "inventory" ? "inventory" : "shop" })
-                }
+                onChange={(event) => patchBox({ open_place: asGachaOpenPlace(event.target.value) })}
               >
                 <option value="shop">상점에서 바로 뽑기</option>
-                <option value="inventory">보관함(선물함)에서 열기</option>
+                <option value="inventory">선물함에서만 뽑기</option>
+                <option value="choice">구매 시 상점 / 선물함 선택</option>
               </select>
             </label>
             <label className="text-xs text-gray-500">
@@ -386,6 +388,44 @@ export default function GoldShopGachaAdminPanel({ onMessage, costumes }: GoldSho
               />
               {selected.burst_image_url ? (
                 <img src={selected.burst_image_url} alt="" className="mt-2 h-20 object-contain" />
+              ) : null}
+            </label>
+            <label className="text-xs text-gray-500 sm:col-span-2">
+              결과 카드 반짝임 · 최고희귀 (GIF / WebP)
+              <input
+                type="file"
+                accept="image/gif,image/webp,image/png,image/jpeg,.gif,.webp"
+                className="mt-1 block w-full text-sm"
+                disabled={uploading === "rare1"}
+                onChange={async (event) => {
+                  const file = event.target.files?.[0];
+                  event.target.value = "";
+                  if (!file) return;
+                  const url = await uploadImage(file, "rare1");
+                  if (url) patchBox({ rare1_fx_url: url });
+                }}
+              />
+              {selected.rare1_fx_url ? (
+                <img src={selected.rare1_fx_url} alt="" className="mt-2 h-20 object-contain" />
+              ) : null}
+            </label>
+            <label className="text-xs text-gray-500 sm:col-span-2">
+              결과 카드 반짝임 · 희귀 (GIF / WebP, 비우면 최고희귀 이미지 사용)
+              <input
+                type="file"
+                accept="image/gif,image/webp,image/png,image/jpeg,.gif,.webp"
+                className="mt-1 block w-full text-sm"
+                disabled={uploading === "rare2"}
+                onChange={async (event) => {
+                  const file = event.target.files?.[0];
+                  event.target.value = "";
+                  if (!file) return;
+                  const url = await uploadImage(file, "rare2");
+                  if (url) patchBox({ rare2_fx_url: url });
+                }}
+              />
+              {selected.rare2_fx_url ? (
+                <img src={selected.rare2_fx_url} alt="" className="mt-2 h-20 object-contain" />
               ) : null}
             </label>
             <div className="flex gap-2 sm:col-span-2 lg:col-span-4">

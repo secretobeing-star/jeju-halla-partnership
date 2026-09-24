@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuthMiddleware } from "@/lib/admin-auth-guard";
 import {
+  asGachaOpenPlace,
   asGachaRewardKind,
   mapGachaBox,
   mapGachaReward,
@@ -174,7 +175,9 @@ export async function POST(request: NextRequest) {
         fx_enabled: body.fx_enabled !== false,
         idle_image_url: String(body.idle_image_url ?? "").trim() || null,
         burst_image_url: String(body.burst_image_url ?? "").trim() || null,
-        open_place: body.open_place === "inventory" ? "inventory" : "shop",
+        rare1_fx_url: String(body.rare1_fx_url ?? "").trim() || null,
+        rare2_fx_url: String(body.rare2_fx_url ?? "").trim() || null,
+        open_place: asGachaOpenPlace(body.open_place),
         layout_count: Math.max(1, Math.min(20, Math.floor(Number(body.layout_count) || 1))),
         confirm_popup: body.confirm_popup !== false,
         is_active: body.is_active !== false,
@@ -236,6 +239,8 @@ export async function PATCH(request: NextRequest) {
         "fx_enabled",
         "idle_image_url",
         "burst_image_url",
+        "rare1_fx_url",
+        "rare2_fx_url",
         "open_place",
         "layout_count",
         "confirm_popup",
@@ -253,7 +258,7 @@ export async function PATCH(request: NextRequest) {
           } else if (key === "layout_count") {
             patch[key] = Math.max(1, Math.min(20, Math.floor(Number(body[key]) || 1)));
           } else if (key === "open_place") {
-            patch[key] = body[key] === "inventory" ? "inventory" : "shop";
+            patch[key] = asGachaOpenPlace(body[key]);
           } else if (key === "starts_at" || key === "ends_at") {
             patch[key] = String(body[key] ?? "").trim() || null;
           } else {
