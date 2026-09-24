@@ -293,7 +293,7 @@ export default function NaverMapPartnersView({
 
     let start: { latitude: number; longitude: number };
     try {
-      start = await resolveUserLocationRef.current();
+      start = await resolveUserLocationRef.current(true);
     } catch (error) {
       if (error instanceof Error && error.message) {
         showLocateMessageRef.current(error.message);
@@ -679,8 +679,6 @@ export default function NaverMapPartnersView({
         markerGap: MINI_CARD_MARKER_GAP,
         placement: "marker",
       });
-
-      void drawRouteTo(partner);
 
       ignoreNextMapClickRef.current = true;
       window.requestAnimationFrame(() => {

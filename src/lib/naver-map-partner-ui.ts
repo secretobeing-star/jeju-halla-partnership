@@ -11,8 +11,8 @@ export type NaverMapPartnerMarker = {
 };
 
 export const PARTNER_MAP_DEFAULT_THUMBNAIL_PATH = "/images/default-thumbnail.svg";
-export const PARTNER_MAP_MARKER_SIZE = { width: 52, height: 62 };
-export const PARTNER_MAP_MARKER_ANCHOR = { x: 26, y: 62 };
+export const PARTNER_MAP_MARKER_SIZE = { width: 48, height: 58 };
+export const PARTNER_MAP_MARKER_ANCHOR = { x: 24, y: 58 };
 const PARTNER_MAP_IMAGE_FALLBACK_TEXT = "?";
 
 export function parsePartnerMapCoordinate(value: number | string | null | undefined): number | null {
@@ -200,8 +200,8 @@ export function createPartnerMapMarkerElement(
   tail.className = "partner-map-marker__tail";
   tail.setAttribute("aria-hidden", "true");
   if (customBorderColor) {
-    tail.style.background = customBorderColor;
-    tail.style.borderColor = "transparent";
+    tail.style.borderTopColor = customBorderColor;
+    tail.style.background = "transparent";
   }
 
   shell.appendChild(button);

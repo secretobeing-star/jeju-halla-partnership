@@ -4528,8 +4528,8 @@ html.dark-mode .board-post-popup-close:hover {
 .partner-map-marker-shell {
   position: relative;
   display: block;
-  width: 3.25rem;
-  height: 3.9rem;
+  width: 48px;
+  height: 58px;
   flex-shrink: 0;
   overflow: visible;
   pointer-events: none;
@@ -4562,15 +4562,16 @@ html.dark-mode .board-post-popup-close:hover {
   left: 0;
   z-index: 1;
   display: block;
-  width: 3.25rem;
-  height: 3.25rem;
+  width: 48px;
+  height: 48px;
   overflow: hidden;
-  border: 5px solid #ffffff;
-  border-radius: 0.85rem;
+  border: 4px solid #ffffff;
+  border-radius: 12px;
   background: #f3f4f6;
   box-shadow: 0 4px 12px rgba(15, 23, 42, 0.18);
   cursor: pointer;
   pointer-events: auto;
+  transform-origin: 50% 100%;
   transition:
     transform 0.15s ease,
     box-shadow 0.15s ease,
@@ -4578,7 +4579,7 @@ html.dark-mode .board-post-popup-close:hover {
 }
 
 .partner-map-marker:hover {
-  transform: translateY(-2px) scale(1.04);
+  transform: scale(1.04);
 }
 
 .partner-map-marker--selected {
@@ -4609,21 +4610,24 @@ html.dark-mode .board-post-popup-close:hover {
 
 .partner-map-marker__tail {
   position: absolute;
-  bottom: 0.22rem;
   left: 50%;
+  bottom: 0;
   z-index: 0;
-  width: 0.72rem;
-  height: 0.72rem;
-  border: 0;
-  border-radius: 0.12rem;
-  background: #ffffff;
-  box-shadow: 2px 2px 6px rgba(15, 23, 42, 0.12);
-  transform: translate(-50%, 42%) rotate(45deg);
+  width: 0;
+  height: 0;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-top: 10px solid #ffffff;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  transform: translateX(-50%);
   pointer-events: none;
 }
 
 .partner-map-marker-shell:has(.partner-map-marker--selected) .partner-map-marker__tail {
-  background: #ffffff;
+  border-top-color: #ffffff;
+  background: transparent;
 }
 
 .partner-map-marker__favorite-badge {

@@ -107,16 +107,18 @@ export function usePartnerMapLocate() {
     }
   }, [locating, showLocateMessage]);
 
-  const resolveUserLocation = useCallback(async () => {
+  const resolveUserLocation = useCallback(async (fresh = false) => {
     if (isPwaLocationAccessDisabled()) {
       throw new GeolocationError("앱 설정에서 위치 사용을 켜 주세요.", "denied");
     }
 
-    if (lastCoordsRef.current) {
+    if (!fresh && lastCoordsRef.current) {
       return lastCoordsRef.current;
     }
 
-    const coords = await getCurrentGeolocation();
+    const coords = await getCurrentGeolocation(
+      fresh ? { enableHighAccuracy: true, maximumAge: 0, timeout: 12_000 } : undefined,
+    );
     lastCoordsRef.current = {
       latitude: coords.latitude,
       longitude: coords.longitude,
