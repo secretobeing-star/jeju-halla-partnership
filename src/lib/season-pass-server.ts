@@ -7,6 +7,7 @@ import {
   asSeasonPassQuestType,
   computeLevelFromExp,
   isSeasonLive,
+  parseGoldShopFilterTabs,
   type RewardItem,
   type Season,
   type SeasonPassClaim,
@@ -22,10 +23,12 @@ import { logSeasonPassToSheets } from "@/lib/google-sheets-student";
 import type { GoldLedgerSource } from "@/lib/gold-analytics";
 import { encodeGiftCouponValue, encodeGiftGachaValue, parseGiftPayload } from "@/lib/map-events";
 import {
+  clampGachaPullCount,
   mapGachaBox,
   mapGachaReward,
   pickGachaReward,
   type GoldShopGachaBox,
+  type GoldShopGachaReward,
 } from "@/lib/gold-shop-gacha";
 
 type AdminClient = NonNullable<ReturnType<typeof createSupabaseAdmin>>;
@@ -59,6 +62,7 @@ function mapSeason(row: Record<string, unknown>): Season {
         : String(row.premium_badge_label).trim(),
     gold_shop_enabled: row.gold_shop_enabled !== false,
     costume_preview_enabled: row.costume_preview_enabled !== false,
+    shop_filter_tabs: parseGoldShopFilterTabs(row.shop_filter_tabs),
     sort_order: Number(row.sort_order) || 0,
   };
 }
@@ -551,6 +555,25 @@ async function loadWalletGold(admin: AdminClient, userId: string): Promise<numbe
   return migrated;
 }
 
+async function writeGoldLedger(
+  admin: AdminClient,
+  userId: string,
+  seasonId: string,
+  amount: number,
+  source: GoldLedgerSource,
+) {
+  const payload = {
+    user_id: userId,
+    season_id: seasonId,
+    amount,
+    source,
+  };
+  const { error } = await admin.from("gold_ledger").insert(payload);
+  if (error && source === "gacha") {
+    await admin.from("gold_ledger").insert({ ...payload, source: "shop_reward" });
+  }
+}
+
 async function adjustGold(
   admin: AdminClient,
   userId: string,
@@ -583,12 +606,7 @@ async function adjustGold(
   }
 
   if (delta !== 0) {
-    void admin.from("gold_ledger").insert({
-      user_id: userId,
-      season_id: season.id,
-      amount: delta,
-      source,
-    });
+    void writeGoldLedger(admin, userId, season.id, delta, source);
   }
   return next;
 }
@@ -1286,7 +1304,7 @@ export async function purchaseGoldShopItem(userIdRaw: string, shopItemIdRaw: str
 export async function pullGoldShopGacha(
   userIdRaw: string,
   boxIdRaw: string,
-  options?: { giftId?: string },
+  options?: { giftId?: string; count?: number },
 ) {
   const userId = userIdRaw.trim();
   const giftId = options?.giftId?.trim() || "";
@@ -1351,18 +1369,21 @@ export async function pullGoldShopGacha(
     throw new Error("판매 중인 확률 상자가 아닙니다.");
   }
 
+  const count = giftId ? 1 : clampGachaPullCount(options?.count, box.layout_count || 1);
+  const spend = giftId ? 0 : box.price_gold * count;
+
   if (!giftId) {
     if (box.price_gold <= 0) {
       throw new Error("판매가가 아직 없습니다.");
     }
     const gold = Number(state.progress?.gold ?? 0);
-    if (gold < box.price_gold) {
+    if (gold < spend) {
       throw new Error("골드가 부족합니다.");
     }
-    await adjustGold(admin, userId, state.season, -box.price_gold, "shop_spend");
+    await adjustGold(admin, userId, state.season, -spend, "shop_spend");
 
     if (box.open_place === "inventory") {
-      const { error: holdError } = await admin.from("user_gifts").insert({
+      const rows = Array.from({ length: count }, () => ({
         user_id: userId,
         reward_id: null,
         event_id: null,
@@ -1370,7 +1391,8 @@ export async function pullGoldShopGacha(
         reward_img: box.idle_image_url,
         frame_css_value: encodeGiftGachaValue(box.id),
         is_claimed: false,
-      });
+      }));
+      const { error: holdError } = await admin.from("user_gifts").insert(rows);
       if (holdError) {
         throw new Error(
           holdError.message.includes("user_gifts")
@@ -1382,11 +1404,12 @@ export async function pullGoldShopGacha(
         studentId: userId,
         action: "shop",
         seasonTitle: state.season.title,
-        detail: `${box.name} 보관함 지급 · 골드 ${box.price_gold}`,
+        detail: `${box.name} 보관함 지급 ${count}개 · 골드 ${spend}`,
       });
       return {
         state: await getSeasonPassState(userId),
         held: true,
+        count,
         gifted: true,
         name: box.name,
         imageUrl: box.idle_image_url,
@@ -1395,40 +1418,77 @@ export async function pullGoldShopGacha(
         fxEnabled: box.fx_enabled,
         idleImageUrl: box.idle_image_url,
         burstImageUrl: box.burst_image_url,
+        prizes: [],
       };
     }
   }
 
-  const prize = pickGachaReward(box.rewards);
-  if (!prize) {
-    throw new Error("지급할 확률이 없습니다. 관리자에서 보상 확률을 확인해 주세요.");
+  if (!admin || !box || !state.season) {
+    throw new Error("판매 중인 확률 상자가 아닙니다.");
+  }
+  const db = admin;
+  const target = box;
+  const season = state.season;
+
+  const prizes: Array<{
+    name: string;
+    imageUrl: string | null;
+    kind: string;
+    goldAmount: number;
+    gifted: boolean;
+  }> = [];
+
+  async function grantPrize(prize: GoldShopGachaReward) {
+    let gifted = false;
+    if (prize.kind === "gold") {
+      const amount = Math.max(0, prize.gold_amount);
+      if (amount > 0) {
+        await adjustGold(db, userId, season, amount, "gacha");
+      }
+    } else {
+      const synthetic: RewardItem = {
+        id: prize.id,
+        name: prize.name || (prize.kind === "coupon" ? "쿠폰" : "코스튬"),
+        item_type: prize.kind,
+        image_url: prize.image_url,
+        metadata:
+          prize.kind === "coupon"
+            ? { coupon_code: prize.coupon_code || "", code: prize.coupon_code || "" }
+            : { frame_id: prize.frame_id || "" },
+        is_active: true,
+        sort_order: prize.sort_order,
+      };
+      await sendSeasonPassInboxGift(db, userId, "확률 상자", synthetic);
+      gifted = true;
+    }
+    prizes.push({
+      name: prize.name || target.name,
+      imageUrl: prize.image_url,
+      kind: prize.kind,
+      goldAmount: prize.gold_amount,
+      gifted,
+    });
+    const { error: pullLogError } = await db.from("gold_shop_gacha_pulls").insert({
+      user_id: userId,
+      box_id: target.id,
+      reward_id: prize.id,
+      gold_spent: giftId ? 0 : target.price_gold,
+    });
+    if (pullLogError && !pullLogError.message.includes("gold_shop_gacha_pulls")) {
+      throw pullLogError;
+    }
   }
 
-  let gifted = false;
-  if (prize.kind === "gold") {
-    const amount = Math.max(0, prize.gold_amount);
-    if (amount > 0) {
-      await adjustGold(admin, userId, state.season, amount, "shop_reward");
+  for (let index = 0; index < count; index += 1) {
+    const prize = pickGachaReward(target.rewards);
+    if (!prize) {
+      throw new Error("지급할 확률이 없습니다. 관리자에서 보상 확률을 확인해 주세요.");
     }
-  } else {
-    const synthetic: RewardItem = {
-      id: prize.id,
-      name: prize.name || (prize.kind === "coupon" ? "쿠폰" : "코스튬"),
-      item_type: prize.kind,
-      image_url: prize.image_url,
-      metadata:
-        prize.kind === "coupon"
-          ? { coupon_code: prize.coupon_code || "", code: prize.coupon_code || "" }
-          : { frame_id: prize.frame_id || "" },
-      is_active: true,
-      sort_order: prize.sort_order,
-    };
-    await sendSeasonPassInboxGift(admin, userId, "확률 상자", synthetic);
-    gifted = true;
+    await grantPrize(prize);
   }
 
   if (giftId) {
-    await admin
+    await db
       .from("user_gifts")
       .update({ is_claimed: true, claimed_at: new Date().toISOString() })
       .eq("id", giftId)
@@ -1436,33 +1496,26 @@ export async function pullGoldShopGacha(
       .eq("is_claimed", false);
   }
 
-  const { error: pullLogError } = await admin.from("gold_shop_gacha_pulls").insert({
-    user_id: userId,
-    box_id: box.id,
-    reward_id: prize.id,
-    gold_spent: giftId ? 0 : box.price_gold,
-  });
-  if (pullLogError && !pullLogError.message.includes("gold_shop_gacha_pulls")) {
-    throw pullLogError;
-  }
-
+  const first = prizes[0];
   logSeasonPassToSheets({
     studentId: userId,
     action: "shop",
-    seasonTitle: state.season.title,
-    detail: `${box.name} 뽑기 · ${prize.name || prize.kind} · 골드 ${giftId ? 0 : box.price_gold}`,
+    seasonTitle: season.title,
+    detail: `${target.name} 뽑기 ${count}회 · 골드 ${spend}`,
   });
 
   return {
     state: await getSeasonPassState(userId),
     held: false,
-    gifted,
-    name: prize.name || box.name,
-    imageUrl: prize.image_url,
-    kind: prize.kind,
-    goldAmount: prize.gold_amount,
-    fxEnabled: box.fx_enabled,
-    idleImageUrl: box.idle_image_url,
-    burstImageUrl: box.burst_image_url,
+    count,
+    gifted: prizes.some((item) => item.gifted),
+    name: first?.name || target.name,
+    imageUrl: first?.imageUrl ?? null,
+    kind: first?.kind || "",
+    goldAmount: first?.goldAmount || 0,
+    fxEnabled: target.fx_enabled,
+    idleImageUrl: target.idle_image_url,
+    burstImageUrl: target.burst_image_url,
+    prizes,
   };
 }

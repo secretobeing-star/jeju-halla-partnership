@@ -203,7 +203,13 @@ export default function GiftInboxNavChip({ hideChip = false }: GiftInboxNavChipP
           setMessage(payload.error || "상자를 열지 못했습니다.");
           return;
         }
-        setGachaPlay(gachaRevealFromPull(payload, gift.reward_name || "확률 상자"));
+        setGachaPlay(
+          gachaRevealFromPull(payload, {
+            id: parsed.gachaBoxId || gift.id,
+            name: gift.reward_name || "확률 상자",
+            layout_count: 1,
+          }),
+        );
         window.dispatchEvent(new Event("site-season-pass-refresh"));
         await refresh();
       } catch {

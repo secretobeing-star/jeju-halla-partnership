@@ -249,4 +249,7 @@ drop policy if exists "gold_shop_items_public_read" on public.gold_shop_items;
 create policy "gold_shop_items_public_read"
   on public.gold_shop_items for select to anon, authenticated using (true);
 
+alter table public.seasons
+  add column if not exists shop_filter_tabs jsonb;
+
 notify pgrst, 'reload schema';

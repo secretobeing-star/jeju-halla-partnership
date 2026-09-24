@@ -5,6 +5,7 @@ export const GOLD_LEDGER_SOURCES = [
   "claim",
   "shop_spend",
   "shop_reward",
+  "gacha",
   "premium",
   "admin",
 ] as const;
@@ -18,6 +19,7 @@ export const GOLD_SOURCE_LABELS: Record<GoldLedgerSource, string> = {
   claim: "시즌패스 보상",
   shop_spend: "골드상점 구매",
   shop_reward: "상점 골드 상품",
+  gacha: "뽑기",
   premium: "프리미엄 패스",
   admin: "관리자 지급",
 };

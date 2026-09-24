@@ -12,6 +12,7 @@ create table if not exists public.gold_ledger (
     'claim',
     'shop_spend',
     'shop_reward',
+    'gacha',
     'premium',
     'admin'
   )),
@@ -38,6 +39,7 @@ alter table public.gold_ledger
     'claim',
     'shop_spend',
     'shop_reward',
+    'gacha',
     'premium',
     'admin'
   ));

@@ -164,6 +164,43 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  if (!usedSources.has("gacha")) {
+    const pulls = await loadInRange(
+      admin,
+      "gold_shop_gacha_pulls",
+      "reward_id, created_at",
+      "created_at",
+      range.from,
+      range.until,
+    );
+    if (!pulls.error) {
+      const rows = (pulls.data ?? []) as Array<{ reward_id?: string; created_at?: string }>;
+      const ids = [...new Set(rows.map((row) => String(row.reward_id ?? "")).filter(Boolean))];
+      const goldByReward = new Map<string, number>();
+      if (ids.length > 0) {
+        const { data: rewards } = await admin
+          .from("gold_shop_gacha_rewards")
+          .select("id, kind, gold_amount")
+          .in("id", ids);
+        for (const reward of (rewards ?? []) as Array<{ id?: string; kind?: string; gold_amount?: number }>) {
+          if (reward.kind !== "gold") continue;
+          goldByReward.set(String(reward.id ?? ""), Math.max(0, Number(reward.gold_amount) || 0));
+        }
+      }
+      for (const row of rows) {
+        if (!row.created_at) continue;
+        applyAmount(
+          dailyMap,
+          sources,
+          totals,
+          row.created_at,
+          goldByReward.get(String(row.reward_id ?? "")) || 0,
+          "gacha",
+        );
+      }
+    }
+  }
+
   const summary: GoldAnalyticsSummary = {
     periodLabel: range.periodLabel,
     averageLabel: range.averageLabel,

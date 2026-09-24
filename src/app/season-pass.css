@@ -713,6 +713,33 @@
   right: 0.28rem;
 }
 
+.season-pass-shop__hanger {
+  position: absolute;
+  top: 0.32rem;
+  right: 0.32rem;
+  z-index: 2;
+  display: flex;
+  width: 1.55rem;
+  height: 1.55rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.42rem;
+  background: #e7f6ff;
+  color: #7dd3fc;
+  font-style: normal;
+  box-shadow: 0 1px 2px rgb(56 189 248 / 0.25);
+}
+
+.season-pass-shop__hanger svg {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.season-pass-shop__art b ~ .season-pass-shop__hanger,
+.season-pass-shop__art em:not(.is-secondary) ~ .season-pass-shop__hanger {
+  top: 1.7rem;
+}
+
 .season-pass-shop__cost s {
   margin-right: 0.2rem;
   color: #8b7355;
@@ -756,6 +783,12 @@
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
+}
+
+.season-pass-shop__actions.is-single .season-pass-shop__buy {
+  min-height: 2.55rem;
+  padding: 0.55rem 0.4rem;
+  font-size: 0.86rem;
 }
 
 .season-pass-shop__preview {
@@ -1290,6 +1323,107 @@
 .season-pass-shop-receipt.is-short .season-pass-shop-receipt__actions button.is-primary {
   border-color: #c24b4b;
   background: linear-gradient(180deg, #e98a8a, #c24b4b);
+}
+
+.season-pass-gacha-overlay {
+  background: rgb(12 18 32 / 0.72);
+  backdrop-filter: blur(6px);
+}
+
+.season-pass-gacha-multi {
+  position: relative;
+  width: min(38rem, calc(100vw - 1.5rem));
+  padding: 2.4rem 1rem 1.3rem;
+  text-align: center;
+}
+
+.season-pass-gacha-multi__glow {
+  position: absolute;
+  inset: 12% 8% 28%;
+  pointer-events: none;
+  background: radial-gradient(circle, rgb(255 255 255 / 0.88) 0%, rgb(255 255 255 / 0.18) 42%, transparent 70%);
+  filter: blur(2px);
+}
+
+.season-pass-gacha-multi__prizes {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.season-pass-gacha-multi__prizes li {
+  display: flex;
+  width: 4.7rem;
+  height: 4.7rem;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 2px solid rgb(255 255 255 / 0.7);
+  border-radius: 1.05rem;
+  background: linear-gradient(180deg, #efe7ff, #b9a4f2);
+  box-shadow: 0 8px 18px rgb(15 23 42 / 0.22);
+}
+
+.season-pass-gacha-multi__prizes li.is-gold {
+  background: linear-gradient(180deg, #fff7d6, #f5d76e);
+}
+
+.season-pass-gacha-multi__prizes li.is-coupon {
+  background: linear-gradient(180deg, #e8f4ff, #93c5fd);
+}
+
+.season-pass-gacha-multi__prizes img,
+.season-pass-gacha-multi__prizes span {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.season-pass-gacha-multi__prizes span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #312e81;
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+
+.season-pass-gacha-multi__actions {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.55rem;
+  margin-top: 2.1rem;
+}
+
+.season-pass-gacha-multi__actions button {
+  min-width: 7.2rem;
+  border: 0;
+  border-radius: 999px;
+  padding: 0.62rem 1.15rem;
+  font-size: 0.92rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.season-pass-gacha-multi__actions button.is-use {
+  background: linear-gradient(180deg, #67e8f9, #22d3ee);
+  color: #0f3f52;
+  box-shadow: 0 6px 0 #0891b2;
+}
+
+.season-pass-gacha-multi__actions button.is-ok {
+  background: linear-gradient(180deg, #f8fafc, #e2e8f0);
+  color: #334155;
+  box-shadow: 0 6px 0 #94a3b8;
 }
 
 .season-pass-gacha {

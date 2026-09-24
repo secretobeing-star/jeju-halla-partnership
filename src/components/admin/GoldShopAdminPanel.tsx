@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import AdminCollapsibleSection from "@/components/admin/AdminCollapsibleSection";
 import { adminApiFetch, reloadAfterAdminSave } from "@/lib/admin-api";
-import type { GoldShopItem, RewardItem, Season } from "@/lib/season-pass";
+import type { GoldShopFilterTab, GoldShopItem, RewardItem, Season } from "@/lib/season-pass";
+import { parseGoldShopFilterTabs } from "@/lib/season-pass";
 import type { PublicCardFrameItem } from "@/lib/student-card-frames";
 import GoldShopGachaAdminPanel from "@/components/admin/GoldShopGachaAdminPanel";
 
@@ -82,6 +83,8 @@ export default function GoldShopAdminPanel({ onMessage }: GoldShopAdminPanelProp
   const [togglingShop, setTogglingShop] = useState(false);
   const [togglingPreview, setTogglingPreview] = useState(false);
   const [pageTab, setPageTab] = useState<"catalog" | "gacha">("catalog");
+  const [shopTabs, setShopTabs] = useState<GoldShopFilterTab[]>(() => parseGoldShopFilterTabs(null));
+  const [savingTabs, setSavingTabs] = useState(false);
 
   const selected = useMemo(
     () => seasons.find((item) => item.id === seasonId) ?? seasons[0] ?? null,
@@ -137,6 +140,10 @@ export default function GoldShopAdminPanel({ onMessage }: GoldShopAdminPanelProp
   useEffect(() => {
     void loadAll();
   }, [loadAll]);
+
+  useEffect(() => {
+    setShopTabs(parseGoldShopFilterTabs(selected?.shop_filter_tabs));
+  }, [selected?.id, selected?.shop_filter_tabs]);
 
   useEffect(() => {
     const season = selected;
@@ -421,6 +428,39 @@ export default function GoldShopAdminPanel({ onMessage }: GoldShopAdminPanelProp
     }
   }
 
+  async function saveShopTabs() {
+    setSavingTabs(true);
+    try {
+      const payload = (await adminApiFetch("/api/admin/season-pass", {
+        method: "PATCH",
+        body: JSON.stringify({
+          entity: "gold_shop",
+          shop_filter_tabs: shopTabs,
+        }),
+      })) as { seasons?: Season[] };
+      const nextSeasons = payload.seasons ?? [];
+      setSeasons(nextSeasons);
+      onMessage("상점 탭 이름과 순서를 저장했습니다.");
+      reloadAfterAdminSave();
+    } catch (error) {
+      onMessage(error instanceof Error ? error.message : "저장에 실패했습니다.");
+    } finally {
+      setSavingTabs(false);
+    }
+  }
+
+  function moveShopTab(index: number, direction: -1 | 1) {
+    setShopTabs((prev) => {
+      const next = [...prev];
+      const target = index + direction;
+      if (target < 0 || target >= next.length) return prev;
+      const current = next[index];
+      next[index] = next[target];
+      next[target] = current;
+      return next;
+    });
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap gap-2">
@@ -476,6 +516,51 @@ export default function GoldShopAdminPanel({ onMessage }: GoldShopAdminPanelProp
           onChange={(event) => void toggleCostumePreview(event.target.checked)}
         />
       </label>
+      <AdminCollapsibleSection title="상점 탭 이름 · 순서">
+        <p className="mb-3 text-xs text-gray-500">
+          상점 상단의 전체·패스·코스튬·쿠폰·확률 탭 이름을 바꾸고 순서를 옮길 수 있습니다.
+        </p>
+        <div className="space-y-2">
+          {shopTabs.map((tab, index) => (
+            <div key={tab.id} className="flex flex-wrap items-center gap-2">
+              <input
+                className="min-w-[8rem] flex-1 rounded border px-2 py-1.5 text-sm"
+                value={tab.label}
+                onChange={(event) =>
+                  setShopTabs((prev) =>
+                    prev.map((item) => (item.id === tab.id ? { ...item, label: event.target.value } : item)),
+                  )
+                }
+              />
+              <span className="text-xs text-gray-400">{tab.id}</span>
+              <button
+                type="button"
+                className="rounded border px-2 py-1 text-xs"
+                disabled={index === 0}
+                onClick={() => moveShopTab(index, -1)}
+              >
+                위로
+              </button>
+              <button
+                type="button"
+                className="rounded border px-2 py-1 text-xs"
+                disabled={index === shopTabs.length - 1}
+                onClick={() => moveShopTab(index, 1)}
+              >
+                아래로
+              </button>
+            </div>
+          ))}
+        </div>
+        <button
+          type="button"
+          className="mt-3 rounded-lg bg-gray-900 px-4 py-2 text-sm text-white"
+          disabled={savingTabs}
+          onClick={() => void saveShopTabs()}
+        >
+          탭 저장
+        </button>
+      </AdminCollapsibleSection>
       <AdminCollapsibleSection title="물품 등록">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <label className="text-xs text-gray-500">

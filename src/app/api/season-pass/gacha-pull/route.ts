@@ -9,6 +9,7 @@ export async function POST(request: NextRequest) {
       studentId?: string;
       boxId?: string;
       giftId?: string;
+      count?: number;
     };
     const auth = await requireStudentSession(request, [body.userId, body.studentId]);
     if (!auth.ok) {
@@ -16,6 +17,7 @@ export async function POST(request: NextRequest) {
     }
     const result = await pullGoldShopGacha(auth.studentId, body.boxId?.trim() || "", {
       giftId: body.giftId?.trim() || "",
+      count: body.count,
     });
     return NextResponse.json({ ok: true, ...result });
   } catch (error) {

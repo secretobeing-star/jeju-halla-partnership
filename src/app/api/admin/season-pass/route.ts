@@ -5,6 +5,7 @@ import {
   GOLD_SHOP_CATALOG_CODE,
   SEASON_PASS_ITEM_TYPES,
   asSeasonPassQuestType,
+  parseGoldShopFilterTabs,
   type SeasonPassItemType,
 } from "@/lib/season-pass";
 
@@ -407,6 +408,29 @@ export async function PATCH(request: NextRequest) {
           }
         }
       }
+      if (body.shop_filter_tabs !== undefined) {
+        const tabs = parseGoldShopFilterTabs(body.shop_filter_tabs);
+        if (seasons.length === 0) {
+          seasons = await listSeasons(admin);
+        }
+        if (seasons.length > 0) {
+          const now = new Date().toISOString();
+          for (const season of seasons) {
+            const seasonId = String(season.id ?? "");
+            if (!seasonId) continue;
+            const { error } = await admin
+              .from("seasons")
+              .update({ shop_filter_tabs: tabs, updated_at: now })
+              .eq("id", seasonId);
+            if (error) {
+              if (error.message.includes("shop_filter_tabs")) {
+                throw new Error("상점 탭 설정 컬럼이 없습니다. supabase/season-pass.sql 을 실행해 주세요.");
+              }
+              throw error;
+            }
+          }
+        }
+      }
       seasons = await listSeasons(admin);
       return NextResponse.json({ ok: true, seasons });
     }
@@ -445,12 +469,15 @@ export async function PATCH(request: NextRequest) {
         "premium_badge_label",
         "gold_shop_enabled",
         "costume_preview_enabled",
+        "shop_filter_tabs",
         "sort_order",
       ]) {
         if (body[key] !== undefined) {
           patch[key] =
             key === "gold_shop_enabled" || key === "costume_preview_enabled"
               ? Boolean(body[key])
+              : key === "shop_filter_tabs"
+                ? parseGoldShopFilterTabs(body[key])
               : body[key];
         }
       }
@@ -461,13 +488,15 @@ export async function PATCH(request: NextRequest) {
           error.message.includes("claimed_check_image_url") ||
           error.message.includes("premium_original_price_gold") ||
           error.message.includes("premium_badge_label") ||
-          error.message.includes("costume_preview_enabled");
+          error.message.includes("costume_preview_enabled") ||
+          error.message.includes("shop_filter_tabs");
         if (missing) {
           delete patch.gold_icon_url;
           delete patch.claimed_check_image_url;
           delete patch.premium_original_price_gold;
           delete patch.premium_badge_label;
           delete patch.costume_preview_enabled;
+          delete patch.shop_filter_tabs;
           const retry = await admin.from("seasons").update(patch).eq("id", id);
           if (retry.error) throw retry.error;
         } else {

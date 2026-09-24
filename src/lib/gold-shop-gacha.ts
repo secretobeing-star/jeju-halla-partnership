@@ -82,6 +82,11 @@ export function mapGachaBox(
   };
 }
 
+export function clampGachaPullCount(value: unknown, maxRaw = 20) {
+  const max = Math.max(1, Math.min(20, Math.floor(Number(maxRaw) || 1)));
+  return Math.max(1, Math.min(max, Math.floor(Number(value) || 1)));
+}
+
 export function pickGachaReward(rewards: GoldShopGachaReward[]): GoldShopGachaReward | null {
   const active = rewards.filter((item) => item.is_active && item.probability > 0);
   if (active.length === 0) {

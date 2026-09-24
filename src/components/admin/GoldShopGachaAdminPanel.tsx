@@ -306,7 +306,7 @@ export default function GoldShopGachaAdminPanel({ onMessage, costumes }: GoldSho
               </select>
             </label>
             <label className="text-xs text-gray-500">
-              상점 진열 개수 (1~20)
+              N개 사용 (1~20, 상점에 1개 사용 / N개 사용 버튼)
               <input
                 type="number"
                 min={1}

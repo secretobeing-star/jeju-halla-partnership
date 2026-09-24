@@ -136,7 +136,7 @@ export default function GoldAnalyticsAdminPanel({ onMessage }: GoldAnalyticsAdmi
 
           <AdminCollapsibleSection
             title="골드 획득량"
-            description="출석, 제휴 방문, 퀘스트, 시즌패스 보상, 상점 골드 상품으로 받은 골드입니다."
+            description="출석, 제휴 방문, 퀘스트, 시즌패스 보상, 상점 골드 상품, 뽑기로 받은 골드입니다."
           >
             <p className="text-3xl font-semibold text-gray-900">{formatCount(summary.gained)}</p>
             <p className="mt-1 text-sm text-gray-500">

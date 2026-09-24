@@ -15,6 +15,48 @@ export function seasonPassQuestTypeLabel(value: string) {
 export const SEASON_PASS_TRACKS = ["free", "premium"] as const;
 export type SeasonPassTrack = (typeof SEASON_PASS_TRACKS)[number];
 
+export const GOLD_SHOP_FILTER_IDS = ["all", "pass", "costume", "coupon", "gacha"] as const;
+export type GoldShopFilterId = (typeof GOLD_SHOP_FILTER_IDS)[number];
+
+export type GoldShopFilterTab = {
+  id: GoldShopFilterId;
+  label: string;
+};
+
+export const DEFAULT_GOLD_SHOP_FILTER_TABS: GoldShopFilterTab[] = [
+  { id: "all", label: "전체" },
+  { id: "pass", label: "패스" },
+  { id: "costume", label: "코스튬" },
+  { id: "coupon", label: "쿠폰" },
+  { id: "gacha", label: "확률" },
+];
+
+export function asGoldShopFilterId(value: unknown): GoldShopFilterId | null {
+  return (GOLD_SHOP_FILTER_IDS as readonly string[]).includes(String(value))
+    ? (value as GoldShopFilterId)
+    : null;
+}
+
+export function parseGoldShopFilterTabs(value: unknown): GoldShopFilterTab[] {
+  const byId = new Map(DEFAULT_GOLD_SHOP_FILTER_TABS.map((tab) => [tab.id, tab.label]));
+  const ordered: GoldShopFilterTab[] = [];
+  const seen = new Set<GoldShopFilterId>();
+  const source = Array.isArray(value) ? value : [];
+  for (const item of source) {
+    const row = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+    const id = asGoldShopFilterId(row.id);
+    if (!id || seen.has(id)) continue;
+    const label = String(row.label ?? "").trim() || byId.get(id) || id;
+    ordered.push({ id, label });
+    seen.add(id);
+  }
+  for (const tab of DEFAULT_GOLD_SHOP_FILTER_TABS) {
+    if (seen.has(tab.id)) continue;
+    ordered.push(tab);
+  }
+  return ordered;
+}
+
 export type Season = {
   id: string;
   code: string;
@@ -40,6 +82,7 @@ export type Season = {
   premium_badge_label: string;
   gold_shop_enabled: boolean;
   costume_preview_enabled: boolean;
+  shop_filter_tabs: GoldShopFilterTab[];
   sort_order: number;
 };
 

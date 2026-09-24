@@ -171,7 +171,7 @@ export function useSeasonPassClient() {
       const preview = rewardPreview(reward, gifted, state.season?.gold_icon_url);
       if (!options?.silent) {
         setClaimPopup({
-          title: "보상을 받았습니다",
+          title: "구입이 완료되었습니다.",
           body: gifted
             ? "선물함으로 보냈습니다. 선물함에서 받아 주세요."
             : "보상이 지급되었습니다.",
@@ -229,7 +229,7 @@ export function useSeasonPassClient() {
     }
     const gifted = collected.some((item) => item.gifted);
     setClaimPopup({
-      title: collected.length > 1 ? `보상 ${collected.length}개를 받았습니다` : "보상을 받았습니다",
+      title: "구입이 완료되었습니다.",
       body: gifted
         ? "코스튬·쿠폰은 선물함으로 보냈습니다. 선물함에서 받아 주세요."
         : "보상이 지급되었습니다.",
@@ -240,7 +240,7 @@ export function useSeasonPassClient() {
 
   async function checkIn() {
     if (!userId) {
-      setMessage("로그인 후 출석할 수 있습니다.");
+      openClaimNotice("출석 체크", "로그인 후 출석할 수 있습니다.");
       return;
     }
     setBusy("attendance");
@@ -259,6 +259,7 @@ export function useSeasonPassClient() {
         throw new Error(payload.error || "출석에 실패했습니다.");
       }
       setMessage("오늘 출석을 완료했습니다.");
+      openClaimNotice("출석 체크", "오늘 출석을 완료했습니다.");
       window.dispatchEvent(new Event("site-season-pass-refresh"));
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "출석에 실패했습니다.");
@@ -287,9 +288,8 @@ export function useSeasonPassClient() {
       if (payload.state) {
         setState(payload.state);
       }
-      setMessage("프리미엄 패스를 구매했습니다.");
+      openClaimNotice("구입이 완료되었습니다.", "프리미엄 패스를 구매했습니다.");
       window.dispatchEvent(new Event("site-season-pass-refresh"));
-      window.location.reload();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "구매에 실패했습니다.");
     } finally {
@@ -356,7 +356,7 @@ export function useSeasonPassClient() {
     }
   }
 
-  async function buyGacha(boxId: string) {
+  async function buyGacha(boxId: string, count = 1) {
     if (!userId) {
       openClaimNotice("구매할 수 없습니다", "로그인 후 구매할 수 있습니다.");
       return null;
@@ -367,7 +367,7 @@ export function useSeasonPassClient() {
       const response = await studentAuthFetch("/api/season-pass/gacha-pull", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, boxId }),
+        body: JSON.stringify({ userId, boxId, count }),
       });
       const payload = (await response.json()) as {
         state?: SeasonPassWidgetState;
@@ -381,6 +381,14 @@ export function useSeasonPassClient() {
         fxEnabled?: boolean;
         idleImageUrl?: string | null;
         burstImageUrl?: string | null;
+        count?: number;
+        prizes?: Array<{
+          name: string;
+          imageUrl: string | null;
+          kind: string;
+          goldAmount: number;
+          gifted: boolean;
+        }>;
       };
       if (!response.ok) {
         throw new Error(payload.error || "뽑기에 실패했습니다.");
