@@ -35,6 +35,12 @@ declare namespace naver.maps {
     getElement?(): HTMLElement | null;
   }
 
+  class Polyline {
+    constructor(options: PolylineOptions);
+    setMap(map: Map | null): void;
+    setPath(path: LatLng[]): void;
+  }
+
   class OverlayView {
     constructor();
     getMap(): Map | null;
@@ -88,6 +94,17 @@ declare namespace naver.maps {
     logoControl?: boolean;
     zoomControl?: boolean;
     mapTypeControl?: boolean;
+  }
+
+  interface PolylineOptions {
+    map?: Map | null;
+    path: LatLng[];
+    strokeColor?: string;
+    strokeWeight?: number;
+    strokeOpacity?: number;
+    strokeLineCap?: string;
+    strokeLineJoin?: string;
+    zIndex?: number;
   }
 
   interface MarkerOptions {

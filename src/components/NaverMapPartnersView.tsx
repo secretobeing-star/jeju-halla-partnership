@@ -145,8 +145,18 @@ export default function NaverMapPartnersView({
   const mapMarkersSignatureRef = useRef("");
   const holdLoadingOverlayRef = useRef(holdLoadingOverlay);
   const wasHoldingLoadingRef = useRef(holdLoadingOverlay);
-  const { locating, locateMessage, handleLocateMe, clearUserLocationOverlay } =
-    usePartnerMapLocate();
+  const {
+    locating,
+    locateMessage,
+    handleLocateMe,
+    clearUserLocationOverlay,
+    resolveUserLocation,
+    showLocateMessage,
+  } = usePartnerMapLocate();
+  const routePolylineRef = useRef<naver.maps.Polyline | null>(null);
+  const routeRequestIdRef = useRef(0);
+  const resolveUserLocationRef = useRef(resolveUserLocation);
+  const showLocateMessageRef = useRef(showLocateMessage);
   const [mapReady, setMapReady] = useState(false);
   const [tilesReady, setTilesReady] = useState(false);
   const [mapRevealed, setMapRevealed] = useState(false);
@@ -254,6 +264,99 @@ export default function NaverMapPartnersView({
   }, [favoritePartnerIds, favoritesEnabled, favoritesTerm]);
 
   useEffect(() => {
+    resolveUserLocationRef.current = resolveUserLocation;
+    showLocateMessageRef.current = showLocateMessage;
+  }, [resolveUserLocation, showLocateMessage]);
+
+  function clearRoute() {
+    routeRequestIdRef.current += 1;
+    routePolylineRef.current?.setMap(null);
+    routePolylineRef.current = null;
+  }
+
+  async function drawRouteTo(partner: NaverMapPartnerMarker) {
+    const maps = window.naver?.maps;
+    const map = mapRef.current;
+    if (!maps || !map) {
+      return;
+    }
+
+    const requestId = ++routeRequestIdRef.current;
+    routePolylineRef.current?.setMap(null);
+
+    let start: { latitude: number; longitude: number };
+    try {
+      start = await resolveUserLocationRef.current();
+    } catch (error) {
+      if (error instanceof Error && error.message) {
+        showLocateMessageRef.current(error.message);
+      } else {
+        showLocateMessageRef.current("현재 위치를 확인해야 경로를 그릴 수 있습니다.");
+      }
+      return;
+    }
+
+    if (requestId !== routeRequestIdRef.current) {
+      return;
+    }
+
+    try {
+      const params = new URLSearchParams({
+        startLat: String(start.latitude),
+        startLng: String(start.longitude),
+        goalLat: String(partner.latitude),
+        goalLng: String(partner.longitude),
+      });
+      const response = await fetch(`/api/directions?${params.toString()}`, {
+        cache: "no-store",
+      });
+      const payload = (await response.json()) as {
+        path?: Array<{ latitude: number; longitude: number }>;
+        error?: string;
+      };
+
+      if (requestId !== routeRequestIdRef.current) {
+        return;
+      }
+
+      const path = payload.path?.filter(
+        (point) => Number.isFinite(point.latitude) && Number.isFinite(point.longitude),
+      );
+      if (!path || path.length < 2) {
+        showLocateMessageRef.current(payload.error || "경로를 찾지 못했습니다.");
+        return;
+      }
+
+      const latLngs = path.map((point) => new maps.LatLng(point.latitude, point.longitude));
+      if (routePolylineRef.current) {
+        routePolylineRef.current.setPath(latLngs);
+        routePolylineRef.current.setMap(map);
+      } else {
+        routePolylineRef.current = new maps.Polyline({
+          map,
+          path: latLngs,
+          strokeColor: "#3b82f6",
+          strokeWeight: 6,
+          strokeOpacity: 0.92,
+          strokeLineCap: "round",
+          strokeLineJoin: "round",
+          zIndex: 80,
+        });
+      }
+
+      const bounds = new maps.LatLngBounds();
+      for (const point of latLngs) {
+        bounds.extend(point);
+      }
+      map.fitBounds(bounds, { top: 72, right: 48, bottom: 240, left: 48 });
+    } catch {
+      if (requestId === routeRequestIdRef.current) {
+        showLocateMessageRef.current("경로를 찾지 못했습니다.");
+      }
+    }
+  }
+
+  useEffect(() => {
     if (!viewResetKey) {
       return;
     }
@@ -262,6 +365,7 @@ export default function NaverMapPartnersView({
     miniCardOverlayRef.current = null;
     miniCardElementRef.current = null;
     selectedPartnerIdRef.current = null;
+    clearRoute();
     for (const element of markerElementsRef.current.values()) {
       getPartnerMapMarkerButton(element)?.classList.remove("partner-map-marker--selected");
     }
@@ -362,6 +466,7 @@ export default function NaverMapPartnersView({
               miniCardOverlayRef.current = null;
               miniCardElementRef.current = null;
               selectedPartnerIdRef.current = null;
+              clearRoute();
               for (const element of markerElementsRef.current.values()) {
                 getPartnerMapMarkerButton(element)?.classList.remove("partner-map-marker--selected");
               }
@@ -435,6 +540,7 @@ export default function NaverMapPartnersView({
       }
       markersRef.current = [];
       markerElementsRef.current.clear();
+      clearRoute();
       clearUserLocationOverlay();
       mapRef.current = null;
     };
@@ -489,6 +595,7 @@ export default function NaverMapPartnersView({
       miniCardElementRef.current = null;
       if (resetSelection) {
         selectedPartnerIdRef.current = null;
+        clearRoute();
         for (const element of markerElementsRef.current.values()) {
           getPartnerMapMarkerButton(element)?.classList.remove("partner-map-marker--selected");
         }
@@ -526,6 +633,9 @@ export default function NaverMapPartnersView({
         favoritesTerm: favoritesTermRef.current,
         onClose: () => {
           closeMiniCard(true);
+        },
+        onDirections: () => {
+          void drawRouteTo(partner);
         },
         onFavoriteToggle: favoritesEnabledRef.current
           ? () => {
@@ -566,6 +676,8 @@ export default function NaverMapPartnersView({
         markerGap: MINI_CARD_MARKER_GAP,
         placement: "marker",
       });
+
+      void drawRouteTo(partner);
 
       ignoreNextMapClickRef.current = true;
       window.requestAnimationFrame(() => {

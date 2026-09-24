@@ -4528,8 +4528,8 @@ html.dark-mode .board-post-popup-close:hover {
 .partner-map-marker-shell {
   position: relative;
   display: block;
-  width: 3rem;
-  height: 3.375rem;
+  width: 4rem;
+  height: 4.75rem;
   flex-shrink: 0;
   overflow: visible;
   pointer-events: none;
@@ -4560,14 +4560,15 @@ html.dark-mode .board-post-popup-close:hover {
   position: absolute;
   top: 0;
   left: 0;
+  z-index: 1;
   display: block;
-  width: 3rem;
-  height: 3rem;
+  width: 4rem;
+  height: 4rem;
   overflow: hidden;
-  border: 2px solid #ffffff;
-  border-radius: 0.75rem;
+  border: 4px solid #3b82f6;
+  border-radius: 1rem;
   background: #f3f4f6;
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.18);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.22);
   cursor: pointer;
   pointer-events: auto;
   transition:
@@ -4581,10 +4582,10 @@ html.dark-mode .board-post-popup-close:hover {
 }
 
 .partner-map-marker--selected {
-  border-color: #10b981;
+  border-color: #2563eb;
   box-shadow:
-    0 0 0 3px rgba(16, 185, 129, 0.28),
-    0 6px 16px rgba(15, 23, 42, 0.2);
+    0 0 0 3px rgba(37, 99, 235, 0.28),
+    0 8px 18px rgba(15, 23, 42, 0.24);
 }
 
 .partner-map-marker__image {
@@ -4602,27 +4603,26 @@ html.dark-mode .board-post-popup-close:hover {
   height: 100%;
   font-size: 0.95rem;
   font-weight: 700;
-  color: #047857;
-  background: #ecfdf5;
+  color: #1d4ed8;
+  background: #dbeafe;
 }
 
 .partner-map-marker__tail {
   position: absolute;
-  bottom: 0;
+  bottom: 0.12rem;
   left: 50%;
   z-index: 0;
-  width: 0.625rem;
-  height: 0.625rem;
-  border-right: 2px solid #ffffff;
-  border-bottom: 2px solid #ffffff;
-  background: #ffffff;
-  transform: translate(-50%, 50%) rotate(45deg);
+  width: 0.78rem;
+  height: 0.78rem;
+  border: 0;
+  border-radius: 0.12rem;
+  background: #3b82f6;
+  transform: translate(-50%, 46%) rotate(45deg);
   pointer-events: none;
 }
 
-.partner-map-marker--selected .partner-map-marker__tail {
-  border-right-color: #10b981;
-  border-bottom-color: #10b981;
+.partner-map-marker-shell:has(.partner-map-marker--selected) .partner-map-marker__tail {
+  background: #2563eb;
 }
 
 .partner-map-marker__favorite-badge {
@@ -5037,6 +5037,23 @@ html.dark-mode .partner-map-locate-button:hover:not(:disabled) {
 
 .partner-map-mini-card__detail-btn:hover {
   background: #047857;
+}
+
+.partner-map-mini-card__directions-btn {
+  width: 100%;
+  margin-top: 0.35rem;
+  border: 1px solid #93c5fd;
+  border-radius: 0.625rem;
+  background: #eff6ff;
+  padding: 0.45rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #1d4ed8;
+  cursor: pointer;
+}
+
+.partner-map-mini-card__directions-btn:hover {
+  background: #dbeafe;
 }
 
 .partner-map-mini-card__stamp-btn {

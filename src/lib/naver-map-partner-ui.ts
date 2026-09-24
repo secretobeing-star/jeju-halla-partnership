@@ -11,8 +11,8 @@ export type NaverMapPartnerMarker = {
 };
 
 export const PARTNER_MAP_DEFAULT_THUMBNAIL_PATH = "/images/default-thumbnail.svg";
-export const PARTNER_MAP_MARKER_SIZE = { width: 48, height: 54 };
-export const PARTNER_MAP_MARKER_ANCHOR = { x: 24, y: 54 };
+export const PARTNER_MAP_MARKER_SIZE = { width: 64, height: 76 };
+export const PARTNER_MAP_MARKER_ANCHOR = { x: 32, y: 76 };
 const PARTNER_MAP_IMAGE_FALLBACK_TEXT = "?";
 
 export function parsePartnerMapCoordinate(value: number | string | null | undefined): number | null {
@@ -164,7 +164,7 @@ export function createPartnerMapMarkerElement(
   const customBorderColor = markerSettings?.borderColor?.trim();
   if (customBorderColor) {
     button.style.borderColor = customBorderColor;
-    button.style.boxShadow = `0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 0 0 1px ${customBorderColor}`;
+    button.style.boxShadow = `0 6px 16px rgba(15, 23, 42, 0.22)`;
   }
 
   if (markerSettings?.bgImg) {
@@ -200,11 +200,12 @@ export function createPartnerMapMarkerElement(
   tail.className = "partner-map-marker__tail";
   tail.setAttribute("aria-hidden", "true");
   if (customBorderColor) {
-    tail.style.borderTopColor = customBorderColor;
+    tail.style.background = customBorderColor;
+    tail.style.borderColor = "transparent";
   }
-  button.appendChild(tail);
 
   shell.appendChild(button);
+  shell.appendChild(tail);
 
   // 상단 원형 뱃지 (하트 대체 불꽃 아이콘)
   const topBadgeIconUrl = markerSettings?.topIconImg || partner.pinImageUrl;
@@ -388,6 +389,7 @@ export function createPartnerMapMiniCardElement(
     customCategoryBookmarkEnabled?: boolean;
     customCategoryBookmarked?: boolean;
     onCustomCategoryBookmark?: () => void;
+    onDirections?: () => void;
     stamp?: {
       visible: boolean;
       disabled: boolean;
@@ -545,6 +547,19 @@ export function createPartnerMapMiniCardElement(
     onDetailClick();
   });
   card.appendChild(detailButton);
+
+  if (options?.onDirections) {
+    const directionsButton = document.createElement("button");
+    directionsButton.type = "button";
+    directionsButton.className = "partner-map-mini-card__directions-btn";
+    directionsButton.textContent = "길찾기";
+    directionsButton.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      options.onDirections?.();
+    });
+    card.appendChild(directionsButton);
+  }
 
   if (options?.stamp?.visible) {
     const stampButton = document.createElement("button");

@@ -17,6 +17,7 @@ const USER_LOCATION_ZOOM = 15;
 
 export function usePartnerMapLocate() {
   const userLocationMarkerRef = useRef<naver.maps.Marker | null>(null);
+  const lastCoordsRef = useRef<{ latitude: number; longitude: number } | null>(null);
   const locateMessageTimerRef = useRef<number | null>(null);
   const [locating, setLocating] = useState(false);
   const [locateMessage, setLocateMessage] = useState<string | null>(null);
@@ -65,6 +66,10 @@ export function usePartnerMapLocate() {
       }
 
       const coords = await getCurrentGeolocation();
+      lastCoordsRef.current = {
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+      };
       const position = new window.naver.maps.LatLng(coords.latitude, coords.longitude);
 
       if (userLocationMarkerRef.current) {
@@ -102,10 +107,29 @@ export function usePartnerMapLocate() {
     }
   }, [locating, showLocateMessage]);
 
+  const resolveUserLocation = useCallback(async () => {
+    if (isPwaLocationAccessDisabled()) {
+      throw new GeolocationError("앱 설정에서 위치 사용을 켜 주세요.", "denied");
+    }
+
+    if (lastCoordsRef.current) {
+      return lastCoordsRef.current;
+    }
+
+    const coords = await getCurrentGeolocation();
+    lastCoordsRef.current = {
+      latitude: coords.latitude,
+      longitude: coords.longitude,
+    };
+    return lastCoordsRef.current;
+  }, []);
+
   return {
     locating,
     locateMessage,
     handleLocateMe,
     clearUserLocationOverlay,
+    resolveUserLocation,
+    showLocateMessage,
   };
 }
