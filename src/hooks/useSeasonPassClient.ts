@@ -13,6 +13,7 @@ export type SeasonPassClaimPopupItem = {
   name: string;
   imageUrl: string | null;
   gifted: boolean;
+  kind?: string;
 };
 
 export type SeasonPassClaimPopup = {
@@ -36,6 +37,7 @@ function rewardPreview(
     name,
     imageUrl: reward?.image_url || (reward?.item_type === "gold" ? goldIconUrl || null : null),
     gifted,
+    kind: reward?.item_type || "",
   };
 }
 
@@ -335,12 +337,13 @@ export function useSeasonPassClient() {
         body: gifted
           ? "구매한 상품은 선물함으로 보냈습니다. 선물함에서 받아 주세요."
           : "구입이 완료되었습니다.",
-        items: item
+            items: item
           ? [
               {
                 name: payload.name?.trim() || item.name,
                 imageUrl,
                 gifted,
+                kind: item.reward?.item_type || item.item_kind,
               },
             ]
           : [],

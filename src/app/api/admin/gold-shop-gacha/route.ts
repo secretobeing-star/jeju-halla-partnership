@@ -7,9 +7,99 @@ import {
 } from "@/lib/gold-shop-gacha";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 
-function missingTable(error: { message?: string } | null) {
-  const message = error?.message ?? "";
-  return message.includes("gold_shop_gacha") && (message.includes("does not exist") || message.includes("schema"));
+type DbError = { message?: string; details?: string; hint?: string; code?: string } | null;
+
+function dbMessage(error: unknown) {
+  if (!error) return "";
+  if (error instanceof Error) return error.message;
+  if (typeof error === "object") {
+    const rec = error as { message?: unknown; details?: unknown; hint?: unknown };
+    return [rec.message, rec.details, rec.hint]
+      .map((value) => String(value ?? "").trim())
+      .filter(Boolean)
+      .join(" · ");
+  }
+  return String(error);
+}
+
+function missingTable(error: DbError | unknown) {
+  const message = dbMessage(error).toLowerCase();
+  return (
+    message.includes("gold_shop_gacha") &&
+    (message.includes("does not exist") || message.includes("schema cache") || message.includes("could not find"))
+  );
+}
+
+function gachaSaveError(error: unknown) {
+  const message = dbMessage(error);
+  if (
+    missingTable(error) ||
+    message.toLowerCase().includes("does not exist") ||
+    message.toLowerCase().includes("schema cache") ||
+    message.toLowerCase().includes("could not find")
+  ) {
+    return "확률성 아이템 테이블/컬럼이 없습니다. Supabase SQL Editor에서 supabase/gold-shop-gacha.sql 을 실행한 뒤 다시 저장해 주세요.";
+  }
+  return message || "저장에 실패했습니다.";
+}
+
+function columnFromSchemaError(message: string) {
+  const quoted = message.match(/Could not find the '([^']+)' column/i);
+  if (quoted?.[1]) return quoted[1];
+  const pg = message.match(/column ["']?(?:public\.)?[a-z0-9_]+\.([a-z0-9_]+)["']? does not exist/i);
+  if (pg?.[1]) return pg[1];
+  const pgBare = message.match(/column ["']([a-z0-9_]+)["'] does not exist/i);
+  if (pgBare?.[1]) return pgBare[1];
+  return null;
+}
+
+function omitColumn(payload: Record<string, unknown>, column: string) {
+  const next = { ...payload };
+  delete next[column];
+  return next;
+}
+
+async function insertOmittingUnknownColumns(
+  admin: NonNullable<ReturnType<typeof createSupabaseAdmin>>,
+  table: string,
+  payload: Record<string, unknown>,
+) {
+  let current = { ...payload };
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const result = await admin.from(table).insert(current).select("*").maybeSingle();
+    if (!result.error) return result.data;
+    const column = columnFromSchemaError(result.error.message);
+    if (column && column in current) {
+      current = omitColumn(current, column);
+      continue;
+    }
+    throw new Error(gachaSaveError(result.error));
+  }
+  throw new Error("저장에 실패했습니다.");
+}
+
+async function updateOmittingUnknownColumns(
+  admin: NonNullable<ReturnType<typeof createSupabaseAdmin>>,
+  table: string,
+  id: string,
+  payload: Record<string, unknown>,
+) {
+  let current = { ...payload };
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const result = await admin.from(table).update(current).eq("id", id);
+    if (!result.error) return;
+    const column = columnFromSchemaError(result.error.message);
+    if (column && column in current) {
+      current = omitColumn(current, column);
+      continue;
+    }
+    if ("updated_at" in current) {
+      current = omitColumn(current, "updated_at");
+      continue;
+    }
+    throw new Error(gachaSaveError(result.error));
+  }
+  throw new Error("저장에 실패했습니다.");
 }
 
 export async function GET(request: NextRequest) {
@@ -25,8 +115,7 @@ export async function GET(request: NextRequest) {
   const { data: boxes, error } = await admin
     .from("gold_shop_gacha_boxes")
     .select("*")
-    .order("sort_order", { ascending: true })
-    .order("created_at", { ascending: false });
+    .order("sort_order", { ascending: true });
   if (error) {
     return NextResponse.json(
       {
@@ -91,34 +180,15 @@ export async function POST(request: NextRequest) {
         is_active: body.is_active !== false,
         sort_order: Number(body.sort_order) || 0,
       };
-      const inserted = await admin.from("gold_shop_gacha_boxes").insert(payload).select("*").maybeSingle();
-      if (inserted.error) {
-        const {
-          open_place: _openPlace,
-          layout_count: _layoutCount,
-          confirm_popup: _confirmPopup,
-          ...retryPayload
-        } = payload;
-        const retry = await admin.from("gold_shop_gacha_boxes").insert(retryPayload).select("*").maybeSingle();
-        if (retry.error) {
-          throw new Error(
-            missingTable(retry.error)
-              ? "확률성 아이템 테이블이 없습니다. supabase/gold-shop-gacha.sql 을 실행해 주세요."
-              : retry.error.message,
-          );
-        }
-        return NextResponse.json({ box: mapGachaBox((retry.data ?? {}) as Record<string, unknown>, []) });
-      }
-      return NextResponse.json({ box: mapGachaBox((inserted.data ?? {}) as Record<string, unknown>, []) });
+      const data = await insertOmittingUnknownColumns(admin, "gold_shop_gacha_boxes", payload);
+      return NextResponse.json({ box: mapGachaBox((data ?? {}) as Record<string, unknown>, []) });
     }
 
     const boxId = String(body.box_id ?? "").trim();
     if (!boxId) {
       return NextResponse.json({ error: "상자가 필요합니다." }, { status: 400 });
     }
-    const { data, error } = await admin
-      .from("gold_shop_gacha_rewards")
-      .insert({
+    const data = await insertOmittingUnknownColumns(admin, "gold_shop_gacha_rewards", {
         box_id: boxId,
         kind: asGachaRewardKind(body.kind),
         name: String(body.name ?? "").trim() || "보상",
@@ -129,16 +199,10 @@ export async function POST(request: NextRequest) {
         image_url: String(body.image_url ?? "").trim() || null,
         is_active: body.is_active !== false,
         sort_order: Number(body.sort_order) || 0,
-      })
-      .select("*")
-      .maybeSingle();
-    if (error) throw error;
+      });
     return NextResponse.json({ reward: mapGachaReward((data ?? {}) as Record<string, unknown>) });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "저장에 실패했습니다." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: gachaSaveError(error) }, { status: 500 });
   }
 }
 
@@ -192,17 +256,7 @@ export async function PATCH(request: NextRequest) {
           }
         }
       }
-      const { error } = await admin.from("gold_shop_gacha_boxes").update(patch).eq("id", id);
-      if (error) {
-        const {
-          open_place: _openPlace,
-          layout_count: _layoutCount,
-          confirm_popup: _confirmPopup,
-          ...retryPatch
-        } = patch;
-        const retry = await admin.from("gold_shop_gacha_boxes").update(retryPatch).eq("id", id);
-        if (retry.error) throw retry.error;
-      }
+      await updateOmittingUnknownColumns(admin, "gold_shop_gacha_boxes", id, patch);
       return NextResponse.json({ ok: true });
     }
 
@@ -216,14 +270,10 @@ export async function PATCH(request: NextRequest) {
     if (body.image_url !== undefined) patch.image_url = String(body.image_url ?? "").trim() || null;
     if (body.is_active !== undefined) patch.is_active = Boolean(body.is_active);
     if (body.sort_order !== undefined) patch.sort_order = Number(body.sort_order) || 0;
-    const { error } = await admin.from("gold_shop_gacha_rewards").update(patch).eq("id", id);
-    if (error) throw error;
+    await updateOmittingUnknownColumns(admin, "gold_shop_gacha_rewards", id, patch);
     return NextResponse.json({ ok: true });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "저장에 실패했습니다." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: gachaSaveError(error) }, { status: 500 });
   }
 }
 

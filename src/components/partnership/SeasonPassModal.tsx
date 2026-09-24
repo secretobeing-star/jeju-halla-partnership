@@ -9,8 +9,8 @@ import GachaRevealOverlay, {
   gachaRevealFromPull,
   type GachaRevealState,
 } from "@/components/partnership/GachaRevealOverlay";
+import ShopCostumeWearPreview from "@/components/partnership/ShopCostumeWearPreview";
 import { useSeasonPassClient } from "@/hooks/useSeasonPassClient";
-import { getSiteMemberSession } from "@/lib/site-member-session";
 
 function remainingDays(endsAt: string | null) {
   if (!endsAt) return null;
@@ -279,25 +279,40 @@ export default function SeasonPassModalBody({
               onClick={clearClaimPopup}
             >
               <div
-                className="season-pass-claim-dialog"
+                className="season-pass-shop-receipt"
                 role="dialog"
                 aria-modal="true"
                 aria-label={claimPopup.title}
                 onClick={(event) => event.stopPropagation()}
               >
-                <h3>{claimPopup.title}</h3>
-                <p>{claimPopup.body}</p>
-                {claimPopup.items.length > 0 ? (
-                  <ul>
-                    {claimPopup.items.map((item, index) => (
-                      <li key={`${item.name}-${index}`}>
-                        {item.imageUrl ? <img src={item.imageUrl} alt="" /> : null}
-                        <span>{item.name}</span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
-                <div className="season-pass-claim-dialog__actions">
+                <div className="season-pass-shop-receipt__head">{claimPopup.title}</div>
+                <div className="season-pass-shop-receipt__body">
+                  {claimPopup.items.some((item) => item.kind === "costume") ? (
+                    <ShopCostumeWearPreview
+                      imageUrl={claimPopup.items.find((item) => item.kind === "costume")?.imageUrl ?? null}
+                    />
+                  ) : claimPopup.items.length > 0 ? (
+                    <div className="season-pass-shop-receipt__row">
+                      <div className="season-pass-shop-receipt__art">
+                        {claimPopup.items[0]?.imageUrl ? (
+                          <img src={claimPopup.items[0].imageUrl} alt="" />
+                        ) : (
+                          <span />
+                        )}
+                      </div>
+                      <div className="season-pass-shop-receipt__fields">
+                        <label>
+                          <span>* 아이템 이름</span>
+                          <strong>{claimPopup.items[0]?.name || claimPopup.title}</strong>
+                        </label>
+                      </div>
+                    </div>
+                  ) : null}
+                  {claimPopup.body ? (
+                    <p className="season-pass-shop-receipt__note">{claimPopup.body}</p>
+                  ) : null}
+                </div>
+                <div className="season-pass-shop-receipt__actions">
                   {claimPopup.gifted ? (
                     <button
                       type="button"
@@ -311,7 +326,7 @@ export default function SeasonPassModalBody({
                       선물함 열기
                     </button>
                   ) : null}
-                  <button type="button" onClick={clearClaimPopup}>
+                  <button type="button" className={claimPopup.gifted ? "" : "is-primary"} onClick={clearClaimPopup}>
                     확인
                   </button>
                 </div>
@@ -402,7 +417,6 @@ function GoldShopBoard({ client }: { client: ReturnType<typeof useSeasonPassClie
   const [gachaPlay, setGachaPlay] = useState<GachaRevealState | null>(null);
   const [heldNotice, setHeldNotice] = useState(false);
   const costumePreviewOn = isCostumeShopPreviewEnabled(state.season);
-  const student = getSiteMemberSession()?.student;
   const items = state.shopItems.filter((item) => {
     if (!item.is_active) return false;
     if (filter === "gacha") return false;
@@ -731,36 +745,27 @@ function GoldShopBoard({ client }: { client: ReturnType<typeof useSeasonPassClie
               onClick={() => setPreview(null)}
             >
               <div
-                className="season-pass-shop-preview"
+                className="season-pass-shop-receipt"
                 role="dialog"
                 aria-modal="true"
                 aria-label={`${preview.name} 미리보기`}
                 onClick={(event) => event.stopPropagation()}
               >
-                <div className="season-pass-shop-preview__head">{preview.name} 미리보기</div>
-                <div className="season-pass-shop-preview__card">
-                  {previewImage ? (
-                    <img src={previewImage} alt="" className="season-pass-shop-preview__frame" />
-                  ) : null}
-                  <div className="season-pass-shop-preview__inner">
-                    <div className="season-pass-shop-preview__photo">
-                      {student?.photoUrl ? <img src={student.photoUrl} alt="" /> : <span>사진</span>}
-                    </div>
-                    <div className="season-pass-shop-preview__meta">
-                      <span>제주한라대학교</span>
-                      <strong>{student?.name?.trim() || "학생"}</strong>
-                      <p>
-                        학과 <b>{student?.department?.trim() || "-"}</b>
-                      </p>
-                      <p>
-                        학번 <b>{student?.studentId?.trim() || "-"}</b>
-                      </p>
-                    </div>
+                <div className="season-pass-shop-receipt__head">미리보기</div>
+                <div className="season-pass-shop-receipt__body">
+                  <ShopCostumeWearPreview imageUrl={previewImage} />
+                  <div className="season-pass-shop-receipt__fields">
+                    <label>
+                      <span>* 아이템 이름</span>
+                      <strong>{preview.name}</strong>
+                    </label>
                   </div>
                 </div>
-                <button type="button" className="is-primary" onClick={() => setPreview(null)}>
-                  닫기
-                </button>
+                <div className="season-pass-shop-receipt__actions">
+                  <button type="button" className="is-primary" onClick={() => setPreview(null)}>
+                    확인
+                  </button>
+                </div>
               </div>
             </div>,
             document.body,

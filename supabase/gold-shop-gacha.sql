@@ -71,4 +71,11 @@ drop policy if exists "gold_shop_gacha_rewards_public_read" on public.gold_shop_
 create policy "gold_shop_gacha_rewards_public_read"
   on public.gold_shop_gacha_rewards for select to anon, authenticated using (true);
 
+alter table if exists public.gold_shop_gacha_boxes
+  add column if not exists updated_at timestamptz not null default now();
+
+grant all on table public.gold_shop_gacha_boxes to service_role;
+grant all on table public.gold_shop_gacha_rewards to service_role;
+grant all on table public.gold_shop_gacha_pulls to service_role;
+
 notify pgrst, 'reload schema';
