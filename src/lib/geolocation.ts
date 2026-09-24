@@ -65,6 +65,37 @@ export function getCurrentGeolocation(options?: PositionOptions): Promise<GeoCoo
   });
 }
 
+export async function getBestEffortGeolocation(
+  fallback?: GeoCoordinates | null,
+): Promise<GeoCoordinates> {
+  const attempts: PositionOptions[] = [
+    { enableHighAccuracy: false, timeout: 8_000, maximumAge: 120_000 },
+    { enableHighAccuracy: true, timeout: 10_000, maximumAge: 60_000 },
+  ];
+
+  let lastError: unknown = null;
+  for (const options of attempts) {
+    try {
+      return await getCurrentGeolocation(options);
+    } catch (error) {
+      lastError = error;
+      if (error instanceof GeolocationError && error.code === "denied") {
+        throw error;
+      }
+    }
+  }
+
+  if (fallback && Number.isFinite(fallback.latitude) && Number.isFinite(fallback.longitude)) {
+    return fallback;
+  }
+
+  if (lastError instanceof GeolocationError) {
+    throw lastError;
+  }
+
+  throw new GeolocationError("현재 위치를 확인하지 못했습니다.", "unavailable");
+}
+
 /** 제주도 대략 범위 — 안내용 */
 export function isWithinJejuIsland(latitude: number, longitude: number) {
   return (

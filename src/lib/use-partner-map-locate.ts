@@ -8,6 +8,7 @@ import {
 } from "@/lib/naver-map-partner-ui";
 import {
   GeolocationError,
+  getBestEffortGeolocation,
   getCurrentGeolocation,
   isWithinJejuIsland,
 } from "@/lib/geolocation";
@@ -116,9 +117,7 @@ export function usePartnerMapLocate() {
       return lastCoordsRef.current;
     }
 
-    const coords = await getCurrentGeolocation(
-      fresh ? { enableHighAccuracy: true, maximumAge: 0, timeout: 12_000 } : undefined,
-    );
+    const coords = await getBestEffortGeolocation(lastCoordsRef.current);
     lastCoordsRef.current = {
       latitude: coords.latitude,
       longitude: coords.longitude,
