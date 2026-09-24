@@ -1366,22 +1366,7 @@
 }
 
 .season-pass-shop-preview-stage {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 2.4rem;
-  gap: 0.4rem;
-  align-items: center;
-}
-
-.season-pass-shop-hanger {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #8b5a2b;
-}
-
-.season-pass-shop-hanger svg {
-  width: 2.15rem;
-  height: 2.15rem;
+  display: block;
 }
 
 .season-pass-shop-preview {

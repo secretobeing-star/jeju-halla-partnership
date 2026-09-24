@@ -252,7 +252,13 @@ export async function PATCH(request: NextRequest) {
             patch[key] = body[key] === "inventory" ? "inventory" : "shop";
           } else {
             const value = String(body[key] ?? "").trim();
-            patch[key] = value || (key === "name" ? "확률 상자" : null);
+            if (key === "name") {
+              patch[key] = value || "확률 상자";
+            } else if (key === "badge_label") {
+              patch[key] = value;
+            } else {
+              patch[key] = value || null;
+            }
           }
         }
       }
