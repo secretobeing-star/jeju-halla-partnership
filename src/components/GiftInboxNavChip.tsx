@@ -10,7 +10,9 @@ import { isStudentRewardExpired } from "@/lib/student-rewards";
 import type { UserGift } from "@/lib/map-events";
 import { parseGiftPayload } from "@/lib/map-events";
 import GachaRevealOverlay, {
+  applyGachaPullResult,
   gachaRevealFromPull,
+  gachaRevealOpening,
   type GachaRevealState,
 } from "@/components/partnership/GachaRevealOverlay";
 import type { PublicCardFrameItem } from "@/data/cardFrames";
@@ -211,6 +213,18 @@ export default function GiftInboxNavChip({ hideChip = false }: GiftInboxNavChipP
       const pullCount = Math.max(1, Math.min(count, owned || 1, bulk));
       setBusyId(gift.id);
       setMessage(null);
+      setGachaPlay(
+        gachaRevealOpening(
+          {
+            id: boxId || gift.id,
+            name: gift.reward_name || "확률 상자",
+            layout_count: bulk,
+            idle_image_url: gift.reward_img,
+            burst_image_url: null,
+          },
+          { againLabel: "뽑기" },
+        ),
+      );
       try {
         const response = await studentAuthFetch("/api/season-pass/gacha-pull", {
           method: "POST",
@@ -231,27 +245,31 @@ export default function GiftInboxNavChip({ hideChip = false }: GiftInboxNavChipP
           layoutCount?: number;
         };
         if (!response.ok) {
+          setGachaPlay(null);
           setMessage(payload.error || "상자를 열지 못했습니다.");
           return;
         }
         const used = Math.max(1, Number(payload.count) || pullCount);
-        setGachaPlay(
-          gachaRevealFromPull(
-            payload,
-            {
-              id: boxId || gift.id,
-              name: gift.reward_name || "확률 상자",
-              layout_count: Number(payload.layoutCount) || bulk,
-            },
-            {
-              remainingPulls: Math.max(0, owned - used),
-              againLabel: "뽑기",
-            },
+        setGachaPlay((current) =>
+          applyGachaPullResult(
+            current,
+            gachaRevealFromPull(
+              payload,
+              {
+                id: boxId || gift.id,
+                name: gift.reward_name || "확률 상자",
+                layout_count: Number(payload.layoutCount) || bulk,
+              },
+              {
+                remainingPulls: Math.max(0, owned - used),
+                againLabel: "뽑기",
+              },
+            ),
           ),
         );
-        window.dispatchEvent(new Event("site-season-pass-refresh"));
         await refresh();
       } catch {
+        setGachaPlay(null);
         setMessage("상자를 열지 못했습니다.");
       } finally {
         setBusyId(null);

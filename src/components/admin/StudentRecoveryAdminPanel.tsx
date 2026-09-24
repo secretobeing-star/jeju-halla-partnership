@@ -70,10 +70,12 @@ function ReclaimButton({
   disabled,
   busy,
   onClick,
+  label = "회수",
 }: {
   disabled?: boolean;
   busy?: boolean;
   onClick: () => void;
+  label?: string;
 }) {
   return (
     <button
@@ -82,7 +84,7 @@ function ReclaimButton({
       onClick={onClick}
       className="shrink-0 rounded-md border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-100 disabled:opacity-50"
     >
-      {busy ? "회수 중..." : "회수"}
+      {busy ? "회수 중..." : label}
     </button>
   );
 }
@@ -141,13 +143,19 @@ export default function StudentRecoveryAdminPanel() {
     const student = data?.studentId || studentId.trim();
     if (!student) return;
     const label =
-      kind === "gold"
-        ? `골드 ${amount?.toLocaleString("ko-KR")}개를 회수할까요?`
-        : kind === "season"
-          ? "시즌패스 레벨·경험치·수령 보상을 회수할까요? 골드는 그대로 둡니다."
-          : kind === "stamp" || kind === "stamp-all"
-            ? "도장 진행도를 초기화할까요?"
-            : "이 항목을 회수할까요? 학생 계정에서 바로 사라집니다.";
+      kind === "all"
+        ? "이 학번의 코스튬·선물·보상·골드·시즌패스·상점·접속보상·도장·인벤토리를 모두 회수할까요?"
+        : kind === "gold-all"
+          ? `보유 골드 ${(data?.seasonPass?.gold ?? 0).toLocaleString("ko-KR")}개를 모두 회수할까요?`
+          : kind === "gold"
+            ? `골드 ${amount?.toLocaleString("ko-KR")}개를 회수할까요?`
+            : kind === "season"
+              ? "시즌패스 레벨·경험치·수령 보상을 회수할까요? 골드는 그대로 둡니다."
+              : kind === "stamp" || kind === "stamp-all"
+                ? "도장 진행도를 초기화할까요?"
+                : kind.endsWith("-all")
+                  ? "이 항목을 모두 회수할까요? 학생 계정에서 바로 사라집니다."
+                  : "이 항목을 회수할까요? 학생 계정에서 바로 사라집니다.";
     setConfirm({ kind, id, amount, label });
   }
 
@@ -199,12 +207,32 @@ export default function StudentRecoveryAdminPanel() {
 
       {data ? (
         <div className="mt-5 space-y-4">
-          <p className="text-sm text-gray-600">
-            학번 <span className="font-mono font-semibold text-gray-900">{data.studentId}</span>
+          <p className="flex flex-wrap items-center justify-between gap-2 text-sm text-gray-600">
+            <span>
+              학번 <span className="font-mono font-semibold text-gray-900">{data.studentId}</span>
+            </span>
+            <button
+              type="button"
+              disabled={Boolean(acting)}
+              onClick={() => void reclaim("all", "all")}
+              className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+            >
+              {acting === "all:all" ? "회수 중..." : "전체 회수"}
+            </button>
           </p>
 
           <section className="rounded-xl border border-gray-200 bg-white p-4">
-            <h3 className="text-sm font-semibold text-gray-900">보관함 (코스튬 {data.frames.unlockedCount})</h3>
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-gray-900">보관함 (코스튬 {data.frames.unlockedCount})</h3>
+              {data.frames.items.length > 0 ? (
+                <ReclaimButton
+                  disabled={Boolean(acting)}
+                  busy={acting === "frame-all:all"}
+                  label="전체 회수"
+                  onClick={() => void reclaim("frame-all", "all")}
+                />
+              ) : null}
+            </div>
             <p className="mt-1 text-xs text-gray-500">
               착용 중: {data.frames.activeFrameId || "기본 스타일"}
             </p>
@@ -233,7 +261,17 @@ export default function StudentRecoveryAdminPanel() {
           </section>
 
           <section className="rounded-xl border border-gray-200 bg-white p-4">
-            <h3 className="text-sm font-semibold text-gray-900">선물함 ({data.gifts.length})</h3>
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-gray-900">선물함 ({data.gifts.length})</h3>
+              {data.gifts.length > 0 ? (
+                <ReclaimButton
+                  disabled={Boolean(acting)}
+                  busy={acting === "gift-all:all"}
+                  label="전체 회수"
+                  onClick={() => void reclaim("gift-all", "all")}
+                />
+              ) : null}
+            </div>
             {data.gifts.length === 0 ? (
               <p className="mt-2 text-sm text-gray-500">선물함 내역이 없습니다.</p>
             ) : (
@@ -256,7 +294,17 @@ export default function StudentRecoveryAdminPanel() {
           </section>
 
           <section className="rounded-xl border border-gray-200 bg-white p-4">
-            <h3 className="text-sm font-semibold text-gray-900">보상 지급 내역 ({data.rewards.length})</h3>
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-gray-900">보상 지급 내역 ({data.rewards.length})</h3>
+              {data.rewards.length > 0 ? (
+                <ReclaimButton
+                  disabled={Boolean(acting)}
+                  busy={acting === "reward-all:all"}
+                  label="전체 회수"
+                  onClick={() => void reclaim("reward-all", "all")}
+                />
+              ) : null}
+            </div>
             {data.rewards.length === 0 ? (
               <p className="mt-2 text-sm text-gray-500">관리자 보상 내역이 없습니다.</p>
             ) : (
@@ -300,7 +348,15 @@ export default function StudentRecoveryAdminPanel() {
                 onClick={() => void reclaim("gold", undefined, Math.floor(Number(goldAmount) || 0))}
                 className="rounded-lg border border-red-200 bg-red-50 px-3 py-1 text-xs font-medium text-red-700 disabled:opacity-50"
               >
-                {acting?.startsWith("gold:") ? "회수 중..." : "골드 회수"}
+                {acting?.startsWith("gold:") && acting !== "gold-all:all" ? "회수 중..." : "골드 회수"}
+              </button>
+              <button
+                type="button"
+                disabled={Boolean(acting) || (data.seasonPass?.gold ?? 0) <= 0}
+                onClick={() => void reclaim("gold-all", "all")}
+                className="rounded-lg border border-red-200 bg-red-50 px-3 py-1 text-xs font-medium text-red-700 disabled:opacity-50"
+              >
+                {acting === "gold-all:all" ? "회수 중..." : "골드 전체 회수"}
               </button>
             </div>
           </section>
@@ -371,7 +427,17 @@ export default function StudentRecoveryAdminPanel() {
           </section>
 
           <section className="rounded-xl border border-gray-200 bg-white p-4">
-            <h3 className="text-sm font-semibold text-gray-900">골드 상점 구매 ({data.shopPurchases?.length ?? 0})</h3>
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-gray-900">골드 상점 구매 ({data.shopPurchases?.length ?? 0})</h3>
+              {(data.shopPurchases ?? []).length > 0 ? (
+                <ReclaimButton
+                  disabled={Boolean(acting)}
+                  busy={acting === "shop-all:all"}
+                  label="전체 회수"
+                  onClick={() => void reclaim("shop-all", "all")}
+                />
+              ) : null}
+            </div>
             {(data.shopPurchases ?? []).length === 0 ? (
               <p className="mt-2 text-sm text-gray-500">상점 구매 내역이 없습니다.</p>
             ) : (
@@ -396,7 +462,17 @@ export default function StudentRecoveryAdminPanel() {
           </section>
 
           <section className="rounded-xl border border-gray-200 bg-white p-4">
-            <h3 className="text-sm font-semibold text-gray-900">접속 보상 ({data.loginClaims?.length ?? 0})</h3>
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-gray-900">접속 보상 ({data.loginClaims?.length ?? 0})</h3>
+              {(data.loginClaims ?? []).length > 0 ? (
+                <ReclaimButton
+                  disabled={Boolean(acting)}
+                  busy={acting === "login-all:all"}
+                  label="전체 회수"
+                  onClick={() => void reclaim("login-all", "all")}
+                />
+              ) : null}
+            </div>
             {(data.loginClaims ?? []).length === 0 ? (
               <p className="mt-2 text-sm text-gray-500">접속 보상 내역이 없습니다.</p>
             ) : (
@@ -432,6 +508,7 @@ export default function StudentRecoveryAdminPanel() {
                   <ReclaimButton
                     disabled={Boolean(acting)}
                     busy={acting === "stamp-all:all"}
+                    label="전체 회수"
                     onClick={() => void reclaim("stamp-all", "all")}
                   />
                   <span className="text-xs text-gray-500">모든 도장 초기화</span>
@@ -460,7 +537,17 @@ export default function StudentRecoveryAdminPanel() {
           </section>
 
           <section className="rounded-xl border border-gray-200 bg-white p-4">
-            <h3 className="text-sm font-semibold text-gray-900">인벤토리 ({data.inventory.length})</h3>
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-gray-900">인벤토리 ({data.inventory.length})</h3>
+              {data.inventory.length > 0 ? (
+                <ReclaimButton
+                  disabled={Boolean(acting)}
+                  busy={acting === "inventory-all:all"}
+                  label="전체 회수"
+                  onClick={() => void reclaim("inventory-all", "all")}
+                />
+              ) : null}
+            </div>
             {data.inventory.length === 0 ? (
               <p className="mt-2 text-sm text-gray-500">인벤토리 아이템이 없습니다.</p>
             ) : (

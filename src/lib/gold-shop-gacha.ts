@@ -31,6 +31,8 @@ export type GoldShopGachaBox = {
   layout_count: number;
   confirm_popup: boolean;
   is_active: boolean;
+  starts_at: string | null;
+  ends_at: string | null;
   sort_order: number;
   rewards: GoldShopGachaReward[];
 };
@@ -77,9 +79,32 @@ export function mapGachaBox(
     layout_count: Math.max(1, Math.min(20, Math.floor(Number(row.layout_count) || 1))),
     confirm_popup: row.confirm_popup !== false,
     is_active: row.is_active !== false,
+    starts_at: String(row.starts_at ?? "").trim() || null,
+    ends_at: String(row.ends_at ?? "").trim() || null,
     sort_order: Number(row.sort_order) || 0,
     rewards,
   };
+}
+
+export function isGachaBoxOnSale(box: Pick<GoldShopGachaBox, "is_active" | "starts_at" | "ends_at">, now = Date.now()) {
+  if (!box.is_active) return false;
+  const start = box.starts_at ? Date.parse(box.starts_at) : Number.NaN;
+  const end = box.ends_at ? Date.parse(box.ends_at) : Number.NaN;
+  if (Number.isFinite(start) && now < start) return false;
+  if (Number.isFinite(end) && now > end) return false;
+  return true;
+}
+
+export function formatGachaSaleRange(startsAt: string | null | undefined, endsAt: string | null | undefined) {
+  const start = startsAt ? new Date(startsAt) : null;
+  const end = endsAt ? new Date(endsAt) : null;
+  const ok = (value: Date | null) => Boolean(value && !Number.isNaN(value.getTime()));
+  const label = (value: Date) =>
+    value.toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  if (ok(start) && ok(end) && start && end) return `${label(start)} ~ ${label(end)}`;
+  if (ok(start) && start) return `${label(start)}부터`;
+  if (ok(end) && end) return `${label(end)}까지`;
+  return "";
 }
 
 export function clampGachaPullCount(value: unknown, maxRaw = 20) {
@@ -101,6 +126,20 @@ export function pickGachaReward(rewards: GoldShopGachaReward[]): GoldShopGachaRe
     }
   }
   return active[active.length - 1] ?? null;
+}
+
+export function gachaRareRankById(rewards: GoldShopGachaReward[]): Map<string, 1 | 2> {
+  const active = rewards.filter((item) => item.is_active && item.probability > 0);
+  const probs = [...new Set(active.map((item) => item.probability))].sort((a, b) => a - b);
+  const lowest = probs[0];
+  const second = probs.length > 1 ? probs[1] : null;
+  const ranks = new Map<string, 1 | 2>();
+  if (lowest == null) return ranks;
+  for (const item of active) {
+    if (item.probability === lowest) ranks.set(item.id, 1);
+    else if (second != null && item.probability === second) ranks.set(item.id, 2);
+  }
+  return ranks;
 }
 
 export function gachaProbabilityTotal(rewards: GoldShopGachaReward[], kind?: GachaRewardKind) {

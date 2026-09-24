@@ -440,7 +440,7 @@ export default function GoldShopAdminPanel({ onMessage }: GoldShopAdminPanelProp
       })) as { seasons?: Season[] };
       const nextSeasons = payload.seasons ?? [];
       setSeasons(nextSeasons);
-      onMessage("상점 탭 이름과 순서를 저장했습니다.");
+      onMessage("상점 탭 이름·순서·활성 상태를 저장했습니다.");
       reloadAfterAdminSave();
     } catch (error) {
       onMessage(error instanceof Error ? error.message : "저장에 실패했습니다.");
@@ -516,9 +516,9 @@ export default function GoldShopAdminPanel({ onMessage }: GoldShopAdminPanelProp
           onChange={(event) => void toggleCostumePreview(event.target.checked)}
         />
       </label>
-      <AdminCollapsibleSection title="상점 탭 이름 · 순서">
+      <AdminCollapsibleSection title="상점 탭 이름 · 순서 · 활성">
         <p className="mb-3 text-xs text-gray-500">
-          상점 상단의 전체·패스·코스튬·쿠폰·확률 탭 이름을 바꾸고 순서를 옮길 수 있습니다.
+          상점 상단 탭 이름을 바꾸고, 순서를 옮기고, 켜고 끌 수 있습니다. 끈 탭은 상점에 나오지 않습니다.
         </p>
         <div className="space-y-2">
           {shopTabs.map((tab, index) => (
@@ -532,6 +532,19 @@ export default function GoldShopAdminPanel({ onMessage }: GoldShopAdminPanelProp
                   )
                 }
               />
+              <label className="flex items-center gap-1 text-xs text-gray-600">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={tab.enabled}
+                  onChange={(event) =>
+                    setShopTabs((prev) =>
+                      prev.map((item) => (item.id === tab.id ? { ...item, enabled: event.target.checked } : item)),
+                    )
+                  }
+                />
+                활성
+              </label>
               <span className="text-xs text-gray-400">{tab.id}</span>
               <button
                 type="button"

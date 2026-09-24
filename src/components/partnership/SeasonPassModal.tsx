@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import type { GoldShopGachaBox } from "@/lib/gold-shop-gacha";
+import { formatGachaSaleRange, isGachaBoxOnSale, type GoldShopGachaBox } from "@/lib/gold-shop-gacha";
 import type {
   GoldShopFilterId,
   GoldShopItem,
@@ -13,11 +13,13 @@ import type {
 import {
   isCostumeShopPreviewEnabled,
   isGoldShopOpen,
-  parseGoldShopFilterTabs,
+  visibleGoldShopFilterTabs,
   seasonPassQuestTypeLabel,
 } from "@/lib/season-pass";
 import GachaRevealOverlay, {
+  applyGachaPullResult,
   gachaRevealFromPull,
+  gachaRevealOpening,
   type GachaRevealState,
 } from "@/components/partnership/GachaRevealOverlay";
 import ShopCostumeWearPreview from "@/components/partnership/ShopCostumeWearPreview";
@@ -421,15 +423,21 @@ function GoldShopBoard({ client }: { client: ReturnType<typeof useSeasonPassClie
   const { state, busy, buyShopItem, buyGacha } = client;
   const gold = state.progress?.gold ?? 0;
   const goldIcon = state.season?.gold_icon_url;
-  const [filter, setFilter] = useState<GoldShopFilterId>("all");
+  const shopTabs = visibleGoldShopFilterTabs(state.season?.shop_filter_tabs);
+  const [filter, setFilter] = useState<GoldShopFilterId>(shopTabs[0]?.id ?? "all");
   const [pending, setPending] = useState<GoldShopItem | null>(null);
   const [pendingGacha, setPendingGacha] = useState<GoldShopGachaBox | null>(null);
   const [pendingGachaCount, setPendingGachaCount] = useState(1);
   const [preview, setPreview] = useState<GoldShopItem | null>(null);
   const [gachaPlay, setGachaPlay] = useState<GachaRevealState | null>(null);
   const [heldNotice, setHeldNotice] = useState(false);
-  const shopTabs = parseGoldShopFilterTabs(state.season?.shop_filter_tabs);
   const costumePreviewOn = isCostumeShopPreviewEnabled(state.season);
+
+  useEffect(() => {
+    if (!shopTabs.some((tab) => tab.id === filter)) {
+      setFilter(shopTabs[0]?.id ?? "all");
+    }
+  }, [shopTabs, filter]);
   const items = state.shopItems.filter((item) => {
     if (!item.is_active) return false;
     if (filter === "gacha") return false;
@@ -439,7 +447,7 @@ function GoldShopBoard({ client }: { client: ReturnType<typeof useSeasonPassClie
     return true;
   });
   const gachaBoxes = (state.gachaBoxes ?? []).filter((box) => {
-    if (!box.is_active) return false;
+    if (!isGachaBoxOnSale(box)) return false;
     return filter === "all" || filter === "gacha";
   });
   const catalog = [
@@ -464,21 +472,28 @@ function GoldShopBoard({ client }: { client: ReturnType<typeof useSeasonPassClie
       setPendingGachaCount(pullCount);
       return;
     }
+    setGachaPlay(gachaRevealOpening(box));
     const result = await buyGacha(box.id, pullCount);
-    if (!result) return;
+    if (!result) {
+      setGachaPlay(null);
+      return;
+    }
     if (result.held) {
       setHeldNotice(true);
       setGachaPlay(null);
       return;
     }
-    setGachaPlay(
-      gachaRevealFromPull(
-        {
-          ...result,
-          idleImageUrl: result.idleImageUrl ?? box.idle_image_url,
-          burstImageUrl: result.burstImageUrl ?? box.burst_image_url,
-        },
-        box,
+    setGachaPlay((current) =>
+      applyGachaPullResult(
+        current,
+        gachaRevealFromPull(
+          {
+            ...result,
+            idleImageUrl: result.idleImageUrl ?? box.idle_image_url,
+            burstImageUrl: result.burstImageUrl ?? box.burst_image_url,
+          },
+          box,
+        ),
       ),
     );
   }
@@ -561,6 +576,9 @@ function GoldShopBoard({ client }: { client: ReturnType<typeof useSeasonPassClie
                       {discount > 0 ? <s>{box.original_price_gold.toLocaleString("ko-KR")}</s> : null}
                       {box.price_gold > 0 ? box.price_gold.toLocaleString("ko-KR") : "-"}
                     </span>
+                    {formatGachaSaleRange(box.starts_at, box.ends_at) ? (
+                      <span className="season-pass-shop__status">{formatGachaSaleRange(box.starts_at, box.ends_at)}</span>
+                    ) : null}
                     <div className={`season-pass-shop__actions ${bulk > 1 ? "" : "is-single"}`}>
                       <button
                         type="button"

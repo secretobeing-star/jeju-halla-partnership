@@ -12,6 +12,7 @@ import {
 import { IMAGE_UPLOAD_ACCEPT } from "@/lib/upload-file-meta";
 import { getStorageErrorMessage } from "@/lib/storage";
 import type { PublicCardFrameItem } from "@/lib/student-card-frames";
+import { fromDatetimeLocalValue, toDatetimeLocalValue } from "@/lib/site-events";
 
 type GoldShopGachaAdminPanelProps = {
   onMessage: (message: string) => void;
@@ -114,6 +115,8 @@ export default function GoldShopGachaAdminPanel({ onMessage, costumes }: GoldSho
           layout_count: box.layout_count,
           confirm_popup: box.confirm_popup,
           is_active: box.is_active,
+          starts_at: box.starts_at,
+          ends_at: box.ends_at,
           sort_order: box.sort_order,
         }),
       });
@@ -291,6 +294,24 @@ export default function GoldShopGachaAdminPanel({ onMessage, costumes }: GoldSho
                 onChange={(event) => patchBox({ is_active: event.target.checked })}
               />
               판매 중
+            </label>
+            <label className="text-xs text-gray-500">
+              판매 시작
+              <input
+                type="datetime-local"
+                className="mt-1 w-full rounded border px-2 py-1.5 text-sm"
+                value={toDatetimeLocalValue(selected.starts_at)}
+                onChange={(event) => patchBox({ starts_at: fromDatetimeLocalValue(event.target.value) })}
+              />
+            </label>
+            <label className="text-xs text-gray-500">
+              판매 종료
+              <input
+                type="datetime-local"
+                className="mt-1 w-full rounded border px-2 py-1.5 text-sm"
+                value={toDatetimeLocalValue(selected.ends_at)}
+                onChange={(event) => patchBox({ ends_at: fromDatetimeLocalValue(event.target.value) })}
+              />
             </label>
             <label className="text-xs text-gray-800 sm:col-span-2">
               뽑는 위치

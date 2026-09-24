@@ -21,14 +21,15 @@ export type GoldShopFilterId = (typeof GOLD_SHOP_FILTER_IDS)[number];
 export type GoldShopFilterTab = {
   id: GoldShopFilterId;
   label: string;
+  enabled: boolean;
 };
 
 export const DEFAULT_GOLD_SHOP_FILTER_TABS: GoldShopFilterTab[] = [
-  { id: "all", label: "전체" },
-  { id: "pass", label: "패스" },
-  { id: "costume", label: "코스튬" },
-  { id: "coupon", label: "쿠폰" },
-  { id: "gacha", label: "확률" },
+  { id: "all", label: "전체", enabled: true },
+  { id: "pass", label: "패스", enabled: true },
+  { id: "costume", label: "코스튬", enabled: true },
+  { id: "coupon", label: "쿠폰", enabled: true },
+  { id: "gacha", label: "확률", enabled: true },
 ];
 
 export function asGoldShopFilterId(value: unknown): GoldShopFilterId | null {
@@ -38,7 +39,7 @@ export function asGoldShopFilterId(value: unknown): GoldShopFilterId | null {
 }
 
 export function parseGoldShopFilterTabs(value: unknown): GoldShopFilterTab[] {
-  const byId = new Map(DEFAULT_GOLD_SHOP_FILTER_TABS.map((tab) => [tab.id, tab.label]));
+  const byId = new Map(DEFAULT_GOLD_SHOP_FILTER_TABS.map((tab) => [tab.id, tab]));
   const ordered: GoldShopFilterTab[] = [];
   const seen = new Set<GoldShopFilterId>();
   const source = Array.isArray(value) ? value : [];
@@ -46,15 +47,24 @@ export function parseGoldShopFilterTabs(value: unknown): GoldShopFilterTab[] {
     const row = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
     const id = asGoldShopFilterId(row.id);
     if (!id || seen.has(id)) continue;
-    const label = String(row.label ?? "").trim() || byId.get(id) || id;
-    ordered.push({ id, label });
+    const fallback = byId.get(id);
+    const label = String(row.label ?? "").trim() || fallback?.label || id;
+    ordered.push({ id, label, enabled: row.enabled !== false });
     seen.add(id);
   }
   for (const tab of DEFAULT_GOLD_SHOP_FILTER_TABS) {
     if (seen.has(tab.id)) continue;
-    ordered.push(tab);
+    ordered.push({ ...tab });
+  }
+  if (!ordered.some((tab) => tab.enabled)) {
+    const all = ordered.find((tab) => tab.id === "all");
+    if (all) all.enabled = true;
   }
   return ordered;
+}
+
+export function visibleGoldShopFilterTabs(value: unknown): GoldShopFilterTab[] {
+  return parseGoldShopFilterTabs(value).filter((tab) => tab.enabled);
 }
 
 export type Season = {

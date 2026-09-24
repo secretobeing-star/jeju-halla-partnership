@@ -12,6 +12,111 @@ import {
 import { debitStudentGold, getSeasonPassState } from "@/lib/season-pass-server";
 import { bumpPublicReloadAt } from "@/lib/public-reload-server";
 
+type AdminClient = NonNullable<ReturnType<typeof createSupabaseAdmin>>;
+
+function maybeThrow(error: { message?: string } | null | undefined, hint: string) {
+  if (error && !String(error.message).includes(hint)) {
+    throw error;
+  }
+}
+
+async function reclaimAllFrames(studentId: string) {
+  const frameState = await loadStudentCardFrameState(studentId).catch(() => null);
+  for (const id of frameState?.state.unlockedIds ?? []) {
+    await revokeStudentCardFrameOnServer(studentId, id);
+  }
+}
+
+async function reclaimAllGifts(admin: AdminClient, studentId: string) {
+  const { data, error } = await admin.from("user_gifts").select("id, frame_css_value").eq("user_id", studentId);
+  maybeThrow(error, "user_gifts");
+  const { parseGiftPayload } = await import("@/lib/map-events");
+  for (const gift of data ?? []) {
+    const parsed = parseGiftPayload({
+      frame_css_value: String(gift.frame_css_value ?? ""),
+    });
+    if (parsed.kind === "costume" && parsed.frameId) {
+      await revokeStudentCardFrameOnServer(studentId, parsed.frameId);
+    }
+  }
+  const deleted = await admin.from("user_gifts").delete().eq("user_id", studentId);
+  maybeThrow(deleted.error, "user_gifts");
+}
+
+async function reclaimAllRewards(admin: AdminClient, studentId: string) {
+  const deleted = await admin.from("site_student_rewards").delete().eq("student_id", studentId);
+  maybeThrow(deleted.error, "site_student_rewards");
+}
+
+async function reclaimAllInventory(admin: AdminClient, studentId: string) {
+  const deleted = await admin.from("user_inventory").delete().eq("user_id", studentId);
+  maybeThrow(deleted.error, "user_inventory");
+}
+
+async function reclaimAllShop(admin: AdminClient, studentId: string) {
+  const deleted = await admin.from("gold_shop_purchases").delete().eq("user_id", studentId);
+  maybeThrow(deleted.error, "gold_shop_purchases");
+}
+
+async function reclaimAllLogin(admin: AdminClient, studentId: string) {
+  const deleted = await admin.from("site_login_reward_claims").delete().eq("student_id", studentId);
+  maybeThrow(deleted.error, "site_login_reward_claims");
+}
+
+async function reclaimAllStamps(admin: AdminClient, studentId: string) {
+  const updated = await admin
+    .from("user_event_progress")
+    .update({
+      current_stamps: 0,
+      stamped_places: [],
+      is_completed: false,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("user_id", studentId);
+  maybeThrow(updated.error, "user_event_progress");
+}
+
+async function reclaimSeason(admin: AdminClient, studentId: string) {
+  const claimError = (await admin.from("reward_claims").delete().eq("user_id", studentId)).error;
+  maybeThrow(claimError, "reward_claims");
+  const questError = (await admin.from("user_quest_logs").delete().eq("user_id", studentId)).error;
+  maybeThrow(questError, "user_quest_logs");
+  const attendError = (await admin.from("season_attendance_logs").delete().eq("user_id", studentId)).error;
+  maybeThrow(attendError, "season_attendance_logs");
+  const progressError = (
+    await admin
+      .from("user_season_progress")
+      .update({
+        exp: 0,
+        level: 1,
+        is_premium: false,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("user_id", studentId)
+  ).error;
+  maybeThrow(progressError, "user_season_progress");
+}
+
+async function reclaimAllGold(studentId: string) {
+  const passState = await getSeasonPassState(studentId).catch(() => null);
+  const gold = Math.floor(Number(passState?.progress?.gold ?? 0) || 0);
+  if (gold > 0) {
+    await debitStudentGold(studentId, gold);
+  }
+}
+
+async function reclaimEverything(admin: AdminClient, studentId: string) {
+  await reclaimAllFrames(studentId);
+  await reclaimAllGifts(admin, studentId);
+  await reclaimAllRewards(admin, studentId);
+  await reclaimAllInventory(admin, studentId);
+  await reclaimAllShop(admin, studentId);
+  await reclaimAllLogin(admin, studentId);
+  await reclaimAllStamps(admin, studentId);
+  await reclaimSeason(admin, studentId);
+  await reclaimAllGold(studentId);
+}
+
 export async function GET(request: NextRequest) {
   const auth = await adminAuthMiddleware(request, "settings");
   if ("error" in auth) return auth.error;
@@ -333,6 +438,47 @@ export async function PATCH(request: NextRequest) {
         .update({ is_premium: false })
         .eq("user_id", studentId);
       if (error) throw error;
+      await bumpPublicReloadAt();
+      return NextResponse.json({ ok: true });
+    }
+
+    if (kind === "frame-all") {
+      await reclaimAllFrames(studentId);
+      await bumpPublicReloadAt();
+      return NextResponse.json({ ok: true });
+    }
+    if (kind === "gift-all") {
+      await reclaimAllGifts(admin, studentId);
+      await bumpPublicReloadAt();
+      return NextResponse.json({ ok: true });
+    }
+    if (kind === "reward-all") {
+      await reclaimAllRewards(admin, studentId);
+      await bumpPublicReloadAt();
+      return NextResponse.json({ ok: true });
+    }
+    if (kind === "inventory-all") {
+      await reclaimAllInventory(admin, studentId);
+      await bumpPublicReloadAt();
+      return NextResponse.json({ ok: true });
+    }
+    if (kind === "shop-all") {
+      await reclaimAllShop(admin, studentId);
+      await bumpPublicReloadAt();
+      return NextResponse.json({ ok: true });
+    }
+    if (kind === "login-all") {
+      await reclaimAllLogin(admin, studentId);
+      await bumpPublicReloadAt();
+      return NextResponse.json({ ok: true });
+    }
+    if (kind === "gold-all") {
+      await reclaimAllGold(studentId);
+      await bumpPublicReloadAt();
+      return NextResponse.json({ ok: true });
+    }
+    if (kind === "all") {
+      await reclaimEverything(admin, studentId);
       await bumpPublicReloadAt();
       return NextResponse.json({ ok: true });
     }

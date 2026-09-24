@@ -178,6 +178,8 @@ export async function POST(request: NextRequest) {
         layout_count: Math.max(1, Math.min(20, Math.floor(Number(body.layout_count) || 1))),
         confirm_popup: body.confirm_popup !== false,
         is_active: body.is_active !== false,
+        starts_at: String(body.starts_at ?? "").trim() || null,
+        ends_at: String(body.ends_at ?? "").trim() || null,
         sort_order: Number(body.sort_order) || 0,
       };
       const data = await insertOmittingUnknownColumns(admin, "gold_shop_gacha_boxes", payload);
@@ -238,6 +240,8 @@ export async function PATCH(request: NextRequest) {
         "layout_count",
         "confirm_popup",
         "is_active",
+        "starts_at",
+        "ends_at",
         "sort_order",
         "season_id",
       ]) {
@@ -250,6 +254,8 @@ export async function PATCH(request: NextRequest) {
             patch[key] = Math.max(1, Math.min(20, Math.floor(Number(body[key]) || 1)));
           } else if (key === "open_place") {
             patch[key] = body[key] === "inventory" ? "inventory" : "shop";
+          } else if (key === "starts_at" || key === "ends_at") {
+            patch[key] = String(body[key] ?? "").trim() || null;
           } else {
             const value = String(body[key] ?? "").trim();
             if (key === "name") {

@@ -370,7 +370,7 @@ export function useSeasonPassClient() {
         body: JSON.stringify({ userId, boxId, count }),
       });
       const payload = (await response.json()) as {
-        state?: SeasonPassWidgetState;
+        gold?: number;
         error?: string;
         held?: boolean;
         gifted?: boolean;
@@ -382,24 +382,27 @@ export function useSeasonPassClient() {
         idleImageUrl?: string | null;
         burstImageUrl?: string | null;
         count?: number;
+        layoutCount?: number;
         prizes?: Array<{
           name: string;
           imageUrl: string | null;
           kind: string;
           goldAmount: number;
           gifted: boolean;
+          rareRank?: number;
         }>;
       };
       if (!response.ok) {
         throw new Error(payload.error || "뽑기에 실패했습니다.");
       }
-      if (payload.state) {
-        setState(payload.state);
+      if (typeof payload.gold === "number") {
+        setState((prev) =>
+          prev.progress ? { ...prev, progress: { ...prev.progress, gold: payload.gold as number } } : prev,
+        );
       }
       if (Boolean(payload.gifted)) {
         window.dispatchEvent(new Event("site-gift-inbox-refresh"));
       }
-      window.dispatchEvent(new Event("site-season-pass-refresh"));
       return payload;
     } catch (error) {
       openClaimNotice("뽑지 못했습니다", error instanceof Error ? error.message : "뽑기에 실패했습니다.");

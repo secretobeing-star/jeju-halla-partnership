@@ -24,6 +24,8 @@ import type { GoldLedgerSource } from "@/lib/gold-analytics";
 import { encodeGiftCouponValue, encodeGiftGachaValue, parseGiftPayload } from "@/lib/map-events";
 import {
   clampGachaPullCount,
+  gachaRareRankById,
+  isGachaBoxOnSale,
   mapGachaBox,
   mapGachaReward,
   pickGachaReward,
@@ -258,7 +260,23 @@ async function loadGoldShopGachaBoxes(admin: AdminClient): Promise<GoldShopGacha
     list.push(reward);
     byBox.set(reward.box_id, list);
   }
-  return boxes.map((box) => ({ ...box, rewards: byBox.get(box.id) ?? [] }));
+  return boxes
+    .filter((box) => isGachaBoxOnSale(box))
+    .map((box) => ({ ...box, rewards: byBox.get(box.id) ?? [] }));
+}
+
+async function loadGoldShopGachaBoxById(admin: AdminClient, boxId: string): Promise<GoldShopGachaBox | null> {
+  const { data: boxRow } = await admin.from("gold_shop_gacha_boxes").select("*").eq("id", boxId).maybeSingle();
+  if (!boxRow) return null;
+  const { data: rewardRows } = await admin
+    .from("gold_shop_gacha_rewards")
+    .select("*")
+    .eq("box_id", boxId)
+    .order("sort_order", { ascending: true });
+  return mapGachaBox(
+    boxRow as Record<string, unknown>,
+    ((rewardRows ?? []) as Record<string, unknown>[]).map((row) => mapGachaReward(row)),
+  );
 }
 
 export async function getSeasonPassState(userId: string): Promise<SeasonPassWidgetState> {
@@ -921,7 +939,10 @@ export async function completeAttendance(userIdRaw: string): Promise<{
   }
 }
 
-async function resolveCostumeFrameId(item: RewardItem): Promise<string> {
+async function resolveCostumeFrameId(
+  item: RewardItem,
+  catalog: Awaited<ReturnType<typeof loadCardFrameCatalogFromDb>>,
+): Promise<string> {
   const meta = item.metadata;
   const candidates = [
     typeof meta.frame_id === "string" ? meta.frame_id : "",
@@ -936,7 +957,6 @@ async function resolveCostumeFrameId(item: RewardItem): Promise<string> {
     throw new Error("코스튬 ID가 없습니다. 보상 아이템을 저장한 뒤 다시 수령해 주세요.");
   }
 
-  const catalog = await loadCardFrameCatalogFromDb().catch(() => []);
   for (const value of candidates) {
     const matched = findCardFrameByRef(catalog, value);
     if (matched?.id) {
@@ -958,6 +978,7 @@ async function sendSeasonPassInboxGift(
   userId: string,
   sourceLabel: string,
   item: RewardItem,
+  catalog?: Awaited<ReturnType<typeof loadCardFrameCatalogFromDb>>,
 ) {
   let giftValue = "";
   let displayName = item.name.trim() && item.name.trim() !== "새 보상" ? item.name.trim() : "";
@@ -971,9 +992,9 @@ async function sendSeasonPassInboxGift(
     giftValue = encodeGiftCouponValue(code);
     displayName = displayName || (sourceLabel.trim() === "상점 구매" ? "상점 쿠폰" : "시즌패스 쿠폰");
   } else {
-    const frameId = await resolveCostumeFrameId(item);
-    const catalog = await loadCardFrameCatalogFromDb().catch(() => []);
-    const frame = findCardFrameByRef(catalog, frameId);
+    const frames = catalog ?? (await loadCardFrameCatalogFromDb().catch(() => []));
+    const frameId = await resolveCostumeFrameId(item, frames);
+    const frame = findCardFrameByRef(frames, frameId);
     giftValue = frameId;
     displayName =
       displayName ||
@@ -1318,8 +1339,10 @@ export async function pullGoldShopGacha(
     throw new Error("Supabase 서버 설정이 없습니다.");
   }
 
-  const state = await getSeasonPassState(userId);
-  if (!state.goldShopEnabled || !state.season) {
+  const [passSeason, shopSeasons] = await Promise.all([getActiveSeason(admin), listShopSeasons(admin)]);
+  const goldShopEnabled = shopSeasons.length > 0;
+  const season = passSeason ?? shopSeasons[0] ?? null;
+  if (!goldShopEnabled || !season) {
     throw new Error("골드 상점이 비활성화되어 있습니다.");
   }
 
@@ -1349,24 +1372,12 @@ export async function pullGoldShopGacha(
     throw new Error("상품이 필요합니다.");
   }
 
-  let box = state.gachaBoxes.find((item) => item.id === boxId);
+  const box = await loadGoldShopGachaBoxById(admin, boxId);
   if (!box) {
-    const { data: boxRow } = await admin.from("gold_shop_gacha_boxes").select("*").eq("id", boxId).maybeSingle();
-    const { data: rewardRows } = await admin
-      .from("gold_shop_gacha_rewards")
-      .select("*")
-      .eq("box_id", boxId)
-      .order("sort_order", { ascending: true });
-    if (!boxRow) {
-      throw new Error("판매 중인 확률 상자가 아닙니다.");
-    }
-    box = mapGachaBox(
-      boxRow as Record<string, unknown>,
-      ((rewardRows ?? []) as Record<string, unknown>[]).map((row) => mapGachaReward(row)),
-    );
-  }
-  if (!giftId && !box.is_active) {
     throw new Error("판매 중인 확률 상자가 아닙니다.");
+  }
+  if (!giftId && !isGachaBoxOnSale(box)) {
+    throw new Error("판매 기간이 아니거나 판매 중이 아닌 확률 상자입니다.");
   }
 
   let count = clampGachaPullCount(options?.count, box.layout_count || 1);
@@ -1387,16 +1398,16 @@ export async function pullGoldShopGacha(
     giftIdsToClaim = ordered.slice(0, count);
   }
   const spend = giftId ? 0 : box.price_gold * count;
+  let gold = (await loadWalletGold(admin, userId)) ?? 0;
 
   if (!giftId) {
     if (box.price_gold <= 0) {
       throw new Error("판매가가 아직 없습니다.");
     }
-    const gold = Number(state.progress?.gold ?? 0);
     if (gold < spend) {
       throw new Error("골드가 부족합니다.");
     }
-    await adjustGold(admin, userId, state.season, -spend, "shop_spend");
+    gold = await adjustGold(admin, userId, season, -spend, "shop_spend");
 
     if (box.open_place === "inventory") {
       const rows = Array.from({ length: count }, () => ({
@@ -1419,11 +1430,11 @@ export async function pullGoldShopGacha(
       logSeasonPassToSheets({
         studentId: userId,
         action: "shop",
-        seasonTitle: state.season.title,
+        seasonTitle: season.title,
         detail: `${box.name} 보관함 지급 ${count}개 · 골드 ${spend}`,
       });
       return {
-        state: await getSeasonPassState(userId),
+        gold,
         held: true,
         count,
         gifted: true,
@@ -1440,12 +1451,10 @@ export async function pullGoldShopGacha(
     }
   }
 
-  if (!admin || !box || !state.season) {
-    throw new Error("판매 중인 확률 상자가 아닙니다.");
-  }
   const db = admin;
   const target = box;
-  const season = state.season;
+  const costumeCatalog = await loadCardFrameCatalogFromDb().catch(() => []);
+  const rareRanks = gachaRareRankById(target.rewards);
 
   const prizes: Array<{
     name: string;
@@ -1453,6 +1462,13 @@ export async function pullGoldShopGacha(
     kind: string;
     goldAmount: number;
     gifted: boolean;
+    rareRank: number;
+  }> = [];
+  const pullRows: Array<{
+    user_id: string;
+    box_id: string;
+    reward_id: string;
+    gold_spent: number;
   }> = [];
 
   async function grantPrize(prize: GoldShopGachaReward) {
@@ -1460,7 +1476,7 @@ export async function pullGoldShopGacha(
     if (prize.kind === "gold") {
       const amount = Math.max(0, prize.gold_amount);
       if (amount > 0) {
-        await adjustGold(db, userId, season, amount, "gacha");
+        gold = await adjustGold(db, userId, season, amount, "gacha");
       }
     } else {
       const synthetic: RewardItem = {
@@ -1475,7 +1491,7 @@ export async function pullGoldShopGacha(
         is_active: true,
         sort_order: prize.sort_order,
       };
-      await sendSeasonPassInboxGift(db, userId, "확률 상자", synthetic);
+      await sendSeasonPassInboxGift(db, userId, "확률 상자", synthetic, costumeCatalog);
       gifted = true;
     }
     prizes.push({
@@ -1484,16 +1500,14 @@ export async function pullGoldShopGacha(
       kind: prize.kind,
       goldAmount: prize.gold_amount,
       gifted,
+      rareRank: rareRanks.get(prize.id) ?? 0,
     });
-    const { error: pullLogError } = await db.from("gold_shop_gacha_pulls").insert({
+    pullRows.push({
       user_id: userId,
       box_id: target.id,
       reward_id: prize.id,
       gold_spent: giftId ? 0 : target.price_gold,
     });
-    if (pullLogError && !pullLogError.message.includes("gold_shop_gacha_pulls")) {
-      throw pullLogError;
-    }
   }
 
   for (let index = 0; index < count; index += 1) {
@@ -1502,6 +1516,13 @@ export async function pullGoldShopGacha(
       throw new Error("지급할 확률이 없습니다. 관리자에서 보상 확률을 확인해 주세요.");
     }
     await grantPrize(prize);
+  }
+
+  if (pullRows.length > 0) {
+    const { error: pullLogError } = await db.from("gold_shop_gacha_pulls").insert(pullRows);
+    if (pullLogError && !pullLogError.message.includes("gold_shop_gacha_pulls")) {
+      throw pullLogError;
+    }
   }
 
   if (giftIdsToClaim.length > 0) {
@@ -1522,7 +1543,7 @@ export async function pullGoldShopGacha(
   });
 
   return {
-    state: await getSeasonPassState(userId),
+    gold,
     held: false,
     count,
     gifted: prizes.some((item) => item.gifted),
