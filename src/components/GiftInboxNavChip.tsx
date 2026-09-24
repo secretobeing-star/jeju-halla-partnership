@@ -75,6 +75,7 @@ export default function GiftInboxNavChip({ hideChip = false }: GiftInboxNavChipP
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [swipeState, setSwipeState] = useState<{ itemId: string; startX: number; currentX: number } | null>(null);
+  const [activeTab, setActiveTab] = useState<"event" | "admin">("event");
   const [gachaPlay, setGachaPlay] = useState<GachaRevealState | null>(null);
   const touchStartRef = useRef<{ itemId: string; startX: number } | null>(null);
 
