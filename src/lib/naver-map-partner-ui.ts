@@ -11,8 +11,8 @@ export type NaverMapPartnerMarker = {
 };
 
 export const PARTNER_MAP_DEFAULT_THUMBNAIL_PATH = "/images/default-thumbnail.svg";
-export const PARTNER_MAP_MARKER_SIZE = { width: 64, height: 76 };
-export const PARTNER_MAP_MARKER_ANCHOR = { x: 32, y: 76 };
+export const PARTNER_MAP_MARKER_SIZE = { width: 52, height: 62 };
+export const PARTNER_MAP_MARKER_ANCHOR = { x: 26, y: 62 };
 const PARTNER_MAP_IMAGE_FALLBACK_TEXT = "?";
 
 export function parsePartnerMapCoordinate(value: number | string | null | undefined): number | null {

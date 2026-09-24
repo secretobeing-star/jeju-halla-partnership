@@ -155,6 +155,7 @@ export default function NaverMapPartnersView({
   } = usePartnerMapLocate();
   const routePolylineRef = useRef<naver.maps.Polyline | null>(null);
   const routeRequestIdRef = useRef(0);
+  const routePartnerIdRef = useRef<string | null>(null);
   const resolveUserLocationRef = useRef(resolveUserLocation);
   const showLocateMessageRef = useRef(showLocateMessage);
   const [mapReady, setMapReady] = useState(false);
@@ -272,17 +273,23 @@ export default function NaverMapPartnersView({
     routeRequestIdRef.current += 1;
     routePolylineRef.current?.setMap(null);
     routePolylineRef.current = null;
+    routePartnerIdRef.current = null;
   }
 
-  async function drawRouteTo(partner: NaverMapPartnerMarker) {
+  async function drawRouteTo(partner: NaverMapPartnerMarker, force = false) {
     const maps = window.naver?.maps;
     const map = mapRef.current;
     if (!maps || !map) {
       return;
     }
 
+    if (!force && routePartnerIdRef.current === partner.id && routePolylineRef.current) {
+      return;
+    }
+
     const requestId = ++routeRequestIdRef.current;
     routePolylineRef.current?.setMap(null);
+    routePartnerIdRef.current = null;
 
     let start: { latitude: number; longitude: number };
     try {
@@ -343,6 +350,8 @@ export default function NaverMapPartnersView({
           zIndex: 80,
         });
       }
+
+      routePartnerIdRef.current = partner.id;
 
       const bounds = new maps.LatLngBounds();
       for (const point of latLngs) {
@@ -465,11 +474,6 @@ export default function NaverMapPartnersView({
               miniCardOverlayRef.current?.close();
               miniCardOverlayRef.current = null;
               miniCardElementRef.current = null;
-              selectedPartnerIdRef.current = null;
-              clearRoute();
-              for (const element of markerElementsRef.current.values()) {
-                getPartnerMapMarkerButton(element)?.classList.remove("partner-map-marker--selected");
-              }
             }),
             window.naver.maps.Event.addListener(map, "idle", () => {
               if (!holdLoadingOverlayRef.current) {
@@ -595,7 +599,6 @@ export default function NaverMapPartnersView({
       miniCardElementRef.current = null;
       if (resetSelection) {
         selectedPartnerIdRef.current = null;
-        clearRoute();
         for (const element of markerElementsRef.current.values()) {
           getPartnerMapMarkerButton(element)?.classList.remove("partner-map-marker--selected");
         }
@@ -632,10 +635,10 @@ export default function NaverMapPartnersView({
         favoritesEnabled: favoritesEnabledRef.current,
         favoritesTerm: favoritesTermRef.current,
         onClose: () => {
-          closeMiniCard(true);
+          closeMiniCard(false);
         },
         onDirections: () => {
-          void drawRouteTo(partner);
+          void drawRouteTo(partner, true);
         },
         onFavoriteToggle: favoritesEnabledRef.current
           ? () => {

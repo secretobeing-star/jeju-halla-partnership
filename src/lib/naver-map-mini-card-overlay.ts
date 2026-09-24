@@ -19,6 +19,35 @@ type CreateMiniCardOverlayOptions = {
   markerGap?: number;
 };
 
+function resolveMapElement(
+  overlay: MiniCardOverlayInstance,
+  mapContainer: HTMLElement | null,
+): HTMLElement | null {
+  const panes = overlay.getPanes();
+  return (
+    mapContainer ??
+    (panes.overlayMouseTarget?.parentElement as HTMLElement | null) ??
+    (panes.floatPane?.parentElement as HTMLElement | null)
+  );
+}
+
+function clampCardPosition(
+  left: number,
+  top: number,
+  element: HTMLElement,
+  mapElement: HTMLElement,
+  padding = 8,
+) {
+  const width = element.offsetWidth;
+  const height = element.offsetHeight;
+  const mapWidth = mapElement.clientWidth;
+  const mapHeight = mapElement.clientHeight;
+  return {
+    left: Math.max(padding, Math.min(left, Math.max(padding, mapWidth - width - padding))),
+    top: Math.max(padding, Math.min(top, Math.max(padding, mapHeight - height - padding))),
+  };
+}
+
 export function createPartnerMapMiniCardOverlay({
   map,
   element,
@@ -34,9 +63,17 @@ export function createPartnerMapMiniCardOverlay({
   element.classList.add("partner-map-mini-card-overlay--above-marker");
   element.style.position = "absolute";
   element.style.zIndex = "120";
+  element.style.touchAction = "none";
 
   const overlay = new window.naver.maps.OverlayView() as MiniCardOverlayInstance;
   const followListeners: unknown[] = [];
+  let pinnedPosition: { left: number; top: number } | null = null;
+  let dragging = false;
+  let dragMoved = false;
+  let dragStartX = 0;
+  let dragStartY = 0;
+  let dragOriginLeft = 0;
+  let dragOriginTop = 0;
 
   overlay.onAdd = function onAdd() {
     const host = mapContainer ?? overlay.getPanes().overlayMouseTarget ?? overlay.getPanes().floatPane;
@@ -51,17 +88,26 @@ export function createPartnerMapMiniCardOverlay({
     }
 
     const padding = 8;
-    const panes = overlay.getPanes();
-    const mapElement =
-      mapContainer ??
-      (panes.overlayMouseTarget?.parentElement as HTMLElement | null) ??
-      (panes.floatPane?.parentElement as HTMLElement | null);
+    const mapElement = resolveMapElement(overlay, mapContainer);
     const mapWidth = mapElement?.clientWidth ?? 0;
     const mapHeight = mapElement?.clientHeight ?? 0;
 
     if (mapWidth > 0) {
       element.style.maxWidth = `${Math.max(140, mapWidth - padding * 2)}px`;
       element.style.boxSizing = "border-box";
+    }
+
+    if (pinnedPosition && mapElement) {
+      pinnedPosition = clampCardPosition(
+        pinnedPosition.left,
+        pinnedPosition.top,
+        element,
+        mapElement,
+        padding,
+      );
+      element.style.left = `${pinnedPosition.left}px`;
+      element.style.top = `${pinnedPosition.top}px`;
+      return;
     }
 
     if (placement === "center" && mapElement) {
@@ -108,11 +154,104 @@ export function createPartnerMapMiniCardOverlay({
     element.style.top = `${top}px`;
   };
 
+  const onPointerDown = (event: PointerEvent) => {
+    if (event.pointerType === "mouse" && event.button !== 0) {
+      return;
+    }
+
+    const target = event.target as HTMLElement | null;
+    if (target?.closest("button, a, input, textarea, select")) {
+      return;
+    }
+
+    const mapElement = resolveMapElement(overlay, mapContainer);
+    if (!mapElement) {
+      return;
+    }
+
+    dragging = true;
+    dragMoved = false;
+    dragStartX = event.clientX;
+    dragStartY = event.clientY;
+    const cardRect = element.getBoundingClientRect();
+    const mapRect = mapElement.getBoundingClientRect();
+    dragOriginLeft = cardRect.left - mapRect.left;
+    dragOriginTop = cardRect.top - mapRect.top;
+    element.classList.add("partner-map-mini-card--dragging");
+    element.setPointerCapture(event.pointerId);
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  const onPointerMove = (event: PointerEvent) => {
+    if (!dragging) {
+      return;
+    }
+
+    const mapElement = resolveMapElement(overlay, mapContainer);
+    if (!mapElement) {
+      return;
+    }
+
+    const dx = event.clientX - dragStartX;
+    const dy = event.clientY - dragStartY;
+    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
+      dragMoved = true;
+    }
+
+    pinnedPosition = clampCardPosition(
+      dragOriginLeft + dx,
+      dragOriginTop + dy,
+      element,
+      mapElement,
+    );
+    element.style.left = `${pinnedPosition.left}px`;
+    element.style.top = `${pinnedPosition.top}px`;
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  const stopDragging = (event: PointerEvent) => {
+    if (!dragging) {
+      return;
+    }
+
+    dragging = false;
+    element.classList.remove("partner-map-mini-card--dragging");
+    try {
+      element.releasePointerCapture(event.pointerId);
+    } catch {
+      // already released
+    }
+    event.stopPropagation();
+  };
+
+  const onClickCapture = (event: MouseEvent) => {
+    if (!dragMoved) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    dragMoved = false;
+  };
+
+  element.addEventListener("pointerdown", onPointerDown);
+  element.addEventListener("pointermove", onPointerMove);
+  element.addEventListener("pointerup", stopDragging);
+  element.addEventListener("pointercancel", stopDragging);
+  element.addEventListener("click", onClickCapture, true);
+
   overlay.onRemove = function onRemove() {
     for (const listener of followListeners) {
       window.naver?.maps?.Event.removeListener(listener);
     }
     followListeners.length = 0;
+    element.removeEventListener("pointerdown", onPointerDown);
+    element.removeEventListener("pointermove", onPointerMove);
+    element.removeEventListener("pointerup", stopDragging);
+    element.removeEventListener("pointercancel", stopDragging);
+    element.removeEventListener("click", onClickCapture, true);
+    element.classList.remove("partner-map-mini-card--dragging");
     element.remove();
   };
 
