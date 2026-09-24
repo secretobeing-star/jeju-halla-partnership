@@ -77,6 +77,8 @@ export default function GiftInboxNavChip({ hideChip = false }: GiftInboxNavChipP
   const [swipeState, setSwipeState] = useState<{ itemId: string; startX: number; currentX: number } | null>(null);
   const [activeTab, setActiveTab] = useState<"event" | "admin">("event");
   const [gachaPlay, setGachaPlay] = useState<GachaRevealState | null>(null);
+  const [gachaBulkByBox, setGachaBulkByBox] = useState<Record<string, number>>({});
+  const eventGiftsRef = useRef<UserGift[]>([]);
   const touchStartRef = useRef<{ itemId: string; startX: number } | null>(null);
 
   useEffect(() => {
@@ -93,6 +95,7 @@ export default function GiftInboxNavChip({ hideChip = false }: GiftInboxNavChipP
     setStudentId(id);
     if (!id) {
       setRewards([]);
+      eventGiftsRef.current = [];
       setEventGifts([]);
       setPendingCount(0);
       setOpen(false);
@@ -121,13 +124,29 @@ export default function GiftInboxNavChip({ hideChip = false }: GiftInboxNavChipP
       } catch {
         gifts = [];
       }
+      eventGiftsRef.current = gifts;
       setEventGifts(gifts);
       setPendingCount(
         (adminPayload.pendingCount ?? adminRewards.filter((item) => item.status === "pending").length) +
           giftPending,
       );
+      try {
+        const passRes = await studentAuthFetch(`/api/season-pass?userId=${encodeURIComponent(id)}`);
+        const passPayload = (await passRes.json()) as {
+          state?: { gachaBoxes?: Array<{ id?: string; layout_count?: number }> };
+        };
+        const next: Record<string, number> = {};
+        for (const box of passPayload.state?.gachaBoxes ?? []) {
+          const boxId = String(box.id ?? "").trim();
+          if (boxId) next[boxId] = Math.max(1, Math.min(20, Math.floor(Number(box.layout_count) || 1)));
+        }
+        setGachaBulkByBox(next);
+      } catch {
+        /* keep previous box counts */
+      }
     } catch {
       setRewards([]);
+      eventGiftsRef.current = [];
       setEventGifts([]);
       setPendingCount(0);
     } finally {
@@ -174,19 +193,29 @@ export default function GiftInboxNavChip({ hideChip = false }: GiftInboxNavChipP
   const close = useCallback(() => setOpen(false), []);
   useAppBackHandler(open, close, "gift-inbox-modal");
 
-  async function claimEventGift(gift: UserGift) {
+  function unclaimedGachaCount(boxId: string) {
+    return eventGiftsRef.current.filter(
+      (item) => !item.is_claimed && parseGiftPayload(item).gachaBoxId === boxId,
+    ).length;
+  }
+
+  async function claimEventGift(gift: UserGift, count = 1) {
     if (!studentId || gift.is_claimed) {
       return;
     }
     const parsed = parseGiftPayload(gift);
     if (parsed.kind === "gacha") {
+      const boxId = parsed.gachaBoxId || "";
+      const bulk = gachaBulkByBox[boxId] || 1;
+      const owned = unclaimedGachaCount(boxId);
+      const pullCount = Math.max(1, Math.min(count, owned || 1, bulk));
       setBusyId(gift.id);
       setMessage(null);
       try {
         const response = await studentAuthFetch("/api/season-pass/gacha-pull", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId: studentId, studentId, giftId: gift.id }),
+          body: JSON.stringify({ userId: studentId, studentId, giftId: gift.id, count: pullCount }),
         });
         const payload = (await response.json()) as {
           error?: string;
@@ -198,17 +227,27 @@ export default function GiftInboxNavChip({ hideChip = false }: GiftInboxNavChipP
           fxEnabled?: boolean;
           idleImageUrl?: string | null;
           burstImageUrl?: string | null;
+          count?: number;
+          layoutCount?: number;
         };
         if (!response.ok) {
           setMessage(payload.error || "상자를 열지 못했습니다.");
           return;
         }
+        const used = Math.max(1, Number(payload.count) || pullCount);
         setGachaPlay(
-          gachaRevealFromPull(payload, {
-            id: parsed.gachaBoxId || gift.id,
-            name: gift.reward_name || "확률 상자",
-            layout_count: 1,
-          }),
+          gachaRevealFromPull(
+            payload,
+            {
+              id: boxId || gift.id,
+              name: gift.reward_name || "확률 상자",
+              layout_count: Number(payload.layoutCount) || bulk,
+            },
+            {
+              remainingPulls: Math.max(0, owned - used),
+              againLabel: "뽑기",
+            },
+          ),
         );
         window.dispatchEvent(new Event("site-season-pass-refresh"));
         await refresh();
@@ -597,6 +636,9 @@ export default function GiftInboxNavChip({ hideChip = false }: GiftInboxNavChipP
                               return <p className="gift-inbox__msg">{gift.reward_name}</p>;
                             })()}
                             </div>
+                            {(() => {
+                              const parsed = parseGiftPayload(gift);
+                              return (
                             <div className="gift-inbox__prize">
                               {gift.reward_img ? (
                                 <img src={gift.reward_img} alt="" className="gift-inbox__thumb" />
@@ -606,18 +648,50 @@ export default function GiftInboxNavChip({ hideChip = false }: GiftInboxNavChipP
                                 </span>
                               )}
                               {!gift.is_claimed ? (
-                                <button
-                                  type="button"
-                                  className="gift-inbox__claim"
-                                  disabled={busyId === gift.id}
-                                  onClick={() => void claimEventGift(gift)}
-                                >
-                                  {busyId === gift.id ? "..." : parseGiftPayload(gift).kind === "gacha" ? "열기" : "받기"}
-                                </button>
+                                parsed.kind === "gacha" ? (
+                                  <div className="gift-inbox__claim-stack">
+                                    <button
+                                      type="button"
+                                      className="gift-inbox__claim"
+                                      disabled={busyId === gift.id}
+                                      onClick={() => void claimEventGift(gift, 1)}
+                                    >
+                                      {busyId === gift.id ? "..." : "1개 뽑기"}
+                                    </button>
+                                    {Math.max(1, gachaBulkByBox[parsed.gachaBoxId || ""] || 1) > 1 &&
+                                    unclaimedGachaCount(parsed.gachaBoxId || "") >=
+                                      (gachaBulkByBox[parsed.gachaBoxId || ""] || 1) ? (
+                                      <button
+                                        type="button"
+                                        className="gift-inbox__claim"
+                                        disabled={busyId === gift.id}
+                                        onClick={() =>
+                                          void claimEventGift(
+                                            gift,
+                                            gachaBulkByBox[parsed.gachaBoxId || ""] || 1,
+                                          )
+                                        }
+                                      >
+                                        {gachaBulkByBox[parsed.gachaBoxId || ""] || 1}개 뽑기
+                                      </button>
+                                    ) : null}
+                                  </div>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    className="gift-inbox__claim"
+                                    disabled={busyId === gift.id}
+                                    onClick={() => void claimEventGift(gift)}
+                                  >
+                                    {busyId === gift.id ? "..." : "받기"}
+                                  </button>
+                                )
                               ) : (
                                 <span className="gift-inbox__claimed">완료</span>
                               )}
                             </div>
+                              );
+                            })()}
                           </div>
                         </div>
                       </li>
@@ -774,7 +848,21 @@ export default function GiftInboxNavChip({ hideChip = false }: GiftInboxNavChipP
       {modal}
       {deleteConfirmModal}
       {gachaPlay ? (
-        <GachaRevealOverlay play={gachaPlay} onChange={setGachaPlay} onClose={() => setGachaPlay(null)} />
+        <GachaRevealOverlay
+          play={gachaPlay}
+          onChange={setGachaPlay}
+          onClose={() => setGachaPlay(null)}
+          onPullAgain={(count) => {
+            const next = eventGiftsRef.current.find(
+              (item) => !item.is_claimed && parseGiftPayload(item).gachaBoxId === gachaPlay.boxId,
+            );
+            if (!next) {
+              setMessage("남은 상자가 없습니다.");
+              return;
+            }
+            void claimEventGift(next, count);
+          }}
+        />
       ) : null}
     </>
   );

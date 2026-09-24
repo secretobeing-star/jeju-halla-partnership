@@ -644,16 +644,7 @@ function GoldShopBoard({ client }: { client: ReturnType<typeof useSeasonPassClie
                     {item.price_gold > 0 ? item.price_gold.toLocaleString("ko-KR") : "-"}
                   </span>
                   {status ? <span className="season-pass-shop__status">{status}</span> : null}
-                  <div className={`season-pass-shop__actions ${canPreview ? "" : "is-single"}`}>
-                    {canPreview ? (
-                      <button
-                        type="button"
-                        className="season-pass-shop__preview"
-                        onClick={() => setPreview(item)}
-                      >
-                        미리보기
-                      </button>
-                    ) : null}
+                  <div className="season-pass-shop__actions is-single">
                     <button
                       type="button"
                       className="season-pass-shop__buy"

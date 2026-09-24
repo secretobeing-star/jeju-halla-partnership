@@ -38,6 +38,7 @@ import AiChatbotAdminPanel from "@/components/admin/AiChatbotAdminPanel";
 import SiteAnalyticsAdminPanel from "@/components/admin/SiteAnalyticsAdminPanel";
 import ChatbotWordAnalyticsAdminPanel from "@/components/admin/ChatbotWordAnalyticsAdminPanel";
 import GoldAnalyticsAdminPanel from "@/components/admin/GoldAnalyticsAdminPanel";
+import GachaAnalyticsAdminPanel from "@/components/admin/GachaAnalyticsAdminPanel";
 import SeasonPassAdminPanel from "@/components/admin/SeasonPassAdminPanel";
 import Pagination from "@/components/Pagination";
 import SiteFeaturesApplier from "@/components/SiteFeaturesApplier";
@@ -3335,6 +3336,15 @@ export default function AdminPage() {
               <p className="text-sm text-emerald-700">{settingsMessage}</p>
             ) : null}
             <GoldAnalyticsAdminPanel onMessage={setSettingsMessage} />
+          </div>
+        )}
+
+        {hasAdminNavAccess(adminAccess, "gacha-analytics") && activeNav === "gacha-analytics" && (
+          <div className="space-y-4">
+            {settingsMessage ? (
+              <p className="text-sm text-emerald-700">{settingsMessage}</p>
+            ) : null}
+            <GachaAnalyticsAdminPanel onMessage={setSettingsMessage} />
           </div>
         )}
 

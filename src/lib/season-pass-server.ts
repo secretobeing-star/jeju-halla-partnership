@@ -1369,7 +1369,23 @@ export async function pullGoldShopGacha(
     throw new Error("판매 중인 확률 상자가 아닙니다.");
   }
 
-  const count = giftId ? 1 : clampGachaPullCount(options?.count, box.layout_count || 1);
+  let count = clampGachaPullCount(options?.count, box.layout_count || 1);
+  let giftIdsToClaim: string[] = giftId ? [giftId] : [];
+  if (giftId) {
+    const { data: siblingRows } = await admin
+      .from("user_gifts")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("is_claimed", false)
+      .eq("frame_css_value", encodeGiftGachaValue(boxId))
+      .order("created_at", { ascending: true });
+    const ids = ((siblingRows ?? []) as Array<{ id?: string }>)
+      .map((row) => String(row.id ?? "").trim())
+      .filter(Boolean);
+    const ordered = [giftId, ...ids.filter((id) => id !== giftId)];
+    count = Math.min(count, Math.max(1, ordered.length));
+    giftIdsToClaim = ordered.slice(0, count);
+  }
   const spend = giftId ? 0 : box.price_gold * count;
 
   if (!giftId) {
@@ -1418,6 +1434,7 @@ export async function pullGoldShopGacha(
         fxEnabled: box.fx_enabled,
         idleImageUrl: box.idle_image_url,
         burstImageUrl: box.burst_image_url,
+        layoutCount: box.layout_count,
         prizes: [],
       };
     }
@@ -1487,11 +1504,11 @@ export async function pullGoldShopGacha(
     await grantPrize(prize);
   }
 
-  if (giftId) {
+  if (giftIdsToClaim.length > 0) {
     await db
       .from("user_gifts")
       .update({ is_claimed: true, claimed_at: new Date().toISOString() })
-      .eq("id", giftId)
+      .in("id", giftIdsToClaim)
       .eq("user_id", userId)
       .eq("is_claimed", false);
   }
@@ -1516,6 +1533,7 @@ export async function pullGoldShopGacha(
     fxEnabled: target.fx_enabled,
     idleImageUrl: target.idle_image_url,
     burstImageUrl: target.burst_image_url,
+    layoutCount: target.layout_count,
     prizes,
   };
 }

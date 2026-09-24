@@ -162,6 +162,7 @@ export const ADMIN_NAV_GROUPS: ReadonlyArray<{
       { kind: "item", key: "site-analytics", permission: "settings", label: "사이트 분석" },
       { kind: "item", key: "chatbot-word-analytics", permission: "settings", label: "AI 챗봇 단어 분석" },
       { kind: "item", key: "gold-analytics", permission: "settings", label: "골드 사용 분석" },
+      { kind: "item", key: "gacha-analytics", permission: "settings", label: "확률형 아이템 분석" },
     ],
   },
   {
@@ -263,6 +264,7 @@ export type AdminNavKey =
   | "site-analytics"
   | "chatbot-word-analytics"
   | "gold-analytics"
+  | "gacha-analytics"
   | "user-settings"
   | "partners"
   | "partner-taxonomy"
