@@ -26,6 +26,7 @@ const EMPTY: SeasonPassWidgetState = {
   shopItems: [],
   passEnabled: false,
   goldShopEnabled: false,
+  gachaBoxes: [],
 };
 
 export default function SeasonPassWidget() {

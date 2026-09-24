@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import type { GoldShopGachaBox } from "@/lib/gold-shop-gacha";
 import type { GoldShopItem, RewardItem, SeasonPassTrack, SeasonPassWidgetState } from "@/lib/season-pass";
 import { isCostumeShopPreviewEnabled, isGoldShopOpen, seasonPassQuestTypeLabel } from "@/lib/season-pass";
 import GachaRevealOverlay, {
