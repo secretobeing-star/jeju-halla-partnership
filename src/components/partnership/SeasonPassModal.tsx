@@ -3,8 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import type { GoldShopItem, RewardItem, SeasonPassTrack, SeasonPassWidgetState } from "@/lib/season-pass";
-import { isGoldShopOpen, seasonPassQuestTypeLabel } from "@/lib/season-pass";
+import { isCostumeShopPreviewEnabled, isGoldShopOpen, seasonPassQuestTypeLabel } from "@/lib/season-pass";
+import GachaRevealOverlay, {
+  gachaRevealFromPull,
+  type GachaRevealState,
+} from "@/components/partnership/GachaRevealOverlay";
 import { useSeasonPassClient } from "@/hooks/useSeasonPassClient";
+import { getSiteMemberSession } from "@/lib/site-member-session";
 
 function remainingDays(endsAt: string | null) {
   if (!endsAt) return null;
@@ -386,19 +391,40 @@ function TrackRow({
 }
 
 function GoldShopBoard({ client }: { client: ReturnType<typeof useSeasonPassClient> }) {
-  const { state, busy, buyShopItem } = client;
+  const { state, busy, buyShopItem, buyGacha } = client;
   const gold = state.progress?.gold ?? 0;
   const goldIcon = state.season?.gold_icon_url;
-  const [filter, setFilter] = useState<"all" | "pass" | "costume" | "coupon">("all");
+  const [filter, setFilter] = useState<"all" | "pass" | "costume" | "coupon" | "gacha">("all");
   const [pending, setPending] = useState<GoldShopItem | null>(null);
+  const [pendingGacha, setPendingGacha] = useState<GoldShopGachaBox | null>(null);
+  const [preview, setPreview] = useState<GoldShopItem | null>(null);
+  const [gachaPlay, setGachaPlay] = useState<GachaRevealState | null>(null);
+  const [heldNotice, setHeldNotice] = useState(false);
+  const costumePreviewOn = isCostumeShopPreviewEnabled(state.season);
+  const student = getSiteMemberSession()?.student;
   const items = state.shopItems.filter((item) => {
     if (!item.is_active) return false;
+    if (filter === "gacha") return false;
     if (filter === "pass") return item.item_kind === "premium";
     if (filter === "costume") return item.reward?.item_type === "costume";
     if (filter === "coupon") return item.reward?.item_type === "coupon";
     return true;
   });
-  const slots = Math.max(6, Math.ceil(Math.max(items.length, 1) / 3) * 3);
+  const gachaBoxes = (state.gachaBoxes ?? []).filter((box) => {
+    if (!box.is_active) return false;
+    return filter === "all" || filter === "gacha";
+  });
+  const catalog = [
+    ...items.map((item) => ({ kind: "item" as const, item })),
+    ...gachaBoxes.flatMap((box) =>
+      Array.from({ length: Math.max(1, box.layout_count || 1) }, (_, slot) => ({
+        kind: "gacha" as const,
+        box,
+        slot,
+      })),
+    ),
+  ];
+  const slots = Math.max(6, Math.ceil(Math.max(catalog.length, 1) / 3) * 3);
 
   async function confirmBuy() {
     if (!pending) return;
@@ -408,11 +434,48 @@ function GoldShopBoard({ client }: { client: ReturnType<typeof useSeasonPassClie
     await buyShopItem(id);
   }
 
+  async function startGacha(box: GoldShopGachaBox) {
+    if (gold < box.price_gold) {
+      setPendingGacha(box);
+      return;
+    }
+    const result = await buyGacha(box.id);
+    if (!result) return;
+    if (result.held) {
+      setHeldNotice(true);
+      return;
+    }
+    setGachaPlay(
+      gachaRevealFromPull(
+        {
+          ...result,
+          idleImageUrl: result.idleImageUrl ?? box.idle_image_url,
+          burstImageUrl: result.burstImageUrl ?? box.burst_image_url,
+        },
+        box.name,
+      ),
+    );
+  }
+
+  async function confirmGacha() {
+    if (!pendingGacha) return;
+    if (gold < pendingGacha.price_gold) return;
+    const box = pendingGacha;
+    setPendingGacha(null);
+    await startGacha(box);
+  }
+
+  const pendingBox = pendingGacha;
   const pendingImage =
     pending?.reward?.image_url ||
-    (pending?.item_kind === "premium" ? state.season?.premium_pass_image_url : null);
-  const canAfford = pending ? gold >= pending.price_gold : false;
-  const goldAfter = pending ? gold - pending.price_gold : gold;
+    (pending?.item_kind === "premium" ? state.season?.premium_pass_image_url : null) ||
+    pendingBox?.idle_image_url ||
+    null;
+  const pendingPrice = pending?.price_gold ?? pendingBox?.price_gold ?? 0;
+  const pendingName = pending?.name ?? pendingBox?.name ?? "";
+  const canAfford = pending || pendingBox ? gold >= pendingPrice : false;
+  const goldAfter = pending || pendingBox ? gold - pendingPrice : gold;
+  const previewImage = preview?.reward?.image_url || null;
 
   return (
     <div className="season-pass-shop">
@@ -423,6 +486,7 @@ function GoldShopBoard({ client }: { client: ReturnType<typeof useSeasonPassClie
             ["pass", "패스"],
             ["costume", "코스튬"],
             ["coupon", "쿠폰"],
+            ["gacha", "확률"],
           ] as const
         ).map(([id, label]) => (
           <button
@@ -442,10 +506,52 @@ function GoldShopBoard({ client }: { client: ReturnType<typeof useSeasonPassClie
       <div className="season-pass-shop__panel">
         <ul className="season-pass-shop__grid">
           {Array.from({ length: slots }, (_, index) => {
-            const item = items[index];
-            if (!item) {
+            const entry = catalog[index];
+            if (!entry) {
               return <li key={`empty-${index}`} className="season-pass-shop__slot" />;
             }
+            if (entry.kind === "gacha") {
+              const box = entry.box;
+              const discount =
+                box.original_price_gold > box.price_gold && box.price_gold > 0
+                  ? Math.round((1 - box.price_gold / box.original_price_gold) * 100)
+                  : 0;
+              const badge = box.badge_label.trim();
+              return (
+                <li key={`${box.id}-${entry.slot}`}>
+                  <div className="season-pass-shop__card">
+                    <span className="season-pass-shop__title">{box.name}</span>
+                    <span className="season-pass-shop__art">
+                      {discount > 0 ? <b>{discount}%</b> : null}
+                      {badge ? <em className={discount > 0 ? "is-secondary" : ""}>{badge}</em> : null}
+                      {box.idle_image_url ? <img src={box.idle_image_url} alt="" /> : <span />}
+                    </span>
+                    <span className="season-pass-shop__cost">
+                      {goldIcon ? <img src={goldIcon} alt="" /> : <span className="season-pass-shop__coin" aria-hidden />}
+                      {discount > 0 ? <s>{box.original_price_gold.toLocaleString("ko-KR")}</s> : null}
+                      {box.price_gold > 0 ? box.price_gold.toLocaleString("ko-KR") : "-"}
+                    </span>
+                    <div className="season-pass-shop__actions">
+                      <button
+                        type="button"
+                        className="season-pass-shop__buy"
+                        disabled={busy !== null}
+                        onClick={() => {
+                          if (box.confirm_popup === false) {
+                            void startGacha(box);
+                            return;
+                          }
+                          setPendingGacha(box);
+                        }}
+                      >
+                        {box.open_place === "inventory" ? "담기" : "뽑기"}
+                      </button>
+                    </div>
+                  </div>
+                </li>
+              );
+            }
+            const item = entry.item;
             const soldOut = item.stock != null && item.stock <= 0;
             const owned =
               (item.item_kind === "premium" && state.isPremium) ||
@@ -460,15 +566,24 @@ function GoldShopBoard({ client }: { client: ReturnType<typeof useSeasonPassClie
             const badge = item.badge_label.trim();
             const disabled = busy !== null || owned || soldOut;
             const status = soldOut && !owned ? "품절" : "";
+            const isCostume = item.reward?.item_type === "costume";
+            const canPreview = costumePreviewOn && isCostume;
             return (
               <li key={item.id}>
                 <div className={`season-pass-shop__card ${owned || soldOut ? "is-disabled" : ""}`}>
                   <span className="season-pass-shop__title">{item.name}</span>
-                  <span className="season-pass-shop__art">
+                  <button
+                    type="button"
+                    className="season-pass-shop__art"
+                    disabled={!canPreview}
+                    onClick={() => {
+                      if (canPreview) setPreview(item);
+                    }}
+                  >
                     {discount > 0 ? <b>{discount}%</b> : null}
                     {badge ? <em className={discount > 0 ? "is-secondary" : ""}>{badge}</em> : null}
                     {imageUrl ? <img src={imageUrl} alt="" /> : <span />}
-                  </span>
+                  </button>
                   <span className="season-pass-shop__cost">
                     {goldIcon ? <img src={goldIcon} alt="" /> : <span className="season-pass-shop__coin" aria-hidden />}
                     {discount > 0 ? (
@@ -477,39 +592,53 @@ function GoldShopBoard({ client }: { client: ReturnType<typeof useSeasonPassClie
                     {item.price_gold > 0 ? item.price_gold.toLocaleString("ko-KR") : "-"}
                   </span>
                   {status ? <span className="season-pass-shop__status">{status}</span> : null}
-                  <button
-                    type="button"
-                    className="season-pass-shop__buy"
-                    disabled={disabled}
-                    onClick={() => {
-                      if (owned || soldOut) return;
-                      setPending(item);
-                    }}
-                  >
-                    {owned ? "보유 중" : "구입하기"}
-                  </button>
+                  <div className="season-pass-shop__actions">
+                    {canPreview ? (
+                      <button
+                        type="button"
+                        className="season-pass-shop__preview"
+                        onClick={() => setPreview(item)}
+                      >
+                        미리보기
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      className="season-pass-shop__buy"
+                      disabled={disabled}
+                      onClick={() => {
+                        if (owned || soldOut) return;
+                        setPending(item);
+                      }}
+                    >
+                      {owned ? "보유 중" : "구입하기"}
+                    </button>
+                  </div>
                 </div>
               </li>
             );
           })}
         </ul>
       </div>
-      {pending
+      {pending || pendingGacha
         ? createPortal(
             <div
               className="season-pass-claim-overlay"
               role="presentation"
-              onClick={() => setPending(null)}
+              onClick={() => {
+                setPending(null);
+                setPendingGacha(null);
+              }}
             >
               <div
                 className={`season-pass-shop-receipt ${canAfford ? "" : "is-short"}`}
                 role="dialog"
                 aria-modal="true"
-                aria-label={canAfford ? "아이템 구입" : "골드 부족"}
+                aria-label={canAfford ? (pendingGacha ? "확률 상자 뽑기" : "아이템 구입") : "골드 부족"}
                 onClick={(event) => event.stopPropagation()}
               >
                 <div className="season-pass-shop-receipt__head">
-                  {canAfford ? "아이템 구입" : "골드 부족"}
+                  {canAfford ? (pendingGacha ? "확률 상자 뽑기" : "아이템 구입") : "골드 부족"}
                 </div>
                 <div className="season-pass-shop-receipt__body">
                   <div className="season-pass-shop-receipt__row">
@@ -519,12 +648,12 @@ function GoldShopBoard({ client }: { client: ReturnType<typeof useSeasonPassClie
                     <div className="season-pass-shop-receipt__fields">
                       <label>
                         <span>* 아이템 이름</span>
-                        <strong>{pending.name}</strong>
+                        <strong>{pendingName}</strong>
                       </label>
                       <label>
                         <span>* 아이템 가격</span>
                         <strong>
-                          {pending.price_gold.toLocaleString("ko-KR")}
+                          {pendingPrice.toLocaleString("ko-KR")}
                           {goldIcon ? <img src={goldIcon} alt="" /> : " 골드"}
                         </strong>
                       </label>
@@ -548,7 +677,9 @@ function GoldShopBoard({ client }: { client: ReturnType<typeof useSeasonPassClie
                   </dl>
                   <p className="season-pass-shop-receipt__note">
                     {canAfford
-                      ? "* 상점에서 구매한 상품은 취소가 되지 않습니다.\n내용을 신중히 확인하신 후 구매해 주세요."
+                      ? pendingGacha
+                        ? "* 확률 상자는 뽑은 뒤 취소할 수 없습니다.\n내용을 신중히 확인하신 후 뽑아 주세요."
+                        : "* 상점에서 구매한 상품은 취소가 되지 않습니다.\n내용을 신중히 확인하신 후 구매해 주세요."
                       : "* 골드가 부족하여 구입할 수 없습니다.\n필요한 골드를 모은 뒤 다시 시도해 주세요."}
                   </p>
                 </div>
@@ -559,19 +690,118 @@ function GoldShopBoard({ client }: { client: ReturnType<typeof useSeasonPassClie
                         type="button"
                         className="is-primary"
                         disabled={busy !== null}
-                        onClick={() => void confirmBuy()}
+                        onClick={() => void (pendingGacha ? confirmGacha() : confirmBuy())}
                       >
                         확인
                       </button>
-                      <button type="button" onClick={() => setPending(null)}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPending(null);
+                          setPendingGacha(null);
+                        }}
+                      >
                         취소
                       </button>
                     </>
                   ) : (
-                    <button type="button" className="is-primary" onClick={() => setPending(null)}>
+                    <button
+                      type="button"
+                      className="is-primary"
+                      onClick={() => {
+                        setPending(null);
+                        setPendingGacha(null);
+                      }}
+                    >
                       확인
                     </button>
                   )}
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+      {preview
+        ? createPortal(
+            <div
+              className="season-pass-claim-overlay"
+              role="presentation"
+              onClick={() => setPreview(null)}
+            >
+              <div
+                className="season-pass-shop-preview"
+                role="dialog"
+                aria-modal="true"
+                aria-label={`${preview.name} 미리보기`}
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="season-pass-shop-preview__head">{preview.name} 미리보기</div>
+                <div className="season-pass-shop-preview__card">
+                  {previewImage ? (
+                    <img src={previewImage} alt="" className="season-pass-shop-preview__frame" />
+                  ) : null}
+                  <div className="season-pass-shop-preview__inner">
+                    <div className="season-pass-shop-preview__photo">
+                      {student?.photoUrl ? <img src={student.photoUrl} alt="" /> : <span>사진</span>}
+                    </div>
+                    <div className="season-pass-shop-preview__meta">
+                      <span>제주한라대학교</span>
+                      <strong>{student?.name?.trim() || "학생"}</strong>
+                      <p>
+                        학과 <b>{student?.department?.trim() || "-"}</b>
+                      </p>
+                      <p>
+                        학번 <b>{student?.studentId?.trim() || "-"}</b>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <button type="button" className="is-primary" onClick={() => setPreview(null)}>
+                  닫기
+                </button>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+      {gachaPlay ? (
+        <GachaRevealOverlay play={gachaPlay} onChange={setGachaPlay} onClose={() => setGachaPlay(null)} />
+      ) : null}
+      {heldNotice
+        ? createPortal(
+            <div
+              className="season-pass-claim-overlay"
+              role="presentation"
+              onClick={() => setHeldNotice(false)}
+            >
+              <div
+                className="season-pass-shop-receipt"
+                role="dialog"
+                aria-modal="true"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="season-pass-shop-receipt__head">보관함으로 보냈습니다</div>
+                <div className="season-pass-shop-receipt__body">
+                  <p className="season-pass-shop-receipt__note">
+                    선물함에서 상자를 열어 뽑을 수 있습니다.
+                  </p>
+                </div>
+                <div className="season-pass-shop-receipt__actions">
+                  <button
+                    type="button"
+                    className="is-primary"
+                    onClick={() => {
+                      setHeldNotice(false);
+                      window.dispatchEvent(new Event("site-season-pass-close"));
+                      window.dispatchEvent(new Event("site-gift-inbox-open"));
+                    }}
+                  >
+                    선물함 열기
+                  </button>
+                  <button type="button" onClick={() => setHeldNotice(false)}>
+                    확인
+                  </button>
                 </div>
               </div>
             </div>,

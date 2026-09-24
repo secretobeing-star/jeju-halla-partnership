@@ -18,6 +18,7 @@ type ChatLine = {
   hasMore?: boolean;
   moreIntent?: ChatbotIntent | null;
   cards?: ChatbotPartnerCard[];
+  openPopup?: "season" | "shop";
 };
 
 const THREAD_KEY = "halla-ai-chatbot-thread";
@@ -156,6 +157,7 @@ export default function AiChatbotWidget() {
       hasMore?: boolean;
       moreIntent?: ChatbotIntent | null;
       cards?: ChatbotPartnerCard[];
+      openPopup?: "season" | "shop";
     };
     if (!response.ok) throw new Error(payload.error || "답변을 받지 못했습니다.");
     return {
@@ -165,6 +167,7 @@ export default function AiChatbotWidget() {
       hasMore: Boolean(payload.hasMore),
       moreIntent: payload.moreIntent ?? null,
       cards: payload.cards ?? [],
+      openPopup: payload.openPopup,
     };
   }
 
@@ -178,6 +181,19 @@ export default function AiChatbotWidget() {
     try {
       const reply = await ask(nextLines, intent);
       setLines([...nextLines, reply]);
+      if (reply.openPopup === "season" || reply.openPopup === "shop") {
+        requestOpenChatbotCard({
+          id: reply.openPopup,
+          name: "",
+          category: "",
+          region: "",
+          benefit: "",
+          address: "",
+          image_url: null,
+          openKind: reply.openPopup === "shop" ? "shop" : "season",
+        });
+        setOpen(false);
+      }
     } catch (error) {
       setLines([
         ...nextLines,
@@ -338,7 +354,13 @@ export default function AiChatbotWidget() {
                           <img src={card.image_url} alt="" className="ai-chatbot__card-photo" />
                         ) : (
                           <div className="ai-chatbot__card-photo is-empty">
-                            {card.openKind === "board" ? "게시판" : "사진 없음"}
+                            {card.openKind === "board"
+                              ? "게시판"
+                              : card.openKind === "season"
+                                ? "시즌패스"
+                                : card.openKind === "shop"
+                                  ? "골드상점"
+                                  : "사진 없음"}
                           </div>
                         )}
                         <div className="ai-chatbot__card-body">

@@ -5,6 +5,7 @@ import {
 } from "@/lib/google-sheets-student";
 import { createSupabaseServer } from "@/lib/supabase-server";
 import type { SiteMemberStudentProfile } from "@/lib/site-member-session";
+import { loadStudentCardPhotoUrl } from "@/lib/student-card-settings-server";
 import { issueStudentApiSession } from "@/lib/student-session-server";
 
 type LoginBody = {
@@ -64,6 +65,7 @@ export async function POST(request: Request) {
       }
 
       if (record.approvalStatus !== "none") {
+        const syncedPhoto = await loadStudentCardPhotoUrl(record.studentId).catch(() => null);
         const student: SiteMemberStudentProfile = {
           studentId: record.studentId,
           name: record.name?.trim() || record.studentId,
@@ -71,7 +73,7 @@ export async function POST(request: Request) {
           major: record.major?.trim() || "",
           phone: "",
           graduationStatus: "enrolled",
-          photoUrl: record.photoUrl?.trim() || null,
+          photoUrl: syncedPhoto || record.photoUrl?.trim() || null,
           notes: null,
           approvalStatus: "approved",
         };

@@ -39,11 +39,18 @@ export type Season = {
   premium_original_price_gold: number;
   premium_badge_label: string;
   gold_shop_enabled: boolean;
+  costume_preview_enabled: boolean;
   sort_order: number;
 };
 
 export function isGoldShopEnabled(season: Pick<Season, "gold_shop_enabled"> | null | undefined) {
   return Boolean(season) && season?.gold_shop_enabled !== false;
+}
+
+export function isCostumeShopPreviewEnabled(
+  season: Pick<Season, "costume_preview_enabled"> | null | undefined,
+) {
+  return season?.costume_preview_enabled !== false;
 }
 
 export const GOLD_SHOP_CATALOG_CODE = "gold-shop";
@@ -137,13 +144,19 @@ export type SeasonPassWidgetState = {
   passEnabled: boolean;
   goldShopEnabled: boolean;
   shopItems: GoldShopItem[];
+  gachaBoxes: import("@/lib/gold-shop-gacha").GoldShopGachaBox[];
 };
 
 export function isGoldShopOpen(
-  state: Pick<SeasonPassWidgetState, "goldShopEnabled" | "season" | "shopItems"> | null | undefined,
+  state: Pick<SeasonPassWidgetState, "goldShopEnabled" | "season" | "shopItems" | "gachaBoxes"> | null | undefined,
 ) {
   if (!state) return false;
-  return Boolean(state.goldShopEnabled) || isGoldShopEnabled(state.season) || state.shopItems.length > 0;
+  return (
+    Boolean(state.goldShopEnabled) ||
+    isGoldShopEnabled(state.season) ||
+    state.shopItems.length > 0 ||
+    (state.gachaBoxes?.length ?? 0) > 0
+  );
 }
 
 export function isSeasonLive(season: Pick<Season, "starts_at" | "ends_at">, now = Date.now()) {

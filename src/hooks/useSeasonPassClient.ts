@@ -55,6 +55,7 @@ export const EMPTY_SEASON_PASS_STATE: SeasonPassWidgetState = {
   shopItems: [],
   passEnabled: false,
   goldShopEnabled: false,
+  gachaBoxes: [],
 };
 
 export function useSeasonPassClient() {
@@ -319,13 +320,79 @@ export function useSeasonPassClient() {
       if (payload.state) {
         setState(payload.state);
       }
+      const gifted = Boolean(payload.gifted);
+      if (gifted) {
+        window.dispatchEvent(new Event("site-gift-inbox-refresh"));
+      }
+      window.dispatchEvent(new Event("site-season-pass-refresh"));
+      const item = state.shopItems.find((shopItem) => shopItem.id === shopItemId);
+      const imageUrl =
+        item?.reward?.image_url ||
+        (item?.item_kind === "premium" ? state.season?.premium_pass_image_url : null) ||
+        null;
+      setClaimPopup({
+        title: "구입이 완료되었습니다.",
+        body: gifted
+          ? "구매한 상품은 선물함으로 보냈습니다. 선물함에서 받아 주세요."
+          : "구입이 완료되었습니다.",
+        items: item
+          ? [
+              {
+                name: payload.name?.trim() || item.name,
+                imageUrl,
+                gifted,
+              },
+            ]
+          : [],
+        gifted,
+      });
+    } catch (error) {
+      openClaimNotice("구매하지 못했습니다", error instanceof Error ? error.message : "구매에 실패했습니다.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function buyGacha(boxId: string) {
+    if (!userId) {
+      openClaimNotice("구매할 수 없습니다", "로그인 후 구매할 수 있습니다.");
+      return null;
+    }
+    setBusy(`gacha-${boxId}`);
+    setMessage("");
+    try {
+      const response = await studentAuthFetch("/api/season-pass/gacha-pull", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, boxId }),
+      });
+      const payload = (await response.json()) as {
+        state?: SeasonPassWidgetState;
+        error?: string;
+        held?: boolean;
+        gifted?: boolean;
+        name?: string;
+        imageUrl?: string | null;
+        kind?: string;
+        goldAmount?: number;
+        fxEnabled?: boolean;
+        idleImageUrl?: string | null;
+        burstImageUrl?: string | null;
+      };
+      if (!response.ok) {
+        throw new Error(payload.error || "뽑기에 실패했습니다.");
+      }
+      if (payload.state) {
+        setState(payload.state);
+      }
       if (Boolean(payload.gifted)) {
         window.dispatchEvent(new Event("site-gift-inbox-refresh"));
       }
       window.dispatchEvent(new Event("site-season-pass-refresh"));
-      window.location.reload();
+      return payload;
     } catch (error) {
-      openClaimNotice("구매하지 못했습니다", error instanceof Error ? error.message : "구매에 실패했습니다.");
+      openClaimNotice("뽑지 못했습니다", error instanceof Error ? error.message : "뽑기에 실패했습니다.");
+      return null;
     } finally {
       setBusy(null);
     }
@@ -344,6 +411,7 @@ export function useSeasonPassClient() {
     checkIn,
     buyPremium,
     buyShopItem,
+    buyGacha,
     claimPopup,
     clearClaimPopup: () => setClaimPopup(null),
   };

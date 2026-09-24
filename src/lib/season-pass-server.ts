@@ -20,7 +20,13 @@ import {
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 import { logSeasonPassToSheets } from "@/lib/google-sheets-student";
 import type { GoldLedgerSource } from "@/lib/gold-analytics";
-import { encodeGiftCouponValue } from "@/lib/map-events";
+import { encodeGiftCouponValue, encodeGiftGachaValue, parseGiftPayload } from "@/lib/map-events";
+import {
+  mapGachaBox,
+  mapGachaReward,
+  pickGachaReward,
+  type GoldShopGachaBox,
+} from "@/lib/gold-shop-gacha";
 
 type AdminClient = NonNullable<ReturnType<typeof createSupabaseAdmin>>;
 
@@ -52,6 +58,7 @@ function mapSeason(row: Record<string, unknown>): Season {
         ? "인기"
         : String(row.premium_badge_label).trim(),
     gold_shop_enabled: row.gold_shop_enabled !== false,
+    costume_preview_enabled: row.costume_preview_enabled !== false,
     sort_order: Number(row.sort_order) || 0,
   };
 }
@@ -219,6 +226,37 @@ async function loadGoldShopItems(
   return shopItems;
 }
 
+async function loadGoldShopGachaBoxes(admin: AdminClient): Promise<GoldShopGachaBox[]> {
+  const { data: boxRows, error } = await admin
+    .from("gold_shop_gacha_boxes")
+    .select("*")
+    .eq("is_active", true)
+    .order("sort_order", { ascending: true });
+  if (error || !boxRows) {
+    return [];
+  }
+  const boxes = (boxRows as Record<string, unknown>[]).map((row) => mapGachaBox(row, []));
+  if (boxes.length === 0) {
+    return [];
+  }
+  const { data: rewardRows } = await admin
+    .from("gold_shop_gacha_rewards")
+    .select("*")
+    .in(
+      "box_id",
+      boxes.map((box) => box.id),
+    )
+    .order("sort_order", { ascending: true });
+  const byBox = new Map<string, GoldShopGachaBox["rewards"]>();
+  for (const row of (rewardRows ?? []) as Record<string, unknown>[]) {
+    const reward = mapGachaReward(row);
+    const list = byBox.get(reward.box_id) ?? [];
+    list.push(reward);
+    byBox.set(reward.box_id, list);
+  }
+  return boxes.map((box) => ({ ...box, rewards: byBox.get(box.id) ?? [] }));
+}
+
 export async function getSeasonPassState(userId: string): Promise<SeasonPassWidgetState> {
   const empty: SeasonPassWidgetState = {
     season: null,
@@ -236,6 +274,7 @@ export async function getSeasonPassState(userId: string): Promise<SeasonPassWidg
     passEnabled: false,
     goldShopEnabled: false,
     shopItems: [],
+    gachaBoxes: [],
   };
 
   const admin = createSupabaseAdmin();
@@ -283,6 +322,7 @@ export async function getSeasonPassState(userId: string): Promise<SeasonPassWidg
               }
             : null,
           shopItems: await loadGoldShopItems(admin, shopSeasons, null, userId, itemsById, false),
+          gachaBoxes: await loadGoldShopGachaBoxes(admin),
         };
       }
     const [{ data: levelRows }, { data: progressRow }, { data: claimRows }, { data: questRows }] =
@@ -406,6 +446,7 @@ export async function getSeasonPassState(userId: string): Promise<SeasonPassWidg
         itemsById,
         Boolean(progress?.is_premium),
       ),
+      gachaBoxes: await loadGoldShopGachaBoxes(admin),
     };
     } catch {
       return seasonOnly;
@@ -1239,5 +1280,189 @@ export async function purchaseGoldShopItem(userIdRaw: string, shopItemIdRaw: str
     state: await getSeasonPassState(userId),
     gifted,
     name: shopItem.name,
+  };
+}
+
+export async function pullGoldShopGacha(
+  userIdRaw: string,
+  boxIdRaw: string,
+  options?: { giftId?: string },
+) {
+  const userId = userIdRaw.trim();
+  const giftId = options?.giftId?.trim() || "";
+  let boxId = boxIdRaw.trim();
+  if (!userId) {
+    throw new Error("로그인이 필요합니다.");
+  }
+
+  const admin = createSupabaseAdmin();
+  if (!admin) {
+    throw new Error("Supabase 서버 설정이 없습니다.");
+  }
+
+  const state = await getSeasonPassState(userId);
+  if (!state.goldShopEnabled || !state.season) {
+    throw new Error("골드 상점이 비활성화되어 있습니다.");
+  }
+
+  if (giftId) {
+    const { data: gift, error } = await admin
+      .from("user_gifts")
+      .select("*")
+      .eq("id", giftId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (error || !gift) {
+      throw new Error("보관함에서 상자를 찾지 못했습니다.");
+    }
+    if (gift.is_claimed) {
+      throw new Error("이미 연 상자입니다.");
+    }
+    const parsed = parseGiftPayload({
+      frame_css_value: String(gift.frame_css_value ?? ""),
+    });
+    if (parsed.kind !== "gacha" || !parsed.gachaBoxId) {
+      throw new Error("확률 상자가 아닙니다.");
+    }
+    boxId = parsed.gachaBoxId;
+  }
+
+  if (!boxId) {
+    throw new Error("상품이 필요합니다.");
+  }
+
+  let box = state.gachaBoxes.find((item) => item.id === boxId);
+  if (!box) {
+    const { data: boxRow } = await admin.from("gold_shop_gacha_boxes").select("*").eq("id", boxId).maybeSingle();
+    const { data: rewardRows } = await admin
+      .from("gold_shop_gacha_rewards")
+      .select("*")
+      .eq("box_id", boxId)
+      .order("sort_order", { ascending: true });
+    if (!boxRow) {
+      throw new Error("판매 중인 확률 상자가 아닙니다.");
+    }
+    box = mapGachaBox(
+      boxRow as Record<string, unknown>,
+      ((rewardRows ?? []) as Record<string, unknown>[]).map((row) => mapGachaReward(row)),
+    );
+  }
+  if (!giftId && !box.is_active) {
+    throw new Error("판매 중인 확률 상자가 아닙니다.");
+  }
+
+  if (!giftId) {
+    if (box.price_gold <= 0) {
+      throw new Error("판매가가 아직 없습니다.");
+    }
+    const gold = Number(state.progress?.gold ?? 0);
+    if (gold < box.price_gold) {
+      throw new Error("골드가 부족합니다.");
+    }
+    await adjustGold(admin, userId, state.season, -box.price_gold, "shop_spend");
+
+    if (box.open_place === "inventory") {
+      const { error: holdError } = await admin.from("user_gifts").insert({
+        user_id: userId,
+        reward_id: null,
+        event_id: null,
+        reward_name: box.name,
+        reward_img: box.idle_image_url,
+        frame_css_value: encodeGiftGachaValue(box.id),
+        is_claimed: false,
+      });
+      if (holdError) {
+        throw new Error(
+          holdError.message.includes("user_gifts")
+            ? "선물함 테이블이 없습니다. supabase/map-events-gifts.sql 을 실행해 주세요."
+            : holdError.message,
+        );
+      }
+      logSeasonPassToSheets({
+        studentId: userId,
+        action: "shop",
+        seasonTitle: state.season.title,
+        detail: `${box.name} 보관함 지급 · 골드 ${box.price_gold}`,
+      });
+      return {
+        state: await getSeasonPassState(userId),
+        held: true,
+        gifted: true,
+        name: box.name,
+        imageUrl: box.idle_image_url,
+        kind: "gacha",
+        goldAmount: 0,
+        fxEnabled: box.fx_enabled,
+        idleImageUrl: box.idle_image_url,
+        burstImageUrl: box.burst_image_url,
+      };
+    }
+  }
+
+  const prize = pickGachaReward(box.rewards);
+  if (!prize) {
+    throw new Error("지급할 확률이 없습니다. 관리자에서 보상 확률을 확인해 주세요.");
+  }
+
+  let gifted = false;
+  if (prize.kind === "gold") {
+    const amount = Math.max(0, prize.gold_amount);
+    if (amount > 0) {
+      await adjustGold(admin, userId, state.season, amount, "shop_reward");
+    }
+  } else {
+    const synthetic: RewardItem = {
+      id: prize.id,
+      name: prize.name || (prize.kind === "coupon" ? "쿠폰" : "코스튬"),
+      item_type: prize.kind,
+      image_url: prize.image_url,
+      metadata:
+        prize.kind === "coupon"
+          ? { coupon_code: prize.coupon_code || "", code: prize.coupon_code || "" }
+          : { frame_id: prize.frame_id || "" },
+      is_active: true,
+      sort_order: prize.sort_order,
+    };
+    await sendSeasonPassInboxGift(admin, userId, "확률 상자", synthetic);
+    gifted = true;
+  }
+
+  if (giftId) {
+    await admin
+      .from("user_gifts")
+      .update({ is_claimed: true, claimed_at: new Date().toISOString() })
+      .eq("id", giftId)
+      .eq("user_id", userId)
+      .eq("is_claimed", false);
+  }
+
+  const { error: pullLogError } = await admin.from("gold_shop_gacha_pulls").insert({
+    user_id: userId,
+    box_id: box.id,
+    reward_id: prize.id,
+    gold_spent: giftId ? 0 : box.price_gold,
+  });
+  if (pullLogError && !pullLogError.message.includes("gold_shop_gacha_pulls")) {
+    throw pullLogError;
+  }
+
+  logSeasonPassToSheets({
+    studentId: userId,
+    action: "shop",
+    seasonTitle: state.season.title,
+    detail: `${box.name} 뽑기 · ${prize.name || prize.kind} · 골드 ${giftId ? 0 : box.price_gold}`,
+  });
+
+  return {
+    state: await getSeasonPassState(userId),
+    held: false,
+    gifted,
+    name: prize.name || box.name,
+    imageUrl: prize.image_url,
+    kind: prize.kind,
+    goldAmount: prize.gold_amount,
+    fxEnabled: box.fx_enabled,
+    idleImageUrl: box.idle_image_url,
+    burstImageUrl: box.burst_image_url,
   };
 }

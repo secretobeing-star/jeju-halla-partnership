@@ -5,8 +5,12 @@ create table if not exists public.site_student_card_settings (
   equipped_frame_id text,
   unlocked_ids jsonb not null default '[]'::jsonb,
   sources jsonb not null default '{}'::jsonb,
+  photo_url text,
   updated_at timestamptz not null default now()
 );
+
+alter table if exists public.site_student_card_settings
+  add column if not exists photo_url text;
 
 create index if not exists site_student_card_settings_updated_idx
   on public.site_student_card_settings (updated_at desc);

@@ -5,6 +5,7 @@ import AdminCollapsibleSection from "@/components/admin/AdminCollapsibleSection"
 import { adminApiFetch, reloadAfterAdminSave } from "@/lib/admin-api";
 import type { GoldShopItem, RewardItem, Season } from "@/lib/season-pass";
 import type { PublicCardFrameItem } from "@/lib/student-card-frames";
+import GoldShopGachaAdminPanel from "@/components/admin/GoldShopGachaAdminPanel";
 
 type GoldShopAdminPanelProps = {
   onMessage: (message: string) => void;
@@ -77,7 +78,10 @@ export default function GoldShopAdminPanel({ onMessage }: GoldShopAdminPanelProp
   const [addOriginal, setAddOriginal] = useState(0);
   const [addBadge, setAddBadge] = useState("");
   const shopOn = seasons.some((item) => item.gold_shop_enabled !== false);
+  const costumePreviewOn = seasons.some((item) => item.costume_preview_enabled !== false);
   const [togglingShop, setTogglingShop] = useState(false);
+  const [togglingPreview, setTogglingPreview] = useState(false);
+  const [pageTab, setPageTab] = useState<"catalog" | "gacha">("catalog");
 
   const selected = useMemo(
     () => seasons.find((item) => item.id === seasonId) ?? seasons[0] ?? null,
@@ -397,8 +401,51 @@ export default function GoldShopAdminPanel({ onMessage }: GoldShopAdminPanelProp
     }
   }
 
+  async function toggleCostumePreview(enabled: boolean) {
+    setTogglingPreview(true);
+    try {
+      const payload = (await adminApiFetch("/api/admin/season-pass", {
+        method: "PATCH",
+        body: JSON.stringify({
+          entity: "gold_shop",
+          costume_preview_enabled: enabled,
+        }),
+      })) as { seasons?: Season[] };
+      const nextSeasons = payload.seasons ?? [];
+      setSeasons(nextSeasons);
+      onMessage(enabled ? "코스튬 미리보기를 켰습니다." : "코스튬 미리보기를 껐습니다.");
+    } catch (error) {
+      onMessage(error instanceof Error ? error.message : "저장에 실패했습니다.");
+    } finally {
+      setTogglingPreview(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          className={`rounded-full px-3 py-1.5 text-sm ${
+            pageTab === "catalog" ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-700"
+          }`}
+          onClick={() => setPageTab("catalog")}
+        >
+          판매 상품
+        </button>
+        <button
+          type="button"
+          className={`rounded-full px-3 py-1.5 text-sm ${
+            pageTab === "gacha" ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-700"
+          }`}
+          onClick={() => setPageTab("gacha")}
+        >
+          확률성 아이템
+        </button>
+      </div>
+      {pageTab === "gacha" ? <GoldShopGachaAdminPanel onMessage={onMessage} costumes={costumes} /> : null}
+      {pageTab === "catalog" ? (
+    <>
       <label className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
         <span>
           골드상점 활성화
@@ -412,6 +459,21 @@ export default function GoldShopAdminPanel({ onMessage }: GoldShopAdminPanelProp
           checked={shopOn}
           disabled={togglingShop}
           onChange={(event) => void toggleGoldShop(event.target.checked)}
+        />
+      </label>
+      <label className="flex items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-950">
+        <span>
+          코스튬 미리보기
+          <span className="mt-0.5 block text-xs font-normal text-emerald-800">
+            상점의 코스튬 상품에서 학생증 착용 미리보기를 보여 줍니다.
+          </span>
+        </span>
+        <input
+          type="checkbox"
+          className="h-4 w-4"
+          checked={costumePreviewOn}
+          disabled={togglingPreview}
+          onChange={(event) => void toggleCostumePreview(event.target.checked)}
         />
       </label>
       <AdminCollapsibleSection title="물품 등록">
@@ -652,6 +714,8 @@ export default function GoldShopAdminPanel({ onMessage }: GoldShopAdminPanelProp
           {visibleRows.length === 0 ? <p className="text-sm text-gray-500">등록된 상품이 없습니다.</p> : null}
         </div>
       </AdminCollapsibleSection>
+    </>
+      ) : null}
     </div>
   );
 }

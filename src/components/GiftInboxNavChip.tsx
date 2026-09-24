@@ -9,6 +9,10 @@ import type { StudentRewardPublic } from "@/lib/student-rewards";
 import { isStudentRewardExpired } from "@/lib/student-rewards";
 import type { UserGift } from "@/lib/map-events";
 import { parseGiftPayload } from "@/lib/map-events";
+import GachaRevealOverlay, {
+  gachaRevealFromPull,
+  type GachaRevealState,
+} from "@/components/partnership/GachaRevealOverlay";
 import type { PublicCardFrameItem } from "@/data/cardFrames";
 import { requestStudentLoginModal } from "@/lib/site-student-auth-settings";
 import { studentAuthFetch } from "@/lib/student-session";
@@ -71,7 +75,7 @@ export default function GiftInboxNavChip({ hideChip = false }: GiftInboxNavChipP
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [swipeState, setSwipeState] = useState<{ itemId: string; startX: number; currentX: number } | null>(null);
-  const [activeTab, setActiveTab] = useState<"event" | "admin">("event");
+  const [gachaPlay, setGachaPlay] = useState<GachaRevealState | null>(null);
   const touchStartRef = useRef<{ itemId: string; startX: number } | null>(null);
 
   useEffect(() => {
@@ -171,6 +175,41 @@ export default function GiftInboxNavChip({ hideChip = false }: GiftInboxNavChipP
 
   async function claimEventGift(gift: UserGift) {
     if (!studentId || gift.is_claimed) {
+      return;
+    }
+    const parsed = parseGiftPayload(gift);
+    if (parsed.kind === "gacha") {
+      setBusyId(gift.id);
+      setMessage(null);
+      try {
+        const response = await studentAuthFetch("/api/season-pass/gacha-pull", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: studentId, studentId, giftId: gift.id }),
+        });
+        const payload = (await response.json()) as {
+          error?: string;
+          name?: string;
+          imageUrl?: string | null;
+          gifted?: boolean;
+          goldAmount?: number;
+          kind?: string;
+          fxEnabled?: boolean;
+          idleImageUrl?: string | null;
+          burstImageUrl?: string | null;
+        };
+        if (!response.ok) {
+          setMessage(payload.error || "상자를 열지 못했습니다.");
+          return;
+        }
+        setGachaPlay(gachaRevealFromPull(payload, gift.reward_name || "확률 상자"));
+        window.dispatchEvent(new Event("site-season-pass-refresh"));
+        await refresh();
+      } catch {
+        setMessage("상자를 열지 못했습니다.");
+      } finally {
+        setBusyId(null);
+      }
       return;
     }
     setBusyId(gift.id);
@@ -426,7 +465,7 @@ export default function GiftInboxNavChip({ hideChip = false }: GiftInboxNavChipP
     }
     setMessage(null);
     if (activeTab === "event") {
-      const pending = eventGifts.filter((item) => !item.is_claimed);
+      const pending = eventGifts.filter((item) => !item.is_claimed && parseGiftPayload(item).kind !== "gacha");
       for (const gift of pending) {
         await claimEventGift(gift);
       }
@@ -534,6 +573,13 @@ export default function GiftInboxNavChip({ hideChip = false }: GiftInboxNavChipP
                                   </p>
                                 );
                               }
+                              if (parsed.kind === "gacha") {
+                                return (
+                                  <p className="gift-inbox__msg">
+                                    {gift.is_claimed ? `${gift.reward_name} (열림)` : `${gift.reward_name} (확률 상자)`}
+                                  </p>
+                                );
+                              }
                               if (parsed.kind === "costume") {
                                 return (
                                   <p className="gift-inbox__msg">
@@ -559,7 +605,7 @@ export default function GiftInboxNavChip({ hideChip = false }: GiftInboxNavChipP
                                   disabled={busyId === gift.id}
                                   onClick={() => void claimEventGift(gift)}
                                 >
-                                  {busyId === gift.id ? "..." : "받기"}
+                                  {busyId === gift.id ? "..." : parseGiftPayload(gift).kind === "gacha" ? "열기" : "받기"}
                                 </button>
                               ) : (
                                 <span className="gift-inbox__claimed">완료</span>
@@ -720,6 +766,9 @@ export default function GiftInboxNavChip({ hideChip = false }: GiftInboxNavChipP
       ) : null}
       {modal}
       {deleteConfirmModal}
+      {gachaPlay ? (
+        <GachaRevealOverlay play={gachaPlay} onChange={setGachaPlay} onClose={() => setGachaPlay(null)} />
+      ) : null}
     </>
   );
 }

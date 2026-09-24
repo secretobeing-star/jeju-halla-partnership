@@ -121,6 +121,7 @@ import {
   partnerIdsInCustomCategories,
   pruneUserCustomCategories,
   saveUserCustomCategories,
+  hydrateUserCustomCategoriesFromServer,
   type UserCustomCategory,
 } from "@/lib/user-custom-categories";
 import { getPartnerSearchKeywordGroups } from "@/lib/partner-search-keywords";
@@ -771,6 +772,13 @@ export default function HomePage() {
     window.addEventListener(USER_CUSTOM_CATEGORIES_EVENT, refreshCustomCategories);
     return () => window.removeEventListener(USER_CUSTOM_CATEGORIES_EVENT, refreshCustomCategories);
   }, []);
+
+  useEffect(() => {
+    if (!memberStudentLoggedIn) {
+      return;
+    }
+    void hydrateUserCustomCategoriesFromServer();
+  }, [memberStudentLoggedIn]);
 
   useEffect(() => {
     function onOpenEditor(event: Event) {

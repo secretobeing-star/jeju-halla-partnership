@@ -93,6 +93,38 @@ export default function StudentIdProvider({
     return () => window.removeEventListener(SITE_MEMBER_SESSION_EVENT, refreshSession);
   }, [refreshSession]);
 
+  useEffect(() => {
+    const studentId = student?.studentId?.trim();
+    if (!studentId) {
+      return;
+    }
+    let cancelled = false;
+    void studentAuthFetch("/api/student/photo")
+      .then(async (response) => {
+        if (!response.ok) {
+          return;
+        }
+        const payload = (await response.json()) as { photoUrl?: string | null };
+        const photoUrl = payload.photoUrl?.trim() || "";
+        if (!photoUrl || cancelled) {
+          return;
+        }
+        const current = getSiteMemberSession()?.student;
+        if (!current || current.photoUrl === photoUrl) {
+          return;
+        }
+        const next: SiteMemberStudentProfile = { ...current, photoUrl };
+        patchSiteMemberStudentProfile(next);
+        setStudent(next);
+      })
+      .catch(() => {
+        // 로컬 세션 사진 유지
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [student?.studentId]);
+
   const startStudentAuth = useCallback(() => {
     if (!authDisplay.enabled) {
       return;
@@ -278,13 +310,12 @@ export default function StudentIdProvider({
                 const payload = (await response.json().catch(() => null)) as {
                   error?: string;
                 } | null;
-                throw new Error(payload?.error || "시트에 사진을 저장하지 못했습니다.");
+                throw new Error(payload?.error || "학생증 사진을 저장하지 못했습니다.");
               }
             } catch (error) {
-              // 로컬 카드에는 반영된 상태로 두고, 시트 실패만 상위로 전달
               throw error instanceof Error
                 ? error
-                : new Error("시트에 사진을 저장하지 못했습니다.");
+                : new Error("학생증 사진을 저장하지 못했습니다.");
             }
           }}
         />

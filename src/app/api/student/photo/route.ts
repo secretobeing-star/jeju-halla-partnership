@@ -3,12 +3,32 @@ import {
   loadStudentSheetsConfigFromDb,
   updateStudentApprovalPhoto,
 } from "@/lib/google-sheets-student";
+import {
+  loadStudentCardPhotoUrl,
+  saveStudentCardPhotoUrl,
+} from "@/lib/student-card-settings-server";
 import { requireStudentSession } from "@/lib/student-session-server";
 
 type PhotoBody = {
   studentId?: string;
   photoUrl?: string;
 };
+
+export async function GET(request: Request) {
+  const auth = await requireStudentSession(request);
+  if (!auth.ok) {
+    return auth.response;
+  }
+
+  try {
+    const photoUrl = await loadStudentCardPhotoUrl(auth.studentId);
+    return NextResponse.json({ ok: true, photoUrl });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "학생증 사진을 불러오지 못했습니다.";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
 
 export async function POST(request: Request) {
   let body: PhotoBody;
@@ -32,29 +52,22 @@ export async function POST(request: Request) {
     );
   }
 
-  const config = await loadStudentSheetsConfigFromDb();
-  if (!config) {
-    return NextResponse.json(
-      {
-        error:
-          "구글 시트 스프레드시트 ID가 설정되지 않았습니다. 관리자에서 시트 연동을 확인해 주세요.",
-      },
-      { status: 503 },
-    );
-  }
-
   try {
-    const updated = await updateStudentApprovalPhoto(config, studentId, photoUrl);
-    if (!updated) {
-      return NextResponse.json(
-        { error: "승인 시트에서 해당 학번을 찾지 못했습니다." },
-        { status: 404 },
-      );
-    }
+    await saveStudentCardPhotoUrl(studentId, photoUrl);
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : "사진 URL을 시트에 저장하지 못했습니다.";
-    return NextResponse.json({ error: message }, { status: 500 });
+      error instanceof Error ? error.message : "학생증 사진을 저장하지 못했습니다.";
+    const status = message.includes("sql") ? 503 : 500;
+    return NextResponse.json({ error: message }, { status });
+  }
+
+  const config = await loadStudentSheetsConfigFromDb();
+  if (config) {
+    try {
+      await updateStudentApprovalPhoto(config, studentId, photoUrl);
+    } catch {
+      // 시트는 보조 저장. 서버 저장이 됐으면 기기 연동은 유지.
+    }
   }
 
   return NextResponse.json({ ok: true, photoUrl });

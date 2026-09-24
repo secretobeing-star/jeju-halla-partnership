@@ -338,16 +338,9 @@ export default function FrameInventoryNavChip({
                       {/* 프레임 정보 및 착용 버튼 */}
                       <div className="w-full pt-2.5 mt-2 border-t border-gray-100 text-center">
                         <div className="mb-2">
-                          <div className="flex items-center justify-center gap-1.5">
-                            <h4 className="font-bold text-gray-900 text-xs sm:text-sm">
-                              {currentPreview?.name || "기본 학생증"}
-                            </h4>
-                            {currentPreview && state.sources[currentPreview.id] ? (
-                              <span className="px-1.5 py-0.5 text-[9px] font-medium rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200">
-                                {state.sources[currentPreview.id] === "event" ? "이벤트" : "지급"}
-                              </span>
-                            ) : null}
-                          </div>
+                          <h4 className="font-bold text-gray-900 text-xs sm:text-sm">
+                            {currentPreview?.name || "기본 학생증"}
+                          </h4>
                           {currentPreview?.description ? (
                             <p className="text-[11px] text-gray-400 truncate mt-0.5">
                               {currentPreview.description}

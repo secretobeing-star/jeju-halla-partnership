@@ -363,24 +363,51 @@ export async function PATCH(request: NextRequest) {
 
   try {
     if (entity === "gold_shop") {
-      const enabled = Boolean(body.gold_shop_enabled);
       let seasons = await listSeasons(admin);
-      if (enabled && seasons.length === 0) {
-        seasons = await ensureShopCatalogSeason(admin);
-      }
-      if (seasons.length > 0) {
-        const now = new Date().toISOString();
-        for (const season of seasons) {
-          const seasonId = String(season.id ?? "");
-          if (!seasonId) continue;
-          const { error } = await admin
-            .from("seasons")
-            .update({ gold_shop_enabled: enabled, updated_at: now })
-            .eq("id", seasonId);
-          if (error) throw error;
+      if (body.gold_shop_enabled !== undefined) {
+        const enabled = Boolean(body.gold_shop_enabled);
+        if (enabled && seasons.length === 0) {
+          seasons = await ensureShopCatalogSeason(admin);
         }
-        seasons = await listSeasons(admin);
+        if (seasons.length > 0) {
+          const now = new Date().toISOString();
+          for (const season of seasons) {
+            const seasonId = String(season.id ?? "");
+            if (!seasonId) continue;
+            const { error } = await admin
+              .from("seasons")
+              .update({ gold_shop_enabled: enabled, updated_at: now })
+              .eq("id", seasonId);
+            if (error) throw error;
+          }
+        }
       }
+      if (body.costume_preview_enabled !== undefined) {
+        const previewEnabled = Boolean(body.costume_preview_enabled);
+        if (seasons.length === 0) {
+          seasons = await listSeasons(admin);
+        }
+        if (seasons.length > 0) {
+          const now = new Date().toISOString();
+          for (const season of seasons) {
+            const seasonId = String(season.id ?? "");
+            if (!seasonId) continue;
+            const { error } = await admin
+              .from("seasons")
+              .update({ costume_preview_enabled: previewEnabled, updated_at: now })
+              .eq("id", seasonId);
+            if (error) {
+              if (error.message.includes("costume_preview_enabled")) {
+                throw new Error(
+                  "코스튬 미리보기 설정 컬럼이 없습니다. supabase/season-pass-costume-preview.sql 을 실행해 주세요.",
+                );
+              }
+              throw error;
+            }
+          }
+        }
+      }
+      seasons = await listSeasons(admin);
       return NextResponse.json({ ok: true, seasons });
     }
 
@@ -417,24 +444,30 @@ export async function PATCH(request: NextRequest) {
         "premium_original_price_gold",
         "premium_badge_label",
         "gold_shop_enabled",
+        "costume_preview_enabled",
         "sort_order",
       ]) {
         if (body[key] !== undefined) {
-          patch[key] = key === "gold_shop_enabled" ? Boolean(body[key]) : body[key];
+          patch[key] =
+            key === "gold_shop_enabled" || key === "costume_preview_enabled"
+              ? Boolean(body[key])
+              : body[key];
         }
       }
       const { error } = await admin.from("seasons").update(patch).eq("id", id);
       if (error) {
-        const missing =
+          const missing =
           error.message.includes("gold_icon_url") ||
           error.message.includes("claimed_check_image_url") ||
           error.message.includes("premium_original_price_gold") ||
-          error.message.includes("premium_badge_label");
+          error.message.includes("premium_badge_label") ||
+          error.message.includes("costume_preview_enabled");
         if (missing) {
           delete patch.gold_icon_url;
           delete patch.claimed_check_image_url;
           delete patch.premium_original_price_gold;
           delete patch.premium_badge_label;
+          delete patch.costume_preview_enabled;
           const retry = await admin.from("seasons").update(patch).eq("id", id);
           if (retry.error) throw retry.error;
         } else {

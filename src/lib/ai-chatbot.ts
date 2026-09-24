@@ -3,7 +3,7 @@ import { parsePartnerRegion } from "@/lib/partner-regions";
 export const AI_CHATBOT_PROVIDERS = ["openai", "gemini"] as const;
 export type AiChatbotProvider = (typeof AI_CHATBOT_PROVIDERS)[number];
 
-export type AiChatbotLessonKind = "answer" | "recommend" | "search" | "events" | "board";
+export type AiChatbotLessonKind = "answer" | "recommend" | "search" | "events" | "board" | "season" | "shop";
 
 export type AiChatbotLesson = {
   id: string;
@@ -35,7 +35,7 @@ export type AiChatbotPublicConfig = {
   icon_url: string | null;
 };
 
-export type ChatbotCardOpenKind = "partner" | "season" | "map" | "site" | "board";
+export type ChatbotCardOpenKind = "partner" | "season" | "shop" | "map" | "site" | "board";
 
 export type ChatbotPartnerCard = {
   id: string;
@@ -64,6 +64,7 @@ export type ChatbotReply = {
   cards?: ChatbotPartnerCard[];
   taught?: boolean;
   missedPartnerQuery?: string;
+  openPopup?: "season" | "shop";
 };
 
 export type ChatbotLiveEventLine = {
@@ -89,7 +90,16 @@ const CHOICE_PAGE = 6;
 const CARD_PAGE = 4;
 
 export function asAiChatbotLessonKind(value: unknown): AiChatbotLessonKind {
-  if (value === "recommend" || value === "search" || value === "events" || value === "board") return value;
+  if (
+    value === "recommend" ||
+    value === "search" ||
+    value === "events" ||
+    value === "board" ||
+    value === "season" ||
+    value === "shop"
+  ) {
+    return value;
+  }
   return "answer";
 }
 
@@ -170,6 +180,10 @@ export function requestOpenChatbotCard(card: ChatbotPartnerCard) {
   const kind = card.openKind ?? "partner";
   if (kind === "season") {
     window.dispatchEvent(new Event("site-season-pass-open"));
+    return;
+  }
+  if (kind === "shop") {
+    window.dispatchEvent(new Event("site-gold-shop-open"));
     return;
   }
   if (kind === "map") {
@@ -614,6 +628,113 @@ export function formatBoardReply(question: string): ChatbotReply {
   }
 
   return { text, cards, taught: true };
+}
+
+function chatbotHowToQuestion(compact: string) {
+  return includesAny(compact, [
+    "어떻게",
+    "어케",
+    "사용법",
+    "쓰는법",
+    "하는법",
+    "모으",
+    "획득",
+    "얻는법",
+    "레벨업",
+    "경험치",
+  ]);
+}
+
+export function isSeasonPassPopupQuestion(question: string) {
+  const compact = compactText(question);
+  if (!compact || chatbotHowToQuestion(compact)) return false;
+  if (includesAny(compact, ["비밀번호", "패스워드", "password"])) return false;
+  if (includesAny(compact, ["골드상점", "골드샵", "골상점"])) return false;
+  if (
+    includesAny(compact, [
+      "시즌패스열어",
+      "시즌패스보여",
+      "시즌패스창",
+      "시즌패스팝업",
+      "패스열어",
+      "패스보여",
+      "패스창",
+      "패스팝업",
+    ])
+  ) {
+    return true;
+  }
+  if (compact === "시즌패스" || compact === "시즌빠스" || compact === "시즌패쓰") return true;
+  return (
+    includesAny(compact, ["시즌패스", "시즌빠스", "시즌패쓰"]) &&
+    includesAny(compact, ["열어", "보여", "창", "팝업", "켜", "실행"])
+  );
+}
+
+export function isGoldShopPopupQuestion(question: string) {
+  const compact = compactText(question);
+  if (!compact || chatbotHowToQuestion(compact)) return false;
+  if (
+    includesAny(compact, [
+      "골드상점열어",
+      "골드상점보여",
+      "골드상점창",
+      "골드상점팝업",
+      "골드샵열어",
+      "골드샵보여",
+      "상점열어",
+      "상점보여",
+      "상점창",
+      "상점팝업",
+    ])
+  ) {
+    return true;
+  }
+  if (compact === "골드상점" || compact === "골드샵" || compact === "골상점") return true;
+  return (
+    includesAny(compact, ["골드상점", "골드샵", "골상점"]) &&
+    includesAny(compact, ["열어", "보여", "창", "팝업", "켜", "실행"])
+  );
+}
+
+export function formatSeasonPassPopupReply(): ChatbotReply {
+  return {
+    text: "시즌패스를 엽니다. 아래 카드를 눌러도 같은 창이 열립니다.",
+    cards: [
+      {
+        id: "season-pass",
+        name: "시즌패스 열기",
+        category: "시즌패스",
+        region: "",
+        benefit: "눌러서 시즌패스 보기",
+        address: "",
+        image_url: null,
+        openKind: "season",
+      },
+    ],
+    taught: true,
+    openPopup: "season",
+  };
+}
+
+export function formatGoldShopPopupReply(): ChatbotReply {
+  return {
+    text: "골드상점을 엽니다. 아래 카드를 눌러도 같은 창이 열립니다.",
+    cards: [
+      {
+        id: "gold-shop",
+        name: "골드상점 열기",
+        category: "골드상점",
+        region: "",
+        benefit: "눌러서 골드상점 보기",
+        address: "",
+        image_url: null,
+        openKind: "shop",
+      },
+    ],
+    taught: true,
+    openPopup: "shop",
+  };
 }
 
 export function chatbotNeedsLiveEvents(
@@ -1619,7 +1740,8 @@ function siteGuideReply(question: string): ChatbotReply | null {
     ])
   ) {
     return {
-      text: "시즌패스는 로그인 후 메뉴에서 열 수 있습니다. 제휴 방문·출석으로 경험치와 골드를 모으고, 레벨 보상을 받을 수 있습니다. 지금 열린 패스 이름·기간은 「현재 진행중인 이벤트」로 물어보세요.",
+      text: "시즌패스는 로그인 후 메뉴에서 열 수 있습니다. 제휴 방문·출석으로 경험치와 골드를 모으고, 레벨 보상을 받을 수 있습니다. 아래 카드로 시즌패스를 열어 드립니다.",
+      cards: formatSeasonPassPopupReply().cards,
     };
   }
   if (includesAny(compact, ["선물함", "받은선물", "선물확인", "쿠폰함"])) {
@@ -1629,7 +1751,8 @@ function siteGuideReply(question: string): ChatbotReply | null {
   }
   if (includesAny(compact, ["골드", "상점", "코스튬", "구입", "구매", "골드샵", "골드상점", "옷입"])) {
     return {
-      text: "골드상점은 로그인 후 상점 메뉴에서 이용할 수 있습니다. 모은 골드로 패스·코스튬·쿠폰을 살 수 있습니다.",
+      text: "골드상점은 로그인 후 상점 메뉴에서 이용할 수 있습니다. 모은 골드로 패스·코스튬·쿠폰을 살 수 있습니다. 아래 카드로 골드상점을 열어 드립니다.",
+      cards: formatGoldShopPopupReply().cards,
     };
   }
   if (includesAny(compact, ["도장", "스탬프", "지도이벤트", "완주", "찍는법", "도장찍"])) {
@@ -1710,6 +1833,12 @@ function applyChatbotLessons(
   if (best.kind === "board") {
     return formatBoardReply(question);
   }
+  if (best.kind === "season") {
+    return formatSeasonPassPopupReply();
+  }
+  if (best.kind === "shop") {
+    return formatGoldShopPopupReply();
+  }
   if (best.kind === "recommend") {
     const key = asRecoKey(best.reco) ?? "hangout";
     return { ...recommendCards(partners, key, 0, undefined, false, detectMentionedRegion(question, partners)), taught: true };
@@ -1735,6 +1864,14 @@ export function buildChatbotReply(
   if (!intent && lessons.length > 0) {
     const taught = applyChatbotLessons(question, partners, lessons, liveEvents);
     if (taught) return taught;
+  }
+
+  if (!intent && isGoldShopPopupQuestion(question)) {
+    return formatGoldShopPopupReply();
+  }
+
+  if (!intent && isSeasonPassPopupQuestion(question)) {
+    return formatSeasonPassPopupReply();
   }
 
   if (!intent && isLiveEventsQuestion(question)) {

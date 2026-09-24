@@ -229,3 +229,67 @@ export async function revokeStudentCardFrameOnServer(studentId: string, frameId:
     }
   }
 }
+
+function isMissingPhotoColumn(error: { message?: string; code?: string } | null) {
+  const message = error?.message?.toLowerCase() ?? "";
+  return message.includes("photo_url") && (message.includes("column") || message.includes("schema"));
+}
+
+/** 학생증 사진 URL — 기기 간 동기화 */
+export async function loadStudentCardPhotoUrl(studentId: string): Promise<string | null> {
+  const db = getDb();
+  const id = studentId.trim();
+  if (!db || !id) {
+    return null;
+  }
+
+  const { data, error } = await db
+    .from("site_student_card_settings")
+    .select("photo_url")
+    .eq("student_id", id)
+    .maybeSingle();
+
+  if (error) {
+    if (isMissingPhotoColumn(error)) {
+      return null;
+    }
+    throw error;
+  }
+
+  const url = typeof data?.photo_url === "string" ? data.photo_url.trim() : "";
+  return url || null;
+}
+
+export async function saveStudentCardPhotoUrl(studentId: string, photoUrl: string): Promise<string> {
+  const db = getDb();
+  if (!db) {
+    throw new Error("Supabase 서버 설정이 없습니다.");
+  }
+
+  const id = studentId.trim();
+  const nextPhoto = photoUrl.trim();
+  if (!id || !nextPhoto) {
+    throw new Error("학번과 사진 URL이 필요합니다.");
+  }
+
+  const payload = {
+    student_id: id,
+    photo_url: nextPhoto,
+    updated_at: new Date().toISOString(),
+  };
+
+  const { error } = await db.from("site_student_card_settings").upsert(payload, {
+    onConflict: "student_id",
+  });
+
+  if (error) {
+    if (isMissingPhotoColumn(error)) {
+      throw new Error(
+        "학생증 사진 동기화 컬럼이 없습니다. supabase/site-student-card-photo.sql 을 실행해 주세요.",
+      );
+    }
+    throw error;
+  }
+
+  return nextPhoto;
+}

@@ -279,7 +279,7 @@ export async function POST(request: NextRequest) {
       : process.env.OPENAI_API_KEY?.trim() || "");
 
   const hasStructured = Boolean(
-    structured.choices?.length || structured.cards?.length || structured.moreIntent,
+    structured.choices?.length || structured.cards?.length || structured.moreIntent || structured.openPopup,
   );
 
   if (apiKey && !hasStructured && !intent && !structured.taught) {
@@ -312,5 +312,6 @@ ${context}`;
     hasMore: Boolean(structured.hasMore),
     moreIntent: structured.moreIntent ?? null,
     cards: structured.cards ?? [],
+    openPopup: structured.openPopup ?? null,
   });
 }

@@ -108,25 +108,35 @@ export type UserGift = {
 };
 
 export const GIFT_COUPON_PREFIX = "coupon:";
+export const GIFT_GACHA_PREFIX = "gacha:";
 
 export function encodeGiftCouponValue(code: string) {
   return `${GIFT_COUPON_PREFIX}${code.trim()}`;
 }
 
+export function encodeGiftGachaValue(boxId: string) {
+  return `${GIFT_GACHA_PREFIX}${boxId.trim()}`;
+}
+
 export function parseGiftPayload(gift: Pick<UserGift, "frame_css_value">): {
-  kind: "costume" | "coupon" | "other";
+  kind: "costume" | "coupon" | "gacha" | "other";
   frameId: string | null;
   couponCode: string | null;
+  gachaBoxId: string | null;
 } {
   const raw = String(gift.frame_css_value ?? "").trim();
   if (!raw) {
-    return { kind: "other", frameId: null, couponCode: null };
+    return { kind: "other", frameId: null, couponCode: null, gachaBoxId: null };
+  }
+  if (raw.startsWith(GIFT_GACHA_PREFIX)) {
+    const gachaBoxId = raw.slice(GIFT_GACHA_PREFIX.length).trim();
+    return { kind: gachaBoxId ? "gacha" : "other", frameId: null, couponCode: null, gachaBoxId: gachaBoxId || null };
   }
   if (raw.startsWith(GIFT_COUPON_PREFIX)) {
     const couponCode = raw.slice(GIFT_COUPON_PREFIX.length).trim();
-    return { kind: couponCode ? "coupon" : "other", frameId: null, couponCode: couponCode || null };
+    return { kind: couponCode ? "coupon" : "other", frameId: null, couponCode: couponCode || null, gachaBoxId: null };
   }
-  return { kind: "costume", frameId: raw, couponCode: null };
+  return { kind: "costume", frameId: raw, couponCode: null, gachaBoxId: null };
 }
 
 export function parseStepProbabilities(value: unknown, maxStamps: number): number[] {

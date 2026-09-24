@@ -655,7 +655,16 @@
   justify-content: center;
   min-height: 5.4rem;
   padding: 0.35rem;
+  border: 0;
+  width: 100%;
+  color: inherit;
+  font: inherit;
   background: radial-gradient(circle at 50% 40%, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.08));
+  cursor: default;
+}
+
+.season-pass-shop__art:not(:disabled) {
+  cursor: pointer;
 }
 
 .season-pass-shop__art img,
@@ -739,6 +748,24 @@
   background: linear-gradient(180deg, #ffe27a, #f0c43a);
   color: #5a3a10;
   font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.season-pass-shop__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.season-pass-shop__preview {
+  margin: 0 0.35rem;
+  border: 1px solid #9bb6d4;
+  border-radius: 0.22rem;
+  padding: 0.24rem 0.4rem;
+  background: #f4f8fd;
+  color: #2a4a72;
+  font-size: 0.74rem;
   font-weight: 800;
   cursor: pointer;
 }
@@ -1263,6 +1290,188 @@
 .season-pass-shop-receipt.is-short .season-pass-shop-receipt__actions button.is-primary {
   border-color: #c24b4b;
   background: linear-gradient(180deg, #e98a8a, #c24b4b);
+}
+
+.season-pass-gacha {
+  width: min(22rem, calc(100vw - 2rem));
+  border-radius: 0.8rem;
+  background: #0f172a;
+  color: #fff;
+  padding: 1rem 1rem 1.1rem;
+  text-align: center;
+}
+
+.season-pass-gacha__hint {
+  margin: 0 0 0.7rem;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.season-pass-gacha__tap,
+.season-pass-gacha__burst {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 12rem;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.season-pass-gacha__tap img,
+.season-pass-gacha__burst img,
+.season-pass-gacha > img {
+  max-width: 100%;
+  max-height: 16rem;
+  object-fit: contain;
+}
+
+.season-pass-gacha h3 {
+  margin: 0 0 0.6rem;
+  font-size: 1.05rem;
+}
+
+.season-pass-gacha p {
+  margin: 0.35rem 0 0;
+  font-weight: 700;
+}
+
+.season-pass-gacha__sub {
+  color: #cbd5e1;
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+.season-pass-gacha__actions {
+  display: flex;
+  justify-content: center;
+  gap: 0.45rem;
+  margin-top: 0.9rem;
+}
+
+.season-pass-gacha__actions button {
+  border: 1px solid #64748b;
+  border-radius: 0.4rem;
+  padding: 0.4rem 0.75rem;
+  background: #1e293b;
+  color: #fff;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.season-pass-gacha__actions button.is-primary {
+  border-color: #3d78c7;
+  background: linear-gradient(180deg, #6ea4ea, #3d78c7);
+}
+
+.season-pass-shop-preview {
+  width: min(22rem, calc(100vw - 2rem));
+  border-radius: 0.7rem;
+  background: #fff;
+  box-shadow: 0 18px 40px rgb(15 23 42 / 0.28);
+  padding: 0.85rem 0.9rem 0.95rem;
+}
+
+.season-pass-shop-preview__head {
+  margin: 0 0 0.7rem;
+  color: #163a6b;
+  font-size: 0.95rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.season-pass-shop-preview__card {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 1.62 / 1;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.85rem;
+  background: linear-gradient(180deg, #fff, #f3f7fb);
+}
+
+.season-pass-shop-preview__frame {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  pointer-events: none;
+}
+
+.season-pass-shop-preview__inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  height: 100%;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.7rem 0.85rem;
+}
+
+.season-pass-shop-preview__photo {
+  display: flex;
+  width: 30%;
+  aspect-ratio: 3 / 4;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.7rem;
+  background: #f3f4f6;
+  color: #9ca3af;
+  font-size: 0.72rem;
+}
+
+.season-pass-shop-preview__photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.season-pass-shop-preview__meta {
+  min-width: 0;
+}
+
+.season-pass-shop-preview__meta span {
+  display: block;
+  color: #065f46;
+  font-size: 0.62rem;
+  font-weight: 800;
+}
+
+.season-pass-shop-preview__meta strong {
+  display: block;
+  margin: 0.15rem 0 0.35rem;
+  color: #111827;
+  font-size: 0.95rem;
+}
+
+.season-pass-shop-preview__meta p {
+  margin: 0;
+  color: #4b5563;
+  font-size: 0.72rem;
+}
+
+.season-pass-shop-preview__meta b {
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.season-pass-shop-preview > button {
+  display: block;
+  width: 100%;
+  margin-top: 0.75rem;
+  border: 1px solid #3d78c7;
+  border-radius: 0.35rem;
+  padding: 0.45rem 0.6rem;
+  background: linear-gradient(180deg, #6ea4ea, #3d78c7);
+  color: #fff;
+  font-size: 0.86rem;
+  font-weight: 800;
+  cursor: pointer;
 }
 
 .gold-shop__balance {

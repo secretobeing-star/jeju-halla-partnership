@@ -38,10 +38,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "선물을 찾을 수 없습니다." }, { status: 404 });
   }
 
+  const parsed = parseGiftPayload({
+    frame_css_value: String(gift.frame_css_value ?? ""),
+  });
+  if (parsed.kind === "gacha") {
+    return NextResponse.json(
+      { error: "확률 상자는 선물함에서 열기를 눌러 주세요." },
+      { status: 400 },
+    );
+  }
+
   if (gift.is_claimed) {
-    const parsed = parseGiftPayload({
-      frame_css_value: String(gift.frame_css_value ?? ""),
-    });
     return NextResponse.json({
       ok: true,
       alreadyClaimed: true,
@@ -62,10 +69,6 @@ export async function POST(request: NextRequest) {
   if (updateError) {
     return NextResponse.json({ error: updateError.message }, { status: 500 });
   }
-
-  const parsed = parseGiftPayload({
-    frame_css_value: String(gift.frame_css_value ?? ""),
-  });
   if (parsed.kind === "costume" && parsed.frameId) {
     await admin.from("user_frames").insert({
       user_id: userId,

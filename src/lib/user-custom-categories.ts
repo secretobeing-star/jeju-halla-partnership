@@ -48,6 +48,72 @@ function normalizeCategory(raw: unknown): UserCustomCategory | null {
   return { id, label, partnerIds };
 }
 
+function sanitizeCategoryList(items: readonly unknown[]): UserCustomCategory[] {
+  const seen = new Set<string>();
+  const categories: UserCustomCategory[] = [];
+  for (const item of items) {
+    const category = normalizeCategory(item);
+    if (!category || seen.has(category.id)) {
+      continue;
+    }
+    seen.add(category.id);
+    categories.push(category);
+    if (categories.length >= MAX_CATEGORIES) {
+      break;
+    }
+  }
+  return categories;
+}
+
+export function normalizeUserCustomCategoryList(items: unknown): UserCustomCategory[] {
+  return Array.isArray(items) ? sanitizeCategoryList(items) : [];
+}
+
+export function mergeUserCustomCategories(
+  local: readonly UserCustomCategory[],
+  remote: readonly UserCustomCategory[],
+): UserCustomCategory[] {
+  const byId = new Map<string, UserCustomCategory>();
+  for (const item of remote) {
+    const category = normalizeCategory(item);
+    if (category) {
+      byId.set(category.id, category);
+    }
+  }
+
+  for (const item of local) {
+    const category = normalizeCategory(item);
+    if (!category) {
+      continue;
+    }
+
+    const existing =
+      byId.get(category.id) ??
+      [...byId.values()].find((entry) => entry.label === category.label);
+
+    if (!existing) {
+      byId.set(category.id, category);
+      continue;
+    }
+
+    const seen = new Set(existing.partnerIds);
+    const partnerIds = [...existing.partnerIds];
+    for (const partnerId of category.partnerIds) {
+      if (!seen.has(partnerId)) {
+        seen.add(partnerId);
+        partnerIds.push(partnerId);
+      }
+    }
+    byId.set(existing.id, {
+      ...existing,
+      label: existing.label || category.label,
+      partnerIds,
+    });
+  }
+
+  return sanitizeCategoryList([...byId.values()]);
+}
+
 export function customCategoryValue(id: string) {
   return `${USER_CUSTOM_CATEGORY_PREFIX}${id}`;
 }
@@ -78,24 +144,7 @@ export function loadUserCustomCategories(): UserCustomCategory[] {
       return [];
     }
     const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    const seen = new Set<string>();
-    const categories: UserCustomCategory[] = [];
-    for (const item of parsed) {
-      const category = normalizeCategory(item);
-      if (!category || seen.has(category.id)) {
-        continue;
-      }
-      seen.add(category.id);
-      categories.push(category);
-      if (categories.length >= MAX_CATEGORIES) {
-        break;
-      }
-    }
-    return categories;
+    return normalizeUserCustomCategoryList(parsed);
   } catch {
     return [];
   }
@@ -155,22 +204,63 @@ export function saveUserCustomCategories(next: UserCustomCategory[]) {
     return;
   }
 
-  const seen = new Set<string>();
-  const categories: UserCustomCategory[] = [];
-  for (const item of next) {
-    const category = normalizeCategory(item);
-    if (!category || seen.has(category.id)) {
-      continue;
-    }
-    seen.add(category.id);
-    categories.push(category);
-    if (categories.length >= MAX_CATEGORIES) {
-      break;
-    }
-  }
-
+  const categories = sanitizeCategoryList(next);
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(categories));
   window.dispatchEvent(new CustomEvent(USER_CUSTOM_CATEGORIES_EVENT));
+  void syncUserCustomCategoriesToServer(categories);
+}
+
+async function syncUserCustomCategoriesToServer(categories: UserCustomCategory[]) {
+  try {
+    const { getSiteMemberSession } = await import("@/lib/site-member-session");
+    const { studentAuthFetch } = await import("@/lib/student-session");
+    const userId = getSiteMemberSession()?.student?.studentId?.trim();
+    if (!userId) {
+      return;
+    }
+    await studentAuthFetch("/api/custom-categories", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, categories }),
+    });
+  } catch {
+    // 로컬 저장은 유지
+  }
+}
+
+export async function hydrateUserCustomCategoriesFromServer(): Promise<UserCustomCategory[] | null> {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const { getSiteMemberSession } = await import("@/lib/site-member-session");
+    const { studentAuthFetch } = await import("@/lib/student-session");
+    const userId = getSiteMemberSession()?.student?.studentId?.trim();
+    if (!userId) {
+      return null;
+    }
+
+    const response = await studentAuthFetch(
+      `/api/custom-categories?userId=${encodeURIComponent(userId)}`,
+    );
+    if (!response.ok) {
+      return null;
+    }
+    const payload = (await response.json()) as { categories?: unknown };
+    const remote = normalizeUserCustomCategoryList(payload.categories);
+    const local = loadUserCustomCategories();
+    const merged = mergeUserCustomCategories(local, remote);
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+    window.dispatchEvent(new CustomEvent(USER_CUSTOM_CATEGORIES_EVENT));
+    const remoteJson = JSON.stringify(remote);
+    if (JSON.stringify(merged) !== remoteJson) {
+      void syncUserCustomCategoriesToServer(merged);
+    }
+    return merged;
+  } catch {
+    return null;
+  }
 }
 
 export function pruneUserCustomCategories(

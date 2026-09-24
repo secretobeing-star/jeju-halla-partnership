@@ -37,7 +37,8 @@ export type UploadFolder =
   | "ai-chatbot"
   | "push-notifications"
   | "pwa-icons"
-  | "map-marker-settings";
+  | "map-marker-settings"
+  | "gold-shop-gacha";
 
 export const ALLOWED_UPLOAD_FOLDERS = new Set<string>([
   "banners",
@@ -79,6 +80,7 @@ export const ALLOWED_UPLOAD_FOLDERS = new Set<string>([
   "push-notifications",
   "pwa-icons",
   "map-marker-settings",
+  "gold-shop-gacha",
 ]);
 
 export const PUBLIC_BOARD_UPLOAD_FOLDERS = new Set([

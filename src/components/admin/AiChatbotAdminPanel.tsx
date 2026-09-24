@@ -313,6 +313,8 @@ export default function AiChatbotAdminPanel({ onMessage }: AiChatbotAdminPanelPr
                     <option value="search">제휴 검색</option>
                     <option value="events">진행 중 이벤트 안내</option>
                     <option value="board">게시판 열기</option>
+                    <option value="season">시즌패스 열기</option>
+                    <option value="shop">골드상점 열기</option>
                   </select>
                 </label>
                 {lesson.kind === "events" ? (
@@ -325,6 +327,14 @@ export default function AiChatbotAdminPanel({ onMessage }: AiChatbotAdminPanelPr
                     게시판 팝업을 안내하고, 카드를 누르면 게시판(글쓰기 문장이면 글쓰기)을 엽니다. 기본 학습
                     (게시판·글쓰기·댓글·신고·목록·리스트 등)은 이미 들어 있습니다. 여기에는 추가로 알아듣게 할 말만
                     넣으면 됩니다.
+                  </p>
+                ) : lesson.kind === "season" ? (
+                  <p className="mt-2 text-xs leading-5 text-gray-500">
+                    시즌패스 팝업을 바로 엽니다. 문구를 따로 적을 필요는 없습니다.
+                  </p>
+                ) : lesson.kind === "shop" ? (
+                  <p className="mt-2 text-xs leading-5 text-gray-500">
+                    골드상점 팝업을 바로 엽니다. 문구를 따로 적을 필요는 없습니다.
                   </p>
                 ) : lesson.kind === "recommend" ? (
                   <label className="mt-2 block text-xs text-gray-500">
