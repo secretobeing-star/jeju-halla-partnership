@@ -317,6 +317,11 @@ export default function BoardSection({
       return;
     }
 
+    const form = document.getElementById("board-write-form");
+    window.requestAnimationFrame(() => {
+      form?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+    });
+
     let cancelled = false;
 
     void fetchBoardWriteAccess(getBoardVoterKey()).then(async (access) => {
@@ -1510,12 +1515,12 @@ export default function BoardSection({
             detail={renderBoardSplitDetailPane()}
           />
         ) : (
-          <>
+          <div className="board-section-scroll">
             {renderBoardTabs()}
             <div className={showBoardTabletSplit ? "p-2 sm:p-3" : compactLayout ? "p-3 sm:p-5" : "p-4 sm:p-5"}>
               {renderBoardMasterContent()}
             </div>
-          </>
+          </div>
         ))}
 
       {showBoardPostModal && selectedPost ? (

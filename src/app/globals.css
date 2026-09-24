@@ -1287,6 +1287,15 @@ html.mobile-pc-mode {
   outline: none;
 }
 
+@media (max-width: 640px) {
+  .rich-editor {
+    max-height: min(50dvh, 22rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
 @media (min-width: 640px) {
   .rich-editor {
     font-size: 1rem;
@@ -3522,7 +3531,9 @@ body > .board-post-popup-overlay ~ .board-post-popup-overlay {
 .board-post-popup-dialog--swipeable .board-comments textarea,
 .board-post-popup-dialog--swipeable .partner-reviews,
 .board-post-popup-dialog--swipeable .tablet-split-layout__master,
-.board-post-popup-dialog--swipeable .board-community-list {
+.board-post-popup-dialog--swipeable .board-community-list,
+.board-post-popup-dialog--swipeable .board-section-scroll,
+.board-post-popup-dialog--swipeable #board-write-form {
   touch-action: pan-y;
 }
 
@@ -3680,6 +3691,16 @@ body > .board-post-popup-overlay ~ .board-post-popup-overlay {
 .board-section--popup:not(.board-section--popup-split) > .board-section-header + * ,
 .board-section--popup:not(.board-section--popup-split) > div:not(.board-section-header) {
   min-height: 0;
+}
+
+.board-section-scroll {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
 }
 
 .board-section--popup-split .board-section-split-layout {

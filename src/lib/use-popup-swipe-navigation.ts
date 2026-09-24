@@ -22,6 +22,8 @@ const SWIPE_BLOCK_SELECTOR = [
   ".site-event-comments",
   ".tablet-split-layout__master",
   ".board-community-list",
+  "#board-write-form",
+  ".board-section-scroll",
 ].join(", ");
 
 type UsePopupSwipeNavigationOptions = {
