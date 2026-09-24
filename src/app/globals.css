@@ -11709,23 +11709,93 @@ html.pwa-fold-tablet-lg.dark-mode .tablet-split-detail-pane {
   border: 0;
 }
 
+.gift-inbox__header {
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.gift-inbox__tabs {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: auto;
+}
+
+.gift-inbox__tab {
+  position: relative;
+  border: 0;
+  border-radius: 0.7rem 0.7rem 0 0;
+  background: #ece4f7;
+  color: #5b4a78;
+  font-size: 0.8rem;
+  font-weight: 800;
+  padding: 0.4rem 0.7rem;
+  cursor: pointer;
+}
+
+.gift-inbox__tab--on {
+  background: #7c5cbf;
+  color: #fff;
+}
+
+.gift-inbox__tab em {
+  margin-left: 0.25rem;
+  font-style: normal;
+  font-size: 0.68rem;
+}
+
+.gift-inbox__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.7rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 0.7rem;
+  background: #efe8f8;
+}
+
+.gift-inbox__hint {
+  flex: 1;
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #5b4a78;
+  line-height: 1.35;
+}
+
+.gift-inbox__claim-all {
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 0.65rem;
+  background: #7c5cbf;
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 800;
+  padding: 0.4rem 0.7rem;
+  cursor: pointer;
+}
+
+.gift-inbox__claim-all:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 .gift-inbox__list,
 .frame-inventory__grid {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 0.75rem;
+  gap: 0.55rem;
 }
 
 .gift-inbox__item {
   display: flex;
-  gap: 0.75rem;
-  align-items: center;
-  padding: 0.65rem;
-  border: 1px solid #e5e7eb;
+  align-items: stretch;
+  padding: 0;
+  border: 1px solid #ddd3ef;
   border-radius: 0.75rem;
-  background: #fff;
+  background: #f7f3fc;
   touch-action: pan-y;
   position: relative;
   overflow: hidden;
@@ -11733,17 +11803,57 @@ html.pwa-fold-tablet-lg.dark-mode .tablet-split-detail-pane {
 
 .gift-inbox__card {
   display: flex;
-  gap: 0.75rem;
-  align-items: center;
+  flex-direction: column;
+  gap: 0.35rem;
   width: 100%;
+  padding: 0.55rem 0.65rem 0.6rem;
+}
+
+.gift-inbox__row-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.gift-inbox__sender {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #4c3d6e;
+}
+
+.gift-inbox__remain {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #7c5cbf;
+  white-space: nowrap;
+}
+
+.gift-inbox__row-main {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.gift-inbox__mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex-shrink: 0;
+  border-radius: 0.45rem;
+  background: #fff;
+  color: #7c5cbf;
+  box-shadow: inset 0 0 0 1px #e4daf6;
 }
 
 .gift-inbox__thumb {
-  width: 3rem;
-  height: 3rem;
+  width: 2.65rem;
+  height: 2.65rem;
   object-fit: contain;
   border-radius: 0.5rem;
-  background: #f3f4f6;
+  background: #fff;
   flex-shrink: 0;
 }
 
@@ -11751,7 +11861,7 @@ html.pwa-fold-tablet-lg.dark-mode .tablet-split-detail-pane {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #059669;
+  color: #7c5cbf;
 }
 
 .gift-inbox__title {
@@ -11770,9 +11880,11 @@ html.pwa-fold-tablet-lg.dark-mode .tablet-split-detail-pane {
 
 .gift-inbox__msg,
 .gift-inbox__meta {
-  margin: 0.15rem 0 0;
-  font-size: 0.75rem;
-  color: #6b7280;
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #4b3f63;
+  line-height: 1.4;
 }
 
 .gift-inbox__body {
@@ -11780,14 +11892,31 @@ html.pwa-fold-tablet-lg.dark-mode .tablet-split-detail-pane {
   min-width: 0;
 }
 
+.gift-inbox__prize {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.28rem;
+  flex-shrink: 0;
+}
+
 .gift-inbox__claim {
   flex-shrink: 0;
+  border: 0;
   border-radius: 0.55rem;
-  background: #059669;
+  background: #7c5cbf;
   color: #fff;
-  font-size: 0.8rem;
-  font-weight: 700;
-  padding: 0.4rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 800;
+  padding: 0.28rem 0.7rem;
+  min-width: 2.65rem;
+  cursor: pointer;
+}
+
+.gift-inbox__claimed {
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: #9ca3af;
 }
 
 .gift-inbox__actions {
@@ -11818,7 +11947,7 @@ html.pwa-fold-tablet-lg.dark-mode .tablet-split-detail-pane {
 .gift-inbox__feedback {
   margin: 0.75rem 0 0;
   font-size: 0.85rem;
-  color: #047857;
+  color: #5b4a78;
 }
 
 .frame-inventory__grid {

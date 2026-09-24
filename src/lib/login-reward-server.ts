@@ -15,6 +15,7 @@ import {
   serializeLoginRewardWeekdays,
   type LoginRewardSettings,
 } from "@/lib/login-reward";
+import { resolveRewardExpiresAt } from "@/lib/student-rewards";
 
 export async function loadLoginRewardSettings(): Promise<LoginRewardSettings> {
   const admin = createSupabaseAdmin();
@@ -146,6 +147,8 @@ export async function claimDailyLoginReward(
   if (!claimedOn) {
     return { claimed: false as const, reason: "not-yet" };
   }
+
+  const expiresAt = resolveRewardExpiresAt({ validDays: settings.giftValidDays });
   const { error } = await admin.from("site_login_reward_claims").insert({
     student_id: studentId,
     claimed_on: claimedOn,
@@ -178,6 +181,7 @@ export async function claimDailyLoginReward(
       message: "접속 보상입니다. 선물함에서 받아 주세요.",
       status: "pending",
       created_by: "login-reward",
+      expires_at: expiresAt,
     });
   }
   if (settings.costumeFrameId) {
@@ -191,6 +195,7 @@ export async function claimDailyLoginReward(
       message: "접속 보상입니다. 선물함에서 받아 주세요.",
       status: "pending",
       created_by: "login-reward",
+      expires_at: expiresAt,
     });
   }
   if (settings.couponCode) {
@@ -204,6 +209,7 @@ export async function claimDailyLoginReward(
       message: "접속 보상입니다. 선물함에서 받아 주세요.",
       status: "pending",
       created_by: "login-reward",
+      expires_at: expiresAt,
     });
   }
 
@@ -216,8 +222,10 @@ export async function claimDailyLoginReward(
       throw new Error(
         inboxError.message.includes("site_student_rewards")
           ? "보상 테이블이 없습니다. supabase/site-student-rewards.sql 을 실행해 주세요."
-          : inboxError.message.includes("gold_amount") || inboxError.message.includes("coupon_code")
+            : inboxError.message.includes("gold_amount") || inboxError.message.includes("coupon_code")
             ? "보상 종류 컬럼이 없습니다. supabase/site-student-rewards.sql 을 다시 실행해 주세요."
+            : inboxError.message.includes("expires_at")
+              ? "유효 기간 컬럼이 없습니다. supabase/site-student-rewards.sql 을 다시 실행해 주세요."
             : inboxError.message,
       );
     }
@@ -349,6 +357,7 @@ export function loginRewardSettingsToRow(body: Partial<LoginRewardSettings>) {
     start_date: String(body.startDate ?? "").trim() || null,
     end_date: String(body.endDate ?? "").trim() || null,
     weekdays: weekdays || null,
+    gift_valid_days: Math.max(0, Math.floor(Number(body.giftValidDays) || 0)),
     updated_at: new Date().toISOString(),
   };
 }

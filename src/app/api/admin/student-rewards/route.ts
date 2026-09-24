@@ -12,7 +12,7 @@ import {
   findCardFrameById,
   loadCardFrameCatalogFromDb,
 } from "@/lib/student-card-frames";
-import { parseStudentIds } from "@/lib/student-rewards";
+import { parseStudentIds, resolveRewardExpiresAt } from "@/lib/student-rewards";
 
 export async function GET(request: NextRequest) {
   const auth = await adminAuthMiddleware(request, "settings");
@@ -103,6 +103,8 @@ export async function POST(request: NextRequest) {
     title?: string;
     message?: string;
     reason?: string;
+    validDays?: number | string;
+    expiresAt?: string | null;
   };
   try {
     body = (await request.json()) as typeof body;
@@ -172,6 +174,10 @@ export async function POST(request: NextRequest) {
         : `코스튬 보상 · ${frameName}`);
   const message = body.message?.trim() || "";
   const reason = body.reason?.trim() || message || title;
+  const expiresAt = resolveRewardExpiresAt({
+    validDays: body.validDays,
+    expiresAt: body.expiresAt,
+  });
   const adminId = auth.user.id;
   const adminName =
     (typeof auth.user.user_metadata?.full_name === "string" &&
@@ -190,6 +196,7 @@ export async function POST(request: NextRequest) {
     message: message || null,
     status: "pending",
     created_by: auth.email,
+    expires_at: expiresAt,
   }));
 
   const { data, error } = await supabase
@@ -204,6 +211,8 @@ export async function POST(request: NextRequest) {
           ? "보상 테이블이 없습니다. Supabase에서 site-student-rewards.sql을 실행해 주세요."
           : error.message.includes("coupon_code") || error.message.includes("gold_amount")
             ? "보상 종류 컬럼이 없습니다. supabase/site-student-rewards.sql 을 다시 실행해 주세요."
+            : error.message.includes("expires_at")
+              ? "유효 기간 컬럼이 없습니다. supabase/site-student-rewards.sql 을 다시 실행해 주세요."
             : error.message,
       },
       { status: 500 },

@@ -99,6 +99,12 @@ export default function StudentRecoveryAdminPanel() {
   const [goldAmount, setGoldAmount] = useState("0");
   const [message, setMessage] = useState<string | null>(null);
   const [data, setData] = useState<RecoveryPayload | null>(null);
+  const [confirm, setConfirm] = useState<{
+    kind: string;
+    id?: string;
+    amount?: number;
+    label: string;
+  } | null>(null);
 
   async function loadStudent(id: string) {
     const payload = (await adminApiFetch(
@@ -142,7 +148,14 @@ export default function StudentRecoveryAdminPanel() {
           : kind === "stamp" || kind === "stamp-all"
             ? "도장 진행도를 초기화할까요?"
             : "이 항목을 회수할까요? 학생 계정에서 바로 사라집니다.";
-    if (!window.confirm(label)) return;
+    setConfirm({ kind, id, amount, label });
+  }
+
+  async function confirmReclaim() {
+    if (!confirm) return;
+    const student = data?.studentId || studentId.trim();
+    if (!student) return;
+    const { kind, id, amount } = confirm;
     const actionKey = `${kind}:${id ?? amount ?? "gold"}`;
     setActing(actionKey);
     setMessage(null);
@@ -152,6 +165,7 @@ export default function StudentRecoveryAdminPanel() {
         body: JSON.stringify({ studentId: student, kind, id, amount }),
       })) as { error?: string };
       if (payload.error) throw new Error(payload.error);
+      setConfirm(null);
       await loadStudent(student);
       setMessage("회수했습니다.");
     } catch (error) {
@@ -469,6 +483,34 @@ export default function StudentRecoveryAdminPanel() {
               </ul>
             )}
           </section>
+        </div>
+      ) : null}
+
+      {confirm ? (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl">
+            <h3 className="text-lg font-semibold text-gray-900">회수 확인</h3>
+            <p className="mt-2 text-sm text-gray-600">{confirm.label}</p>
+            <p className="mt-1 text-xs text-gray-500">이 작업은 학생 계정에서 바로 반영됩니다.</p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirm(null)}
+                disabled={Boolean(acting)}
+                className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 disabled:opacity-50"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmReclaim()}
+                disabled={Boolean(acting)}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {acting ? "회수 중..." : "회수"}
+              </button>
+            </div>
+          </div>
         </div>
       ) : null}
     </AdminCollapsibleSection>

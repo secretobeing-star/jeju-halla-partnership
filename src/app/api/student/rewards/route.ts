@@ -6,6 +6,7 @@ import {
   toPublicCardFrame,
 } from "@/lib/student-card-frames";
 import type { StudentRewardPublic, StudentRewardRow } from "@/lib/student-rewards";
+import { isStudentRewardExpired } from "@/lib/student-rewards";
 import { requireStudentSession } from "@/lib/student-session-server";
 
 export async function GET(request: NextRequest) {
@@ -64,13 +65,16 @@ export async function GET(request: NextRequest) {
         status: claimed ? "claimed" : "pending",
         createdAt: row.created_at,
         claimedAt: row.claimed_at,
+        expiresAt: row.expires_at ?? null,
       };
     },
   );
 
   return NextResponse.json({
     rewards,
-    pendingCount: rewards.filter((r) => r.status === "pending").length,
+    pendingCount: rewards.filter(
+      (r) => r.status === "pending" && !isStudentRewardExpired(r.expiresAt),
+    ).length,
   });
 }
 

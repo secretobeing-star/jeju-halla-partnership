@@ -15,6 +15,7 @@ export type LoginRewardSettings = {
   endDate: string;
   weekdays: number[];
   lastDispatchedOn: string;
+  giftValidDays: number;
 };
 
 export const DEFAULT_LOGIN_REWARD: LoginRewardSettings = {
@@ -32,6 +33,7 @@ export const DEFAULT_LOGIN_REWARD: LoginRewardSettings = {
   endDate: "",
   weekdays: [],
   lastDispatchedOn: "",
+  giftValidDays: 7,
 };
 
 export const LOGIN_REWARD_WEEKDAY_LABELS = [
@@ -159,5 +161,6 @@ export function mapLoginRewardSettings(row: Record<string, unknown> | null): Log
     endDate: asYmd(row.end_date),
     weekdays: parseLoginRewardWeekdays(row.weekdays),
     lastDispatchedOn: asYmd(row.last_dispatched_on),
+    giftValidDays: Math.max(0, Math.floor(Number(row.gift_valid_days) || 0)),
   };
 }

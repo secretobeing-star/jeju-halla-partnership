@@ -21,7 +21,8 @@ alter table if exists public.site_login_reward_settings
   add column if not exists start_date date,
   add column if not exists end_date date,
   add column if not exists weekdays text,
-  add column if not exists last_dispatched_on date;
+  add column if not exists last_dispatched_on date,
+  add column if not exists gift_valid_days integer not null default 7;
 
 insert into public.site_login_reward_settings (id)
 values (1)

@@ -6,6 +6,7 @@ import { useAppBackHandler } from "@/lib/app-back-stack";
 import { getSiteMemberSession, SITE_MEMBER_SESSION_EVENT } from "@/lib/site-member-session";
 import { grantCardFrameUnlock } from "@/lib/student-card-frames";
 import type { StudentRewardPublic } from "@/lib/student-rewards";
+import { isStudentRewardExpired } from "@/lib/student-rewards";
 import type { UserGift } from "@/lib/map-events";
 import { parseGiftPayload } from "@/lib/map-events";
 import type { PublicCardFrameItem } from "@/data/cardFrames";
@@ -390,6 +391,55 @@ export default function GiftInboxNavChip({ hideChip = false }: GiftInboxNavChipP
     }
   };
 
+  const eventPendingCount = eventGifts.filter((item) => !item.is_claimed).length;
+  const adminPendingCount = rewards.filter(
+    (item) => item.status === "pending" && !isStudentRewardExpired(item.expiresAt),
+  ).length;
+  const currentPendingCount = activeTab === "event" ? eventPendingCount : adminPendingCount;
+
+  function formatRemainLabel(createdAt: string, claimed: boolean, expiresAt?: string | null) {
+    if (claimed) {
+      return "수령 완료";
+    }
+    const end = expiresAt
+      ? new Date(expiresAt).getTime()
+      : new Date(createdAt).getTime() + 7 * 24 * 60 * 60 * 1000;
+    const diff = end - Date.now();
+    if (diff <= 0) {
+      return "유효 기간 만료";
+    }
+    const days = Math.floor(diff / 86_400_000);
+    const hours = Math.floor((diff % 86_400_000) / 3_600_000);
+    const minutes = Math.floor((diff % 3_600_000) / 60_000);
+    if (days > 0) {
+      return `남은시간 ${days}일${hours}시간${minutes}분`;
+    }
+    if (hours > 0) {
+      return `남은시간 ${hours}시간${minutes}분`;
+    }
+    return `남은시간 ${minutes}분`;
+  }
+
+  async function claimAllInTab() {
+    if (busyId || currentPendingCount === 0) {
+      return;
+    }
+    setMessage(null);
+    if (activeTab === "event") {
+      const pending = eventGifts.filter((item) => !item.is_claimed);
+      for (const gift of pending) {
+        await claimEventGift(gift);
+      }
+      return;
+    }
+      const pending = rewards.filter(
+        (item) => item.status === "pending" && !isStudentRewardExpired(item.expiresAt),
+      );
+    for (const reward of pending) {
+      await claim(reward);
+    }
+  }
+
   const modal =
     mounted && open
       ? createPortal(
@@ -401,22 +451,24 @@ export default function GiftInboxNavChip({ hideChip = false }: GiftInboxNavChipP
               aria-label="선물함"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="site-event-dialog__header">
+              <div className="site-event-dialog__header gift-inbox__header">
                 <h2 className="site-event-dialog__title">선물함</h2>
-                <div className="flex gap-2 ml-auto">
+                <div className="gift-inbox__tabs">
                   <button
                     type="button"
-                    className={`px-3 py-1 text-sm rounded-lg ${activeTab === "event" ? "bg-emerald-600 text-white" : "bg-gray-200 text-gray-700"}`}
+                    className={`gift-inbox__tab ${activeTab === "event" ? "gift-inbox__tab--on" : ""}`}
                     onClick={() => setActiveTab("event")}
                   >
                     이벤트
+                    {eventPendingCount > 0 ? <em>{eventPendingCount}</em> : null}
                   </button>
                   <button
                     type="button"
-                    className={`px-3 py-1 text-sm rounded-lg ${activeTab === "admin" ? "bg-emerald-600 text-white" : "bg-gray-200 text-gray-700"}`}
+                    className={`gift-inbox__tab ${activeTab === "admin" ? "gift-inbox__tab--on" : ""}`}
                     onClick={() => setActiveTab("admin")}
                   >
-                    관리자
+                    선물함
+                    {adminPendingCount > 0 ? <em>{adminPendingCount}</em> : null}
                   </button>
                   <button type="button" className="site-event-close" onClick={close} aria-label="닫기">
                     <CloseIcon className="h-5 w-5" />
@@ -428,9 +480,24 @@ export default function GiftInboxNavChip({ hideChip = false }: GiftInboxNavChipP
                   <p className="site-event-tab-empty">로그인(학번) 후 이용할 수 있습니다.</p>
                 ) : loading ? (
                   <p className="site-event-tab-empty">불러오는 중...</p>
-                ) : (activeTab === "event" ? eventGifts : rewards).length === 0 ? (
-                  <p className="site-event-tab-empty">받은 선물이 없습니다.</p>
                 ) : (
+                  <>
+                    <div className="gift-inbox__toolbar">
+                      <p className="gift-inbox__hint">
+                        이벤트와 선물함 보상을 구분해서 모두 받을 수 있습니다
+                      </p>
+                      <button
+                        type="button"
+                        className="gift-inbox__claim-all"
+                        disabled={busyId !== null || currentPendingCount === 0}
+                        onClick={() => void claimAllInTab()}
+                      >
+                        모두받기
+                      </button>
+                    </div>
+                    {(activeTab === "event" ? eventGifts : rewards).length === 0 ? (
+                      <p className="site-event-tab-empty">받은 선물이 없습니다.</p>
+                    ) : (
                   <ul className="gift-inbox__list">
                     {activeTab === "event" ? eventGifts.map((gift) => (
                       <li 
@@ -445,70 +512,59 @@ export default function GiftInboxNavChip({ hideChip = false }: GiftInboxNavChipP
                         }}
                       >
                         <div className="gift-inbox__card">
-                          {gift.reward_img ? (
-                            <img src={gift.reward_img} alt="" className="gift-inbox__thumb" />
-                          ) : (
-                            <span className="gift-inbox__thumb gift-inbox__thumb--empty">
-                              <GiftIcon className="h-6 w-6" />
+                          <div className="gift-inbox__row-top">
+                            <span className="gift-inbox__sender">이벤트</span>
+                            <span className="gift-inbox__remain">
+                              {formatRemainLabel(gift.created_at, gift.is_claimed)}
                             </span>
-                          )}
-                          <div className="gift-inbox__body">
-                            <p className="gift-inbox__title">{gift.reward_name}</p>
+                          </div>
+                          <div className="gift-inbox__row-main">
+                            <span className="gift-inbox__mark" aria-hidden>
+                              <GiftIcon className="h-5 w-5" />
+                            </span>
+                            <div className="gift-inbox__body">
                             {(() => {
                               const parsed = parseGiftPayload(gift);
                               if (parsed.kind === "coupon") {
                                 return (
-                                  <>
-                                    <p className="gift-inbox__description" style={{ whiteSpace: "pre-line" }}>
-                                      {gift.is_claimed && parsed.couponCode
-                                        ? `쿠폰 코드: ${parsed.couponCode}`
-                                        : "쿠폰이 포함되어 있습니다. 받으면 코드가 표시됩니다."}
-                                    </p>
-                                    <p className="gift-inbox__msg">
-                                      {gift.reward_name.includes("상점 구매")
-                                        ? "상점 구매"
-                                        : "시즌패스·이벤트 쿠폰"}
-                                    </p>
-                                  </>
+                                  <p className="gift-inbox__msg">
+                                    {gift.is_claimed && parsed.couponCode
+                                      ? `쿠폰 코드: ${parsed.couponCode}`
+                                      : `${gift.reward_name} (쿠폰)`}
+                                  </p>
                                 );
                               }
                               if (parsed.kind === "costume") {
                                 return (
-                                  <>
-                                    <p className="gift-inbox__description" style={{ whiteSpace: "pre-line" }}>
-                                      코스튬 프레임이 포함되어 있습니다.
-                                    </p>
-                                    <p className="gift-inbox__msg">받기 전까지 보관함에 들어가지 않습니다</p>
-                                  </>
+                                  <p className="gift-inbox__msg">
+                                    {gift.reward_name} (코스튬)
+                                  </p>
                                 );
                               }
-                              return <p className="gift-inbox__msg">선물함 보상</p>;
+                              return <p className="gift-inbox__msg">{gift.reward_name}</p>;
                             })()}
-                            <p className="gift-inbox__meta">
-                              {gift.is_claimed ? "수령 완료" : "미수령"} ·{" "}
-                              {new Date(gift.created_at).toLocaleDateString("ko-KR")}
-                            </p>
-                          </div>
-                          <div className="gift-inbox__actions">
-                            {!gift.is_claimed ? (
-                              <button
-                                type="button"
-                                className="gift-inbox__claim"
-                                disabled={busyId === gift.id}
-                                onClick={() => void claimEventGift(gift)}
-                              >
-                                {busyId === gift.id ? "..." : "받기"}
-                              </button>
-                            ) : null}
-                            <button
-                              type="button"
-                              className="gift-inbox__delete"
-                              disabled={deletingId === gift.id}
-                              onClick={() => handleDeleteClick(gift.id)}
-                              title="삭제"
-                            >
-                              {deletingId === gift.id ? "..." : "×"}
-                            </button>
+                            </div>
+                            <div className="gift-inbox__prize">
+                              {gift.reward_img ? (
+                                <img src={gift.reward_img} alt="" className="gift-inbox__thumb" />
+                              ) : (
+                                <span className="gift-inbox__thumb gift-inbox__thumb--empty">
+                                  <GiftIcon className="h-6 w-6" />
+                                </span>
+                              )}
+                              {!gift.is_claimed ? (
+                                <button
+                                  type="button"
+                                  className="gift-inbox__claim"
+                                  disabled={busyId === gift.id}
+                                  onClick={() => void claimEventGift(gift)}
+                                >
+                                  {busyId === gift.id ? "..." : "받기"}
+                                </button>
+                              ) : (
+                                <span className="gift-inbox__claimed">완료</span>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </li>
@@ -525,66 +581,68 @@ export default function GiftInboxNavChip({ hideChip = false }: GiftInboxNavChipP
                         }}
                       >
                         <div className="gift-inbox__card">
-                          {reward.frameImageUrl ? (
-                            <img
-                              src={reward.frameImageUrl}
-                              alt=""
-                              className="gift-inbox__thumb"
-                            />
-                          ) : (
-                            <span className="gift-inbox__thumb gift-inbox__thumb--empty">
-                              <GiftIcon className="h-6 w-6" />
+                          <div className="gift-inbox__row-top">
+                            <span className="gift-inbox__sender">선물함</span>
+                            <span className="gift-inbox__remain">
+                              {formatRemainLabel(reward.createdAt, reward.status === "claimed", reward.expiresAt)}
                             </span>
-                          )}
-                          <div className="gift-inbox__body">
-                            <p className="gift-inbox__title">{reward.title}</p>
+                          </div>
+                          <div className="gift-inbox__row-main">
+                            <span className="gift-inbox__mark" aria-hidden>
+                              <GiftIcon className="h-5 w-5" />
+                            </span>
+                            <div className="gift-inbox__body">
                             {reward.rewardType === "gold" && reward.goldAmount ? (
-                              <p className="gift-inbox__description">
-                                골드 {reward.goldAmount.toLocaleString("ko-KR")}개가 포함되어 있습니다.
+                              <p className="gift-inbox__msg">
+                                골드 {reward.goldAmount.toLocaleString("ko-KR")}개
+                                {reward.title ? ` (${reward.title})` : ""}
                               </p>
                             ) : reward.rewardType === "coupon" ? (
-                              <p className="gift-inbox__description">
+                              <p className="gift-inbox__msg">
                                 {reward.couponCode
                                   ? `쿠폰 코드: ${reward.couponCode}`
-                                  : "쿠폰이 포함되어 있습니다. 받으면 코드가 표시됩니다."}
-                              </p>
-                            ) : reward.message ? (
-                              <p className="gift-inbox__description" style={{ whiteSpace: "pre-line" }}>
-                                {reward.message}
+                                  : `${reward.title || "쿠폰"}`}
                               </p>
                             ) : (
-                              <p className="gift-inbox__msg">코스튬이 포함되어 있습니다.</p>
+                              <p className="gift-inbox__msg">
+                                {reward.message?.trim() || reward.title || "코스튬 보상"}
+                              </p>
                             )}
-                            <p className="gift-inbox__meta">
-                              {reward.status === "claimed" ? "수령 완료" : "미수령"} ·{" "}
-                              {new Date(reward.createdAt).toLocaleDateString("ko-KR")}
-                            </p>
-                          </div>
-                          <div className="gift-inbox__actions">
-                            {reward.status === "pending" ? (
-                              <button
-                                type="button"
-                                className="gift-inbox__claim"
-                                disabled={busyId === reward.id}
-                                onClick={() => void claim(reward)}
-                              >
-                                {busyId === reward.id ? "..." : "받기"}
-                              </button>
-                            ) : null}
-                            <button
-                              type="button"
-                              className="gift-inbox__delete"
-                              disabled={deletingId === reward.id}
-                              onClick={() => handleDeleteClick(reward.id)}
-                              title="삭제"
-                            >
-                              {deletingId === reward.id ? "..." : "×"}
-                            </button>
+                            </div>
+                            <div className="gift-inbox__prize">
+                              {reward.frameImageUrl ? (
+                                <img
+                                  src={reward.frameImageUrl}
+                                  alt=""
+                                  className="gift-inbox__thumb"
+                                />
+                              ) : (
+                                <span className="gift-inbox__thumb gift-inbox__thumb--empty">
+                                  <GiftIcon className="h-6 w-6" />
+                                </span>
+                              )}
+                              {reward.status === "pending" && !isStudentRewardExpired(reward.expiresAt) ? (
+                                <button
+                                  type="button"
+                                  className="gift-inbox__claim"
+                                  disabled={busyId === reward.id}
+                                  onClick={() => void claim(reward)}
+                                >
+                                  {busyId === reward.id ? "..." : "받기"}
+                                </button>
+                              ) : reward.status === "claimed" ? (
+                                <span className="gift-inbox__claimed">완료</span>
+                              ) : (
+                                <span className="gift-inbox__claimed">만료</span>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </li>
                     ))}
                   </ul>
+                    )}
+                  </>
                 )}
                 {message ? <p className="gift-inbox__feedback">{message}</p> : null}
               </div>

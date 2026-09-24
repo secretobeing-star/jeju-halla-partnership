@@ -241,6 +241,24 @@ export default function LoginRewardAdminPanel({ settings }: LoginRewardAdminPane
                 {` 시작일 ${reward.startDate || "(미설정)"} ${formatLoginRewardTime(reward)} 이후, 학생당 1회만 선물함으로 갑니다.`}
               </p>
             </div>
+            <label className="block text-sm font-medium text-gray-700">
+              선물함 유효 기간 (일)
+              <input
+                type="number"
+                min={0}
+                value={reward.giftValidDays}
+                onChange={(event) =>
+                  setReward((prev) => ({
+                    ...prev,
+                    giftValidDays: Math.max(0, Math.floor(Number(event.target.value) || 0)),
+                  }))
+                }
+                className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 outline-none focus:border-emerald-500"
+              />
+              <span className="mt-1 block text-xs font-normal text-gray-500">
+                선물함에 들어간 뒤 이 기간이 지나면 받을 수 없습니다. 0이면 만료되지 않습니다.
+              </span>
+            </label>
           </div>
 
           <label className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 px-3 py-2 text-sm">

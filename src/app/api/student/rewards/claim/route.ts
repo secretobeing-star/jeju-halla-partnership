@@ -7,6 +7,7 @@ import {
   toPublicCardFrame,
 } from "@/lib/student-card-frames";
 import type { StudentRewardRow } from "@/lib/student-rewards";
+import { isStudentRewardExpired } from "@/lib/student-rewards";
 import { creditStudentGold } from "@/lib/season-pass-server";
 import { requireStudentSession } from "@/lib/student-session-server";
 
@@ -66,6 +67,10 @@ export async function POST(request: NextRequest) {
       couponCode: couponCode || null,
       frame: frame ? toPublicCardFrame(frame) : null,
     });
+  }
+
+  if (isStudentRewardExpired(row.expires_at)) {
+    return NextResponse.json({ error: "유효 기간이 지난 선물입니다." }, { status: 410 });
   }
 
   const claimedAt = new Date().toISOString();

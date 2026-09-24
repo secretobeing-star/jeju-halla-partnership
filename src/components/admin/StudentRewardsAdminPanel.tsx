@@ -29,6 +29,8 @@ export default function StudentRewardsAdminPanel({
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
   const [reason, setReason] = useState("");
+  const [validDays, setValidDays] = useState("7");
+  const [expiresAt, setExpiresAt] = useState("");
   const [busy, setBusy] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [recent, setRecent] = useState<StudentRewardRow[]>([]);
@@ -114,6 +116,8 @@ export default function StudentRewardsAdminPanel({
           title,
           message,
           reason,
+          validDays,
+          expiresAt: expiresAt || null,
         }),
       })) as {
         ok?: boolean;
@@ -373,6 +377,31 @@ export default function StudentRewardsAdminPanel({
             비우면 안내 문구·제목을 사유로 기록합니다. 관리자 ID·IP·브라우저 정보와 함께 저장됩니다.
           </span>
         </label>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block text-sm font-medium text-gray-700">
+            유효 기간 (일)
+            <input
+              type="number"
+              min={0}
+              value={validDays}
+              onChange={(e) => setValidDays(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-emerald-500"
+            />
+            <span className="mt-1 block text-xs font-normal text-gray-500">
+              0이면 만료되지 않습니다. 아래 날짜를 넣으면 날짜가 우선입니다.
+            </span>
+          </label>
+          <label className="block text-sm font-medium text-gray-700">
+            수령 마감 (선택)
+            <input
+              type="datetime-local"
+              value={expiresAt}
+              onChange={(e) => setExpiresAt(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-emerald-500"
+            />
+          </label>
+        </div>
 
         <button
           type="submit"

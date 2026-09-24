@@ -25,4 +25,7 @@ alter table public.site_student_rewards
 alter table public.site_student_rewards
   add column if not exists gold_amount integer;
 
+alter table public.site_student_rewards
+  add column if not exists expires_at timestamptz;
+
 notify pgrst, 'reload schema';
