@@ -93,10 +93,12 @@ export async function POST(request: NextRequest) {
       };
       const inserted = await admin.from("gold_shop_gacha_boxes").insert(payload).select("*").maybeSingle();
       if (inserted.error) {
-        const retryPayload = { ...payload };
-        delete retryPayload.open_place;
-        delete retryPayload.layout_count;
-        delete retryPayload.confirm_popup;
+        const {
+          open_place: _openPlace,
+          layout_count: _layoutCount,
+          confirm_popup: _confirmPopup,
+          ...retryPayload
+        } = payload;
         const retry = await admin.from("gold_shop_gacha_boxes").insert(retryPayload).select("*").maybeSingle();
         if (retry.error) {
           throw new Error(
@@ -192,10 +194,13 @@ export async function PATCH(request: NextRequest) {
       }
       const { error } = await admin.from("gold_shop_gacha_boxes").update(patch).eq("id", id);
       if (error) {
-        delete patch.open_place;
-        delete patch.layout_count;
-        delete patch.confirm_popup;
-        const retry = await admin.from("gold_shop_gacha_boxes").update(patch).eq("id", id);
+        const {
+          open_place: _openPlace,
+          layout_count: _layoutCount,
+          confirm_popup: _confirmPopup,
+          ...retryPatch
+        } = patch;
+        const retry = await admin.from("gold_shop_gacha_boxes").update(retryPatch).eq("id", id);
         if (retry.error) throw retry.error;
       }
       return NextResponse.json({ ok: true });
