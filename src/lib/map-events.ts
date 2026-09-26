@@ -34,6 +34,30 @@ export function parseStampRewardAmount(value: unknown, fallback: number) {
   return Math.floor(parsed);
 }
 
+export function stampRewardRange(
+  minValue: unknown,
+  maxValue: unknown,
+  fallback: number,
+) {
+  const min = parseStampRewardAmount(minValue ?? maxValue, fallback);
+  const max = parseStampRewardAmount(maxValue ?? minValue, fallback);
+  const low = Math.min(min, max);
+  const high = Math.max(min, max);
+  return { min: low, max: high };
+}
+
+export function rollStampRewardAmount(
+  minValue: unknown,
+  maxValue: unknown,
+  fallback: number,
+) {
+  const { min, max } = stampRewardRange(minValue, maxValue, fallback);
+  if (max <= min) {
+    return min;
+  }
+  return min + Math.floor(Math.random() * (max - min + 1));
+}
+
 export const MAP_EVENT_REWARD_TYPES = ["RANDOM_STEP", "GUARANTEED", "COMPLETION"] as const;
 export const MAP_EVENT_REWARD_CATEGORIES = ["CARD_SKIN", "CARD_STICKER", "COUPON"] as const;
 
@@ -62,6 +86,10 @@ export type MapEvent = {
   cooldown_minutes: number;
   stamp_exp: number;
   stamp_gold: number;
+  stamp_exp_min: number;
+  stamp_exp_max: number;
+  stamp_gold_min: number;
+  stamp_gold_max: number;
   stamp_active_img: string | null;
   stamp_inactive_img: string | null;
   marker_icon_img: string | null;

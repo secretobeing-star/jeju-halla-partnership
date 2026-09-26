@@ -173,6 +173,7 @@ import {
   getSiteLoadingMessage,
 } from "@/lib/site-loading-message";
 import { Partner, SiteEventWithTabs, SitePopup, SiteSettings, supabase } from "@/lib/supabase";
+import { subscribePartnersChanged } from "@/lib/partners-live";
 
 type PartnerListFilterContext = {
   searchQuery: string;
@@ -667,9 +668,7 @@ export default function HomePage() {
     if (data) {
       const nextPartners = data as Partner[];
       setPartners(nextPartners);
-      if (!options?.silent) {
-        setMapPartners(nextPartners);
-      }
+      setMapPartners(nextPartners);
     }
 
     if (!options?.silent) {
@@ -699,6 +698,41 @@ export default function HomePage() {
     }
 
     void loadPartners();
+  }, [settingsReady, loadPartners]);
+
+  useEffect(() => {
+    if (!settingsReady) {
+      return;
+    }
+
+    let debounceTimer: number | null = null;
+    const refreshQuietly = () => {
+      if (debounceTimer != null) {
+        window.clearTimeout(debounceTimer);
+      }
+      debounceTimer = window.setTimeout(() => {
+        debounceTimer = null;
+        void loadPartners({ silent: true });
+      }, 250);
+    };
+
+    const unsubscribeLive = subscribePartnersChanged(refreshQuietly);
+    const channel = supabase
+      .channel("public-partners-live")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "partners" },
+        refreshQuietly,
+      )
+      .subscribe();
+
+    return () => {
+      if (debounceTimer != null) {
+        window.clearTimeout(debounceTimer);
+      }
+      unsubscribeLive();
+      void supabase.removeChannel(channel);
+    };
   }, [settingsReady, loadPartners]);
 
   useEffect(() => {

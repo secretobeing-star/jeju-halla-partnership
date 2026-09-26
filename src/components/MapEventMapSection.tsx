@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import PartnerMainMapPanel from "@/components/PartnerMainMapPanel";
 import MapEventIntroModal from "@/components/MapEventIntroModal";
 import {
@@ -21,13 +22,34 @@ import { getBoardVoterKey } from "@/lib/board-voter";
 import { SITE_STUDENT_NEED_LOGIN_EVENT } from "@/lib/site-student-auth-settings";
 import { studentAuthFetch } from "@/lib/student-session";
 import { supabase } from "@/lib/supabase";
-import { notifyPublicSiteReload } from "@/lib/public-site-reload";
 import { OPEN_SITE_MAP_EVENT } from "@/lib/ai-chatbot";
 
 const DEFAULT_TAB_ID = "__default_partners__";
 const DEFAULT_STAMP_BAR_BG = "#ecfdf5";
 const DEFAULT_DISTANCE_ERROR_MSG = "제휴와의 거리가 {distance}m 남았습니다. 지정된 반경({radius}m) 내에서 도장을 찍어주세요.";
 const DEFAULT_LOGIN_REQUIRED_MSG = "로그인 후 이벤트 도장을 찍고 보상을 받을 수 있습니다. 로그인하시겠습니까?";
+
+function MapEventStatusChip({
+  children,
+  tone,
+  onClick,
+}: {
+  children: ReactNode;
+  tone: "green" | "dark";
+  onClick?: () => void;
+}) {
+  return (
+    <div
+      className={`map-event-status-chip map-event-status-chip--${tone}${
+        onClick ? " map-event-status-chip--clickable" : ""
+      }`}
+      onClick={onClick}
+      role={onClick ? "button" : undefined}
+    >
+      {children}
+    </div>
+  );
+}
 const DEFAULT_COOLDOWN_TITLE = "잠시 후 도장을 찍을 수 있어요";
 const DEFAULT_COOLDOWN_MSG = "시간이 조금 더 지난 후({remain})에 도장을 찍을 수 있어요!";
 const DEFAULT_TIMER_TEMPLATE = "다음 도장까지 {remain}";
@@ -103,7 +125,13 @@ type MapEventMapSectionProps = {
   onCustomCategoryBookmark?: (partnerId: string) => void;
 };
 
-type RewardModalState = {
+type GoldGrantModalState = {
+  gold: number;
+  exp: number;
+  goldBefore: number;
+  goldAfter: number;
+  goldIconUrl: string | null;
+};
   kind: "win" | "lose" | "completion" | "distance" | "login_required";
   title: string;
   body: string;
@@ -148,6 +176,8 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const [refreshing, setRefreshing] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [rewardModal, setRewardModal] = useState<RewardModalState | null>(null);
+  const [queuedRewardModal, setQueuedRewardModal] = useState<RewardModalState | null>(null);
+  const [goldGrantModal, setGoldGrantModal] = useState<GoldGrantModalState | null>(null);
   const [showIntroModal, setShowIntroModal] = useState(false);
   const [currentGeo, setCurrentGeo] = useState<{ latitude: number; longitude: number } | null>(null);
   
@@ -722,8 +752,9 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
       const popupKind = payload.popup || (payload.completion?.reached ? "completion" : (payload.giftCount ?? 0) > 0 ? "win" : "lose");
 
+      let nextReward: RewardModalState;
       if (popupKind === "completion") {
-        setRewardModal({
+        nextReward = {
           kind: "completion",
           title: config.completion_popup_title || "완주 보상",
           body: payload.messages?.completion || "완주 보상이 선물함으로 지급되었습니다!",
@@ -731,9 +762,9 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
           rewardName: payload.completion?.reward?.reward_name || null,
           rewardImg: payload.completion?.reward?.reward_img || null,
           showGiftButton: (payload.giftCount ?? 0) > 0,
-        });
+        };
       } else if (popupKind === "win") {
-        setRewardModal({
+        nextReward = {
           kind: "win",
           title: config.win_popup_title || "당첨",
           body: payload.messages?.win || "선물함으로 보상이 지급되었습니다!",
@@ -741,9 +772,9 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
           rewardName: payload.step?.reward?.reward_name || null,
           rewardImg: payload.step?.reward?.reward_img || null,
           showGiftButton: true,
-        });
+        };
       } else {
-        setRewardModal({
+        nextReward = {
           kind: "lose",
           title: "미당첨",
           body: payload.messages?.lose || "아쉽지만 이번엔 당첨되지 않았습니다.",
@@ -751,10 +782,35 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
           rewardName: null,
           rewardImg: null,
           showGiftButton: false,
+        };
+      }
+
+      const seasonVisit = payload.seasonPass as {
+        applied?: boolean;
+        visitGold?: number;
+        visitExp?: number;
+        goldBefore?: number;
+        goldAfter?: number;
+        goldIconUrl?: string | null;
+      } | undefined;
+      const gainedGold = Math.max(0, Number(seasonVisit?.visitGold) || 0);
+      const gainedExp = Math.max(0, Number(seasonVisit?.visitExp) || 0);
+      if (seasonVisit?.applied && (gainedGold > 0 || gainedExp > 0)) {
+        setGoldGrantModal({
+          gold: gainedGold,
+          exp: gainedExp,
+          goldBefore: Math.max(0, Number(seasonVisit.goldBefore) || 0),
+          goldAfter: Math.max(0, Number(seasonVisit.goldAfter) || 0),
+          goldIconUrl: seasonVisit.goldIconUrl ?? null,
         });
+        setQueuedRewardModal(nextReward);
+        setRewardModal(null);
+      } else {
+        setGoldGrantModal(null);
+        setQueuedRewardModal(null);
+        setRewardModal(nextReward);
       }
       window.dispatchEvent(new Event("site-stamp-progress-changed"));
-      notifyPublicSiteReload();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "도장 찍기에 실패했습니다.");
     } finally {
@@ -911,179 +967,41 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
 
           {message ? <p className="map-event-message">{message}</p> : null}
 
-          <div style={{ position: "relative", width: "100%", overflow: "visible" }}>
-            
-            {!isDefaultTab && activeEvent && !isCompleted && !rewardModal && !showIntroModal && (
-              isGuest ? (
-                <div
-                  onClick={openLoginModal}
-                  style={{
-                    position: "absolute",
-                    top: "16px",
-                    left: "50%",
-                    transform: "translateX(-50%)",
-                    zIndex: 20,
-                    backgroundColor: "#059669",
-                    color: "#ffffff",
-                    padding: "8px 18px",
-                    borderRadius: "9999px",
-                    fontSize: "13px",
-                    fontWeight: "700",
-                    boxShadow: "0 6px 16px rgba(5, 150, 105, 0.4)",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px",
-                    cursor: "pointer",
-                    border: "1px solid rgba(255, 255, 255, 0.2)",
-                  }}
-                >
-                  <span>🔒 로그인 후 도장을 찍을 수 있어요!</span>
-                </div>
-              ) : !hasFavorites ? (
-                <div
-                  style={{
-                    position: "absolute",
-                    top: "16px",
-                    left: "50%",
-                    transform: "translateX(-50%)",
-                    zIndex: 20,
-                    backgroundColor: "rgba(31, 41, 55, 0.95)",
-                    color: "#f9fafb",
-                    padding: "8px 18px",
-                    borderRadius: "9999px",
-                    fontSize: "12px",
-                    fontWeight: "600",
-                    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.25)",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px",
-                    pointerEvents: "none",
-                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  <span>❤️</span>
-                  <span>찜한 제휴가 없습니다. 제휴의 ❤️를 먼저 눌러주세요!</span>
-                </div>
-              ) : isTimerPaused ? (
-                <div
-                  style={{
-                    position: "absolute",
-                    top: "16px",
-                    left: "50%",
-                    transform: "translateX(-50%)",
-                    zIndex: 20,
-                    backgroundColor: "rgba(31, 41, 55, 0.95)",
-                    color: "#f9fafb",
-                    padding: "8px 18px",
-                    borderRadius: "9999px",
-                    fontSize: "12px",
-                    fontWeight: "600",
-                    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.25)",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px",
-                    pointerEvents: "none",
-                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  <span>⏸️</span>
-                  <span>주변 제휴처를 찾을 수 없어 타이머가 일시정지되었습니다.</span>
-                </div>
-              ) : nearestUnstampedPartnerInside ? (
-                cooldownRemainMs > 0 ? (
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: "16px",
-                      left: "50%",
-                      transform: "translateX(-50%)",
-                      zIndex: 20,
-                      backgroundColor: "rgba(17, 24, 39, 0.92)",
-                      color: "#ffffff",
-                      padding: "8px 18px",
-                      borderRadius: "9999px",
-                      fontSize: "13px",
-                      fontWeight: "700",
-                      boxShadow: "0 6px 16px rgba(0, 0, 0, 0.3)",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                      pointerEvents: "none",
-                      border: "1px solid rgba(255, 255, 255, 0.15)",
-                    }}
-                  >
-                    <span>⏰</span>
-                    <span>{timerBadgeText}</span>
-                  </div>
-                ) : isReadyToStamp ? (
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: "16px",
-                      left: "50%",
-                      transform: "translateX(-50%)",
-                      zIndex: 20,
-                      backgroundColor: "#059669",
-                      color: "#ffffff",
-                      padding: "8px 18px",
-                      borderRadius: "9999px",
-                      fontSize: "13px",
-                      fontWeight: "700",
-                      boxShadow: "0 6px 16px rgba(5, 150, 105, 0.4)",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                      pointerEvents: "none",
-                      border: "1px solid rgba(255, 255, 255, 0.2)",
-                    }}
-                  >
-                    <span>지금 바로 도장을 찍어보세요!</span>
-                  </div>
-                ) : null
-              ) : (
-                <div
-                  style={{
-                    position: "absolute",
-                    top: "16px",
-                    left: "50%",
-                    transform: "translateX(-50%)",
-                    zIndex: 20,
-                    backgroundColor: "rgba(31, 41, 55, 0.95)",
-                    color: "#f9fafb",
-                    padding: "8px 18px",
-                    borderRadius: "9999px",
-                    fontSize: "12px",
-                    fontWeight: "600",
-                    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.25)",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px",
-                    pointerEvents: "none",
-                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  <span>📍</span>
-                  <span>
+          <PartnerMainMapPanel
+            key={`${activeTabId}:${tabMarkerSettings?.topIconImg ?? ""}:${tabMarkerSettings?.borderColor ?? ""}`}
+            {...props}
+            onSearchReset={props.onSearchReset ? handleMapSearchReset : undefined}
+            markerSettings={tabMarkerSettings}
+            partners={visiblePartners}
+            favoriteCountdownEndAt={activeEvent?.end_at ?? null}
+            statusOverlay={
+              !isDefaultTab && activeEvent && !isCompleted && !rewardModal && !showIntroModal ? (
+                isGuest ? (
+                  <MapEventStatusChip tone="green" onClick={openLoginModal}>
+                    로그인 후 도장을 찍을 수 있어요!
+                  </MapEventStatusChip>
+                ) : !hasFavorites ? (
+                  <MapEventStatusChip tone="dark">찜한 제휴가 없습니다. 제휴의 하트를 먼저 눌러주세요!</MapEventStatusChip>
+                ) : isTimerPaused ? (
+                  <MapEventStatusChip tone="dark">주변 제휴처를 찾을 수 없어 타이머가 일시정지되었습니다.</MapEventStatusChip>
+                ) : nearestUnstampedPartnerInside ? (
+                  cooldownRemainMs > 0 ? (
+                    <MapEventStatusChip tone="dark">
+                      {timerBadgeText}
+                    </MapEventStatusChip>
+                  ) : isReadyToStamp ? (
+                    <MapEventStatusChip tone="green">지금 바로 도장을 찍어보세요!</MapEventStatusChip>
+                  ) : null
+                ) : (
+                  <MapEventStatusChip tone="dark">
                     {nearestTargetPartner
                       ? `${nearestTargetPartner.partner.name} (약 ${formatDistance(nearestTargetPartner.distance)}) · 가까운 제휴 찾으러 가볼까요?`
                       : "가까운 제휴를 찾을 수 없습니다."}
-                  </span>
-                </div>
-              )
-            )}
-
-            {/* 탭마다 마커 설정(상단 아이콘·테두리)을 따로 적용 */}
-            <PartnerMainMapPanel
-              key={`${activeTabId}:${tabMarkerSettings?.topIconImg ?? ""}:${tabMarkerSettings?.borderColor ?? ""}`}
-              {...props}
-              onSearchReset={props.onSearchReset ? handleMapSearchReset : undefined}
-              markerSettings={tabMarkerSettings}
-              partners={visiblePartners}
-              favoriteCountdownEndAt={activeEvent?.end_at ?? null}
-              stampAction={
+                  </MapEventStatusChip>
+                )
+              ) : null
+            }
+            stampAction={
                 isStampFeatureActive
                   ? {
                       enabled: true,
@@ -1131,9 +1049,8 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
                     }
                   : undefined
               }
-              detailButtonLabel={config.default_benefit_btn_label || DEFAULT_BENEFIT_BTN_LABEL}
-            />
-          </div>
+            detailButtonLabel={config.default_benefit_btn_label || DEFAULT_BENEFIT_BTN_LABEL}
+          />
 
           <MapEventIntroModal
             event={activeEvent}
@@ -1141,6 +1058,109 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
             onClose={() => setShowIntroModal(false)}
             onConfirm={handleConfirmStartEvent}
           />
+
+          {goldGrantModal && typeof document !== "undefined"
+            ? createPortal(
+                <div
+                  className="season-pass-claim-overlay"
+                  role="presentation"
+                  onClick={() => {
+                    setGoldGrantModal(null);
+                    if (queuedRewardModal) {
+                      setRewardModal(queuedRewardModal);
+                      setQueuedRewardModal(null);
+                    }
+                  }}
+                >
+                  <div
+                    className="season-pass-shop-receipt"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label="골드 획득"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <div className="season-pass-shop-receipt__head">골드 획득</div>
+                    <div className="season-pass-shop-receipt__body">
+                      <div className="season-pass-shop-receipt__row">
+                        <div className="season-pass-shop-receipt__art">
+                          {goldGrantModal.goldIconUrl ? (
+                            <img src={goldGrantModal.goldIconUrl} alt="" />
+                          ) : (
+                            <span />
+                          )}
+                        </div>
+                        <div className="season-pass-shop-receipt__fields">
+                          <label>
+                            <span>* 아이템 이름</span>
+                            <strong>제휴 도장</strong>
+                          </label>
+                          <label>
+                            <span>* 획득 골드</span>
+                            <strong>
+                              {goldGrantModal.gold.toLocaleString("ko-KR")}
+                              {goldGrantModal.goldIconUrl ? (
+                                <img src={goldGrantModal.goldIconUrl} alt="" />
+                              ) : (
+                                " 골드"
+                              )}
+                            </strong>
+                          </label>
+                          {goldGrantModal.exp > 0 ? (
+                            <label>
+                              <span>* 획득 EXP</span>
+                              <strong>{goldGrantModal.exp.toLocaleString("ko-KR")}</strong>
+                            </label>
+                          ) : null}
+                        </div>
+                      </div>
+                      <dl className="season-pass-shop-receipt__gold">
+                        <div>
+                          <dt>현재 골드</dt>
+                          <dd>
+                            {goldGrantModal.goldBefore.toLocaleString("ko-KR")}
+                            {goldGrantModal.goldIconUrl ? (
+                              <img src={goldGrantModal.goldIconUrl} alt="" />
+                            ) : (
+                              " 골드"
+                            )}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>획득 후 골드</dt>
+                          <dd className="is-ok">
+                            {goldGrantModal.goldAfter.toLocaleString("ko-KR")}
+                            {goldGrantModal.goldIconUrl ? (
+                              <img src={goldGrantModal.goldIconUrl} alt="" />
+                            ) : (
+                              " 골드"
+                            )}
+                          </dd>
+                        </div>
+                      </dl>
+                      <p className="season-pass-shop-receipt__note">
+                        * 제휴 도장으로 골드가 지급되었습니다.
+                      </p>
+                    </div>
+                    <div className="season-pass-shop-receipt__actions">
+                      <button
+                        type="button"
+                        className="is-primary"
+                        onClick={() => {
+                          setGoldGrantModal(null);
+                          if (queuedRewardModal) {
+                            setRewardModal(queuedRewardModal);
+                            setQueuedRewardModal(null);
+                          }
+                        }}
+                      >
+                        확인
+                      </button>
+                    </div>
+                  </div>
+                </div>,
+                document.body,
+              )
+            : null}
 
           {rewardModal ? (
             <div
@@ -1250,7 +1270,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
                       style={{ background: "#6b7280", flex: 1, padding: "10px", borderRadius: "8px", color: "#fff", fontWeight: "600" }}
                       onClick={() => {
                         setRewardModal(null);
-                        window.location.reload();
                       }}
                     >
                       확인

@@ -40,6 +40,10 @@ type EventForm = {
   cooldown_minutes: number;
   stamp_exp: number;
   stamp_gold: number;
+  stamp_exp_min: number;
+  stamp_exp_max: number;
+  stamp_gold_min: number;
+  stamp_gold_max: number;
   stamp_btn_label: string;
   stamp_active_img: string;
   stamp_inactive_img: string;
@@ -73,6 +77,10 @@ const EMPTY_FORM: EventForm = {
   cooldown_minutes: 0,
   stamp_exp: DEFAULT_STAMP_EXP,
   stamp_gold: DEFAULT_STAMP_GOLD,
+  stamp_exp_min: DEFAULT_STAMP_EXP,
+  stamp_exp_max: DEFAULT_STAMP_EXP,
+  stamp_gold_min: DEFAULT_STAMP_GOLD,
+  stamp_gold_max: DEFAULT_STAMP_GOLD,
   stamp_btn_label: "",
   stamp_active_img: "",
   stamp_inactive_img: "",
@@ -115,8 +123,12 @@ function eventToForm(event: MapEvent): EventForm {
     ),
     radius_meters: event.radius_meters || 30,
     cooldown_minutes: event.cooldown_minutes || 0,
-    stamp_exp: Math.max(0, Number(event.stamp_exp) || 0),
-    stamp_gold: Math.max(0, Number(event.stamp_gold) || 0),
+    stamp_exp: Math.max(0, Number(event.stamp_exp_max ?? event.stamp_exp) || 0),
+    stamp_gold: Math.max(0, Number(event.stamp_gold_max ?? event.stamp_gold) || 0),
+    stamp_exp_min: Math.max(0, Number(event.stamp_exp_min ?? event.stamp_exp) || 0),
+    stamp_exp_max: Math.max(0, Number(event.stamp_exp_max ?? event.stamp_exp) || 0),
+    stamp_gold_min: Math.max(0, Number(event.stamp_gold_min ?? event.stamp_gold) || 0),
+    stamp_gold_max: Math.max(0, Number(event.stamp_gold_max ?? event.stamp_gold) || 0),
     stamp_btn_label: event.stamp_btn_label ?? "",
     stamp_active_img: event.stamp_active_img ?? "",
     stamp_inactive_img: event.stamp_inactive_img ?? "",
@@ -347,8 +359,12 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
         step_probabilities: form.percents.map((value) => value / 100),
         radius_meters: form.radius_meters,
         cooldown_minutes: form.cooldown_minutes,
-        stamp_exp: form.stamp_exp,
-        stamp_gold: form.stamp_gold,
+        stamp_exp: form.stamp_exp_max,
+        stamp_gold: form.stamp_gold_max,
+        stamp_exp_min: form.stamp_exp_min,
+        stamp_exp_max: form.stamp_exp_max,
+        stamp_gold_min: form.stamp_gold_min,
+        stamp_gold_max: form.stamp_gold_max,
         stamp_btn_label: form.stamp_btn_label?.trim() || null,
         stamp_active_img: form.stamp_active_img || null,
         stamp_inactive_img: form.stamp_inactive_img || null,
@@ -728,32 +744,58 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
             </label>
             <label className="text-sm font-medium text-gray-700">
               제휴 도장 EXP
-              <input
-                type="number"
-                min={0}
-                value={form.stamp_exp}
-                onChange={(e) =>
-                  setForm((prev) => ({ ...prev, stamp_exp: Math.max(0, Number(e.target.value) || 0) }))
-                }
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-              />
+              <div className="mt-1 grid grid-cols-2 gap-2">
+                <input
+                  type="number"
+                  min={0}
+                  value={form.stamp_exp_min}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, stamp_exp_min: Math.max(0, Number(e.target.value) || 0) }))
+                  }
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2"
+                  placeholder="최소"
+                />
+                <input
+                  type="number"
+                  min={0}
+                  value={form.stamp_exp_max}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, stamp_exp_max: Math.max(0, Number(e.target.value) || 0) }))
+                  }
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2"
+                  placeholder="최대"
+                />
+              </div>
               <span className="mt-1 block text-xs font-normal text-gray-500">
-                도장을 찍을 때마다 시즌패스 EXP가 지급됩니다.
+                최소 ~ 최대. 같으면 고정, 다르면 그 사이 랜덤으로 지급됩니다.
               </span>
             </label>
             <label className="text-sm font-medium text-gray-700">
               제휴 도장 골드
-              <input
-                type="number"
-                min={0}
-                value={form.stamp_gold}
-                onChange={(e) =>
-                  setForm((prev) => ({ ...prev, stamp_gold: Math.max(0, Number(e.target.value) || 0) }))
-                }
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-              />
+              <div className="mt-1 grid grid-cols-2 gap-2">
+                <input
+                  type="number"
+                  min={0}
+                  value={form.stamp_gold_min}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, stamp_gold_min: Math.max(0, Number(e.target.value) || 0) }))
+                  }
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2"
+                  placeholder="최소"
+                />
+                <input
+                  type="number"
+                  min={0}
+                  value={form.stamp_gold_max}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, stamp_gold_max: Math.max(0, Number(e.target.value) || 0) }))
+                  }
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2"
+                  placeholder="최대"
+                />
+              </div>
               <span className="mt-1 block text-xs font-normal text-gray-500">
-                도장을 찍을 때마다 골드가 지급됩니다.
+                예: 5000 ~ 5000이면 항상 5000, 4000 ~ 6000이면 그 사이 랜덤입니다.
               </span>
             </label>
           </div>

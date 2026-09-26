@@ -108,7 +108,7 @@ export default function PartnerRegionFilterPanel({
       {expanded ? (
         <div className="partner-region-filter-panel__body">
           <div>
-            <div className="partner-region-filter-panel__chips">
+            <div className="partner-region-filter-panel__chips partner-region-filter-panel__chips--cities">
               <RegionChip
                 label={PARTNER_REGION_ALL}
                 selected={activeCity === PARTNER_REGION_ALL && !filterActive}
@@ -131,7 +131,7 @@ export default function PartnerRegionFilterPanel({
               <p className="partner-region-filter-panel__hint text-[11px] text-gray-400">
                 여러 지역을 선택할 수 있습니다.
               </p>
-              <div className="partner-region-filter-panel__chips">
+              <div className="partner-region-filter-panel__chips partner-region-filter-panel__chips--areas">
                 <RegionChip
                   label={PARTNER_REGION_ALL}
                   count={countPartnersInRegionArea(partners, selectedCityGroup.label, PARTNER_REGION_ALL)}

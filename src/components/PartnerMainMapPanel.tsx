@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import NaverMapPartnersView, {
   type NaverMapPartnerMarker,
 } from "@/components/NaverMapPartnersView";
@@ -48,6 +48,7 @@ type PartnerMainMapPanelProps = {
   detailButtonLabel?: string;
   markerSettings?: MapMarkerCustomSettings | null;
   onSearchReset?: () => void;
+  statusOverlay?: ReactNode;
   customCategoryBookmarkEnabled?: boolean;
   customCategoryBookmarkedIds?: ReadonlySet<string>;
   onCustomCategoryBookmark?: (partnerId: string) => void;
@@ -70,6 +71,7 @@ export default function PartnerMainMapPanel({
   detailButtonLabel,
   markerSettings = null,
   onSearchReset,
+  statusOverlay = null,
   customCategoryBookmarkEnabled = false,
   customCategoryBookmarkedIds,
   onCustomCategoryBookmark,
@@ -135,11 +137,11 @@ export default function PartnerMainMapPanel({
 
   return (
     <section className="partner-main-map mb-6 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
-      <div className={`flex items-start gap-3 ${title ? "justify-between" : "justify-end"}`}>
+      <div className={`partner-main-map__toolbar${title ? " partner-main-map__toolbar--with-title" : ""}`}>
         {title ? (
-          <h2 className="min-w-0 text-sm font-semibold text-gray-900 sm:text-base">{title}</h2>
+          <h2 className="partner-main-map__title">{title}</h2>
         ) : null}
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="partner-main-map__toolbar-actions">
           {onSearchReset ? (
             <button
               type="button"
@@ -148,7 +150,7 @@ export default function PartnerMainMapPanel({
                 onPartnerSelect?.("");
                 onSearchReset();
               }}
-              className="shrink-0 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 sm:text-sm"
+              className="partner-main-map__toolbar-btn"
               aria-label="검색 초기화"
             >
               검색 초기화
@@ -157,7 +159,7 @@ export default function PartnerMainMapPanel({
           <button
             type="button"
             onClick={() => setExpanded((prev) => !prev)}
-            className="shrink-0 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 sm:text-sm"
+            className="partner-main-map__toolbar-btn"
             aria-expanded={expanded}
           >
             {expanded ? "접기" : "펼치기"}
@@ -206,6 +208,9 @@ export default function PartnerMainMapPanel({
               네이버 지도 API 설정이 필요합니다. 관리자에서 지도 API를 확인해 주세요.
             </div>
           )}
+          {statusOverlay ? (
+            <div className="partner-main-map__status-overlay">{statusOverlay}</div>
+          ) : null}
         </div>
       ) : (
         <p className="mt-2 text-xs text-gray-500">지도가 접혀 있습니다.</p>

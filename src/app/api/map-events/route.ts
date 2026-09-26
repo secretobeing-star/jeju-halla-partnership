@@ -8,6 +8,7 @@ import {
   isEventLive,
   parseStampRewardAmount,
   parseStepProbabilities,
+  stampRewardRange,
   type MapEvent,
   type MapEventReward,
 } from "@/lib/map-events";
@@ -26,6 +27,10 @@ type EventRow = {
   cooldown_minutes?: number | null;
   stamp_exp?: number | null;
   stamp_gold?: number | null;
+  stamp_exp_min?: number | null;
+  stamp_exp_max?: number | null;
+  stamp_gold_min?: number | null;
+  stamp_gold_max?: number | null;
   stamp_active_img: string | null;
   stamp_inactive_img: string | null;
   marker_icon_img: string | null;
@@ -52,6 +57,16 @@ function mapEventRow(row: EventRow, extras?: Partial<MapEvent>): MapEvent {
   const winMsg = row.win_message ?? row.win_popup_message ?? extras?.win_message ?? extras?.win_popup_message ?? null;
   const loseMsg = row.lose_message ?? row.lose_popup_message ?? extras?.lose_message ?? extras?.lose_popup_message ?? null;
   const compMsg = row.completion_message ?? row.completion_popup_message ?? extras?.completion_message ?? extras?.completion_popup_message ?? null;
+  const expRange = stampRewardRange(
+    row.stamp_exp_min ?? row.stamp_exp,
+    row.stamp_exp_max ?? row.stamp_exp,
+    DEFAULT_STAMP_EXP,
+  );
+  const goldRange = stampRewardRange(
+    row.stamp_gold_min ?? row.stamp_gold,
+    row.stamp_gold_max ?? row.stamp_gold,
+    DEFAULT_STAMP_GOLD,
+  );
 
   return {
     id: row.id,
@@ -65,8 +80,12 @@ function mapEventRow(row: EventRow, extras?: Partial<MapEvent>): MapEvent {
     step_probabilities: parseStepProbabilities(row.step_probabilities, row.max_stamps),
     radius_meters: Math.max(1, Number(row.radius_meters) || DEFAULT_RADIUS_METERS),
     cooldown_minutes: Math.max(0, Number(row.cooldown_minutes) || 0),
-    stamp_exp: parseStampRewardAmount(row.stamp_exp, DEFAULT_STAMP_EXP),
-    stamp_gold: parseStampRewardAmount(row.stamp_gold, DEFAULT_STAMP_GOLD),
+    stamp_exp: expRange.max,
+    stamp_gold: goldRange.max,
+    stamp_exp_min: expRange.min,
+    stamp_exp_max: expRange.max,
+    stamp_gold_min: goldRange.min,
+    stamp_gold_max: goldRange.max,
     stamp_active_img: row.stamp_active_img,
     stamp_inactive_img: row.stamp_inactive_img,
     marker_icon_img: row.marker_icon_img,
@@ -209,8 +228,12 @@ export async function POST(request: NextRequest) {
     step_probabilities: parseStepProbabilities(body.step_probabilities, maxStamps),
     radius_meters: Math.max(1, Number(body.radius_meters) || DEFAULT_RADIUS_METERS),
     cooldown_minutes: Math.max(0, Number(body.cooldown_minutes) || 0),
-    stamp_exp: parseStampRewardAmount(body.stamp_exp, DEFAULT_STAMP_EXP),
-    stamp_gold: parseStampRewardAmount(body.stamp_gold, DEFAULT_STAMP_GOLD),
+    stamp_exp: stampRewardRange(body.stamp_exp_min ?? body.stamp_exp, body.stamp_exp_max ?? body.stamp_exp, DEFAULT_STAMP_EXP).max,
+    stamp_gold: stampRewardRange(body.stamp_gold_min ?? body.stamp_gold, body.stamp_gold_max ?? body.stamp_gold, DEFAULT_STAMP_GOLD).max,
+    stamp_exp_min: stampRewardRange(body.stamp_exp_min ?? body.stamp_exp, body.stamp_exp_max ?? body.stamp_exp, DEFAULT_STAMP_EXP).min,
+    stamp_exp_max: stampRewardRange(body.stamp_exp_min ?? body.stamp_exp, body.stamp_exp_max ?? body.stamp_exp, DEFAULT_STAMP_EXP).max,
+    stamp_gold_min: stampRewardRange(body.stamp_gold_min ?? body.stamp_gold, body.stamp_gold_max ?? body.stamp_gold, DEFAULT_STAMP_GOLD).min,
+    stamp_gold_max: stampRewardRange(body.stamp_gold_min ?? body.stamp_gold, body.stamp_gold_max ?? body.stamp_gold, DEFAULT_STAMP_GOLD).max,
     stamp_active_img: body.stamp_active_img?.trim() || null,
     stamp_inactive_img: body.stamp_inactive_img?.trim() || null,
     marker_icon_img: body.marker_icon_img?.trim() || null,
@@ -233,7 +256,15 @@ export async function POST(request: NextRequest) {
 
   let { data, error } = await admin.from("events").insert(payload).select("*").maybeSingle();
   if (error && /stamp_exp|stamp_gold|schema cache|does not exist/i.test(error.message)) {
-    const { stamp_exp: _stampExp, stamp_gold: _stampGold, ...retryPayload } = payload;
+    const {
+      stamp_exp: _stampExp,
+      stamp_gold: _stampGold,
+      stamp_exp_min: _stampExpMin,
+      stamp_exp_max: _stampExpMax,
+      stamp_gold_min: _stampGoldMin,
+      stamp_gold_max: _stampGoldMax,
+      ...retryPayload
+    } = payload;
     const retry = await admin.from("events").insert(retryPayload).select("*").maybeSingle();
     data = retry.data;
     error = retry.error;

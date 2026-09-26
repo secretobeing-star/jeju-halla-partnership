@@ -1439,7 +1439,7 @@ export default function BoardSection({
 
   function renderBoardTabs() {
     return (
-      <div className={`grid border-b border-gray-100 ${tabGridClass}`}>
+      <div className={`board-section-tabs grid border-b border-gray-100 ${tabGridClass}`}>
         {visibleTabs.map((tab) => {
           const isActive = activeBoard === tab.id;
 

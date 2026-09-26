@@ -48,6 +48,18 @@ alter table public.events
 alter table public.events
   add column if not exists stamp_gold integer not null default 10;
 
+alter table public.events
+  add column if not exists stamp_exp_min integer not null default 100;
+
+alter table public.events
+  add column if not exists stamp_exp_max integer not null default 100;
+
+alter table public.events
+  add column if not exists stamp_gold_min integer not null default 10;
+
+alter table public.events
+  add column if not exists stamp_gold_max integer not null default 10;
+
 create table if not exists public.event_rewards (
   id uuid primary key default gen_random_uuid(),
   event_id uuid not null references public.events(id) on delete cascade,

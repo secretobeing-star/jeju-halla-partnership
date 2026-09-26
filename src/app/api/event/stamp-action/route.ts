@@ -6,9 +6,11 @@ import {
 import {
   asStringArray,
   DEFAULT_RADIUS_METERS,
+  DEFAULT_STAMP_EXP,
+  DEFAULT_STAMP_GOLD,
   haversineMeters,
   isEventLive,
-  parseStampRewardAmount,
+  rollStampRewardAmount,
   parseStepProbabilities,
   resolveFrameValue,
   rollStepWin,
@@ -385,20 +387,30 @@ export async function POST(request: NextRequest) {
   };
   void postPlainJsonWebhook({ ...webhookPayload });
   recordSiteAnalyticsEvent("stamp_join");
+  const hasExpConfig =
+    event.stamp_exp != null || event.stamp_exp_min != null || event.stamp_exp_max != null;
+  const hasGoldConfig =
+    event.stamp_gold != null || event.stamp_gold_min != null || event.stamp_gold_max != null;
   const seasonVisit = await completeVisit({
     userId,
     partnerId: placeId,
     partnerName: partner?.name || placeName,
     studentName: name,
     department,
-    visitExp:
-      event.stamp_exp === undefined || event.stamp_exp === null
-        ? undefined
-        : parseStampRewardAmount(event.stamp_exp, 0),
-    visitGold:
-      event.stamp_gold === undefined || event.stamp_gold === null
-        ? undefined
-        : parseStampRewardAmount(event.stamp_gold, 0),
+    visitExp: hasExpConfig
+      ? rollStampRewardAmount(
+          event.stamp_exp_min ?? event.stamp_exp,
+          event.stamp_exp_max ?? event.stamp_exp,
+          DEFAULT_STAMP_EXP,
+        )
+      : undefined,
+    visitGold: hasGoldConfig
+      ? rollStampRewardAmount(
+          event.stamp_gold_min ?? event.stamp_gold,
+          event.stamp_gold_max ?? event.stamp_gold,
+          DEFAULT_STAMP_GOLD,
+        )
+      : undefined,
   });
 
   return NextResponse.json({

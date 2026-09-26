@@ -7,6 +7,7 @@ import {
   asSeasonPassQuestType,
   computeLevelFromExp,
   isSeasonLive,
+  isGoldShopCatalogSeason,
   parseGoldShopFilterTabs,
   type RewardItem,
   type Season,
@@ -108,7 +109,10 @@ export async function getActiveSeason(admin: AdminClient): Promise<Season | null
     return null;
   }
 
-  const live = ((data ?? []) as Record<string, unknown>[]).map(mapSeason).find((season) => isSeasonLive(season));
+  const live = ((data ?? []) as Record<string, unknown>[])
+    .map(mapSeason)
+    .filter((season) => !isGoldShopCatalogSeason(season))
+    .find((season) => isSeasonLive(season));
   return live ?? null;
 }
 
@@ -790,7 +794,17 @@ export async function completeVisit(input: {
   department?: string;
   visitExp?: number;
   visitGold?: number;
-}): Promise<{ applied: boolean; reason?: string; state?: SeasonPassWidgetState }> {
+}): Promise<{
+  applied: boolean;
+  reason?: string;
+  firstVisit?: boolean;
+  visitExp?: number;
+  visitGold?: number;
+  goldBefore?: number;
+  goldAfter?: number;
+  goldIconUrl?: string | null;
+  state?: SeasonPassWidgetState;
+}> {
   const userId = input.userId.trim();
   const partnerId = String(input.partnerId ?? "").trim();
   if (!userId || !partnerId) {
@@ -804,11 +818,30 @@ export async function completeVisit(input: {
 
   try {
     const season = await getActiveSeason(admin);
+    const visitExp = Math.max(0, Number(input.visitExp ?? season?.visit_exp ?? 0) || 0);
+    const visitGold = Math.max(0, Number(input.visitGold ?? season?.visit_gold ?? 0) || 0);
+
     if (!season) {
-      return { applied: false, reason: "no-season" };
+      if (visitGold <= 0 && visitExp <= 0) {
+        return { applied: false, reason: "no-season", visitExp: 0, visitGold: 0 };
+      }
+      const wallet = await loadWalletGold(admin, userId);
+      const goldBefore = wallet ?? 0;
+      if (visitGold > 0) {
+        await creditStudentGold(userId, visitGold);
+      }
+      return {
+        applied: true,
+        firstVisit: false,
+        visitExp: 0,
+        visitGold,
+        goldBefore,
+        goldAfter: goldBefore + visitGold,
+        goldIconUrl: null,
+      };
     }
 
-    const { data: visit, error: visitError } = await admin
+    const { error: visitError } = await admin
       .from("season_visit_logs")
       .insert({
         user_id: userId,
@@ -818,14 +851,12 @@ export async function completeVisit(input: {
       .select("id")
       .maybeSingle();
 
+    let firstVisit = true;
     if (visitError) {
-      if (visitError.code === "23505") {
-        return { applied: false, reason: "already-visited" };
+      if (visitError.code !== "23505") {
+        throw visitError;
       }
-      throw visitError;
-    }
-    if (!visit) {
-      return { applied: false, reason: "already-visited" };
+      firstVisit = false;
     }
 
     const { data: existing } = await admin
@@ -835,17 +866,22 @@ export async function completeVisit(input: {
       .eq("season_id", season.id)
       .maybeSingle();
 
-    const visitExp =
-      input.visitExp === undefined ? season.visit_exp : Math.max(0, Number(input.visitExp) || 0);
-    const visitGold =
-      input.visitGold === undefined ? season.visit_gold : Math.max(0, Number(input.visitGold) || 0);
+    const wallet = await loadWalletGold(admin, userId);
+    const goldBefore = wallet ?? Number(existing?.gold || 0);
 
-    await upsertProgress(admin, userId, season, {
-      exp: Number(existing?.exp || 0) + visitExp,
-    });
-    await adjustGold(admin, userId, season, visitGold, "visit");
+    if (visitExp > 0) {
+      await upsertProgress(admin, userId, season, {
+        exp: Number(existing?.exp || 0) + visitExp,
+      });
+    }
+    let goldAfter = goldBefore;
+    if (visitGold > 0) {
+      goldAfter = await adjustGold(admin, userId, season, visitGold, "visit");
+    }
 
-    await bumpQuestsByType(admin, userId, season, "partner_visit");
+    if (firstVisit) {
+      await bumpQuestsByType(admin, userId, season, "partner_visit");
+    }
 
     let partnerName = input.partnerName?.trim() || "";
     if (!partnerName) {
@@ -856,12 +892,21 @@ export async function completeVisit(input: {
       studentId: userId,
       action: "visit",
       seasonTitle: season.title,
-      detail: partnerName || partnerId,
+      detail: `${partnerName || partnerId} (EXP ${visitExp} / 골드 ${visitGold})`,
       name: input.studentName,
       department: input.department,
     });
 
-    return { applied: true, state: await getSeasonPassState(userId) };
+    return {
+      applied: visitExp > 0 || visitGold > 0 || firstVisit,
+      firstVisit,
+      visitExp,
+      visitGold,
+      goldBefore,
+      goldAfter,
+      goldIconUrl: season.gold_icon_url,
+      state: await getSeasonPassState(userId),
+    };
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     if (message.includes("does not exist") || message.includes("schema cache") || message.includes("seasons")) {

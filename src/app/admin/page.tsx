@@ -45,6 +45,7 @@ import SiteFeaturesApplier from "@/components/SiteFeaturesApplier";
 import SiteFaviconApplier from "@/components/SiteFaviconApplier";
 import SiteTitleApplier from "@/components/SiteTitleApplier";
 import { adminApiFetch, reloadAfterAdminSave } from "@/lib/admin-api";
+import { notifyPartnersChanged } from "@/lib/partners-live";
 import {
   AdminNavKey,
   getAdminNavLabel,
@@ -1755,7 +1756,7 @@ export default function AdminPage() {
         );
         cancelEditPartner();
         await loadPartners();
-        reloadAfterAdminSave();
+        notifyPartnersChanged();
       }
     } else {
       setPartnerMessage("저장에 실패했습니다.");
@@ -1776,6 +1777,7 @@ export default function AdminPage() {
           item.id === partner.id ? { ...item, is_active: !item.is_active } : item,
         ),
       );
+      notifyPartnersChanged();
     }
   }
 
@@ -1796,6 +1798,7 @@ export default function AdminPage() {
     }
 
     await loadPartners();
+    notifyPartnersChanged();
   }
 
   if (supabaseChecking) {

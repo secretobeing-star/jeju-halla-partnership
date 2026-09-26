@@ -5,8 +5,8 @@ import {
   DEFAULT_RADIUS_METERS,
   DEFAULT_STAMP_EXP,
   DEFAULT_STAMP_GOLD,
-  parseStampRewardAmount,
   parseStepProbabilities,
+  stampRewardRange,
 } from "@/lib/map-events";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -47,11 +47,33 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   if (body.cooldown_minutes !== undefined) {
     patch.cooldown_minutes = Math.max(0, Number(body.cooldown_minutes) || 0);
   }
-  if (body.stamp_exp !== undefined) {
-    patch.stamp_exp = parseStampRewardAmount(body.stamp_exp, DEFAULT_STAMP_EXP);
+  if (
+    body.stamp_exp !== undefined ||
+    body.stamp_exp_min !== undefined ||
+    body.stamp_exp_max !== undefined
+  ) {
+    const expRange = stampRewardRange(
+      body.stamp_exp_min ?? body.stamp_exp,
+      body.stamp_exp_max ?? body.stamp_exp,
+      DEFAULT_STAMP_EXP,
+    );
+    patch.stamp_exp = expRange.max;
+    patch.stamp_exp_min = expRange.min;
+    patch.stamp_exp_max = expRange.max;
   }
-  if (body.stamp_gold !== undefined) {
-    patch.stamp_gold = parseStampRewardAmount(body.stamp_gold, DEFAULT_STAMP_GOLD);
+  if (
+    body.stamp_gold !== undefined ||
+    body.stamp_gold_min !== undefined ||
+    body.stamp_gold_max !== undefined
+  ) {
+    const goldRange = stampRewardRange(
+      body.stamp_gold_min ?? body.stamp_gold,
+      body.stamp_gold_max ?? body.stamp_gold,
+      DEFAULT_STAMP_GOLD,
+    );
+    patch.stamp_gold = goldRange.max;
+    patch.stamp_gold_min = goldRange.min;
+    patch.stamp_gold_max = goldRange.max;
   }
   if (typeof body.guide_text === "string") patch.guide_text = body.guide_text.trim() || null;
   if (typeof body.distance_error_message === "string") patch.distance_error_message = body.distance_error_message.trim() || null;
@@ -120,6 +142,10 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   if (error && /stamp_exp|stamp_gold|marker_border_color|marker_time_icon|marker_time_format|schema cache|does not exist/i.test(error.message)) {
     delete patch.stamp_exp;
     delete patch.stamp_gold;
+    delete patch.stamp_exp_min;
+    delete patch.stamp_exp_max;
+    delete patch.stamp_gold_min;
+    delete patch.stamp_gold_max;
     delete patch.marker_border_color;
     delete patch.marker_time_icon;
     delete patch.marker_time_format;
