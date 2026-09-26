@@ -9,7 +9,8 @@ import {
   type SiteAnalyticsDaily,
   type SiteAnalyticsSummary,
 } from "@/lib/site-analytics";
-import { aggregateChatbotWords } from "@/lib/chatbot-word-analytics";
+import { aggregateChatbotWordAnalytics } from "@/lib/chatbot-word-analytics";
+import { parseChatbotLessons } from "@/lib/ai-chatbot";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 
 export async function GET(request: NextRequest) {
@@ -135,6 +136,15 @@ export async function GET(request: NextRequest) {
     addJoinRows("board_comments", "created_at", "board_comment"),
   ]);
 
+  const { data: botRow } = await admin.from("ai_chatbot_settings").select("lessons").eq("id", 1).maybeSingle();
+  const lessonWords = parseChatbotLessons((botRow as { lessons?: unknown } | null)?.lessons).flatMap((lesson) =>
+    lesson.phrases
+      .split(/[\n,]/)
+      .map((item) => item.trim())
+      .filter((item) => item.length >= 2),
+  );
+  const chatbotAnalytics = aggregateChatbotWordAnalytics(chatbotPaths, lessonWords);
+
   const summary: SiteAnalyticsSummary = {
     period,
     periodLabel: range.periodLabel,
@@ -153,7 +163,8 @@ export async function GET(request: NextRequest) {
     stampRate: pageViews > 0 ? Math.round((stampJoins / pageViews) * 1000) / 10 : 0,
     seasonPassJoins,
     seasonPassRate: pageViews > 0 ? Math.round((seasonPassJoins / pageViews) * 1000) / 10 : 0,
-    chatbotWords: aggregateChatbotWords(chatbotPaths),
+    chatbotWords: chatbotAnalytics.words,
+    chatbotMissedWords: chatbotAnalytics.missed,
     daily: [...dailyMap.values()],
   };
 

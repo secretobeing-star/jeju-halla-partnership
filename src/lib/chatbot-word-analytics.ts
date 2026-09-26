@@ -32,10 +32,13 @@ const STOP_WORDS = new Set([
   "뭐임",
   "하는",
   "하는거",
+  "음",
+  "어",
+  "아",
 ]);
 
-/** 말하면서 자주 나오는 안내 단어. 질문에 이 말이 들어가면 그대로 집계합니다. */
-const SPOKEN_WORDS = [
+/** 챗봇이 기본적으로 알아듣는 말. 외부 AI가 아니라 사이트 안내 봇의 단어입니다. */
+const CHATBOT_WORDS = [
   "시즌패스",
   "골드상점",
   "도장이벤트",
@@ -90,12 +93,10 @@ export type ChatbotWordCount = {
   count: number;
 };
 
-function spokenTextFromPath(path: string) {
-  const raw = String(path ?? "").trim();
-  if (raw.startsWith("q:")) return raw.slice(2).trim();
-  if (raw === "/" || raw === "") return "";
-  return raw;
-}
+export type ChatbotWordAnalytics = {
+  words: ChatbotWordCount[];
+  missed: ChatbotWordCount[];
+};
 
 function addWord(target: Set<string>, value: string) {
   const word = value.trim().toLowerCase();
@@ -110,19 +111,31 @@ function spokenPart(value: string) {
     .replace(/(을|를|이|가|은|는|의|에서|에게|한테)$/g, "");
 }
 
-/** 말한 문장에서 실제로 나온 단어만 고릅니다. 질문 전체를 한 덩어리로 세지 않습니다. */
-export function tokenizeSpokenWords(raw: string): string[] {
-  const text = spokenTextFromPath(raw);
-  if (!text || text === "더보기") return [];
+function parseChatbotPath(path: string) {
+  const raw = String(path ?? "").trim();
+  let question = raw;
+  let missed = "";
+  if (raw.startsWith("q:")) {
+    const body = raw.slice(2);
+    const split = body.split("|m:");
+    question = (split[0] ?? "").trim();
+    missed = (split[1] ?? "").trim();
+  } else if (raw.startsWith("m:") || raw.startsWith("miss:")) {
+    missed = raw.replace(/^(miss:|m:)/, "").trim();
+    question = "";
+  } else if (raw === "/" || raw === "") {
+    question = "";
+  }
+  return { question, missed };
+}
 
+function matchLexicon(text: string, lexicon: string[]): string[] {
   const found = new Set<string>();
   const lower = text.toLowerCase();
-  const spoken = [...SPOKEN_WORDS].sort((a, b) => b.length - a.length);
+  const spoken = [...new Set([...CHATBOT_WORDS, ...lexicon])]
+    .filter((word) => word.trim().length >= 2)
+    .sort((a, b) => b.length - a.length);
   const used = new Array(lower.length).fill(false);
-
-  for (const quoted of text.matchAll(/[「『“"']([^」』”"']{2,24})[」』”"']/g)) {
-    addWord(found, spokenPart(quoted[1] ?? ""));
-  }
 
   for (const word of spoken) {
     const needle = word.toLowerCase();
@@ -139,17 +152,44 @@ export function tokenizeSpokenWords(raw: string): string[] {
     }
   }
 
-  for (const part of text.split(/[\s,./!?~·「」『』“”"']+/).filter(Boolean)) {
-    addWord(found, spokenPart(part));
-  }
-
   return [...found];
 }
 
-export function aggregateChatbotWords(paths: string[], limit = 30): ChatbotWordCount[] {
+/** 말한 문장에서 챗봇이 쓰는 단어만 고릅니다. */
+export function tokenizeSpokenWords(raw: string, extraLexicon: string[] = []): string[] {
+  const { question } = parseChatbotPath(raw);
+  if (!question || question === "더보기") return [];
+
+  const found = new Set(matchLexicon(question, extraLexicon));
+  for (const quoted of question.matchAll(/[「『“"']([^」』”"']{2,24})[」』”"']/g)) {
+    addWord(found, spokenPart(quoted[1] ?? ""));
+  }
+  return [...found];
+}
+
+export function tokenizeMissedWords(raw: string, extraLexicon: string[] = []): string[] {
+  const { question, missed } = parseChatbotPath(raw);
+  const found = new Set<string>();
+  if (missed) {
+    addWord(found, spokenPart(missed));
+    for (const part of missed.split(/[\s,./!?~·「」『』“”"']+/).filter(Boolean)) {
+      addWord(found, spokenPart(part));
+    }
+    return [...found];
+  }
+  if (!question || question === "더보기") return [];
+  if (tokenizeSpokenWords(raw, extraLexicon).length > 0) return [];
+  addWord(found, spokenPart(question));
+  for (const part of question.split(/[\s,./!?~·「」『』“”"']+/).filter(Boolean)) {
+    addWord(found, spokenPart(part));
+  }
+  return [...found];
+}
+
+function tally(paths: string[], pick: (path: string) => string[], limit: number) {
   const counts = new Map<string, number>();
   for (const path of paths) {
-    for (const word of tokenizeSpokenWords(path)) {
+    for (const word of pick(path)) {
       counts.set(word, (counts.get(word) ?? 0) + 1);
     }
   }
@@ -157,4 +197,23 @@ export function aggregateChatbotWords(paths: string[], limit = 30): ChatbotWordC
     .map(([word, count]) => ({ word, count }))
     .sort((a, b) => b.count - a.count || a.word.localeCompare(b.word, "ko"))
     .slice(0, limit);
+}
+
+export function aggregateChatbotWords(
+  paths: string[],
+  extraLexicon: string[] = [],
+  limit = 30,
+): ChatbotWordCount[] {
+  return tally(paths, (path) => tokenizeSpokenWords(path, extraLexicon), limit);
+}
+
+export function aggregateChatbotWordAnalytics(
+  paths: string[],
+  extraLexicon: string[] = [],
+  limit = 30,
+): ChatbotWordAnalytics {
+  return {
+    words: aggregateChatbotWords(paths, extraLexicon, limit),
+    missed: tally(paths, (path) => tokenizeMissedWords(path, extraLexicon), limit),
+  };
 }

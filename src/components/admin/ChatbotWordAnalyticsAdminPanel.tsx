@@ -56,13 +56,15 @@ export default function ChatbotWordAnalyticsAdminPanel({ onMessage }: ChatbotWor
   }, [loadSummary, period, month]);
 
   const words = summary?.chatbotWords ?? [];
+  const missed = summary?.chatbotMissedWords ?? [];
   const max = words[0]?.count || 1;
+  const missedMax = missed[0]?.count || 1;
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-gray-500">
-          말한 문장에서 나온 단어를 셉니다. 제휴를 찾지 못했을 때는 그때 말한 이름(예: 개발자)이 보입니다.
+          외부 AI가 아니라, 지금 사이트 챗봇이 알아듣는 말을 셉니다. 찾지 못했을 때 말한 이름도 따로 모읍니다.
         </p>
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex rounded-lg border border-gray-200 p-0.5 text-xs">
@@ -107,12 +109,13 @@ export default function ChatbotWordAnalyticsAdminPanel({ onMessage }: ChatbotWor
       {loading ? (
         <p className="text-sm text-gray-500">단어 분석을 불러오는 중...</p>
       ) : summary ? (
+        <>
         <AdminCollapsibleSection
-          title="말한 단어"
-          description={`${summary.periodLabel} 동안 챗봇에 말한 내용에서 나온 단어입니다. 말 ${formatCount(summary.chatbotMessages)}회.`}
+          title="챗봇이 알아들은 단어"
+          description={`${summary.periodLabel} 동안 챗봇이 쓰는 말(목록, 리스트, 학습 문장 등)이 질문에 나온 횟수입니다. 말 ${formatCount(summary.chatbotMessages)}회.`}
         >
           {words.length === 0 ? (
-            <p className="text-sm text-gray-500">아직 말한 단어가 없습니다. 챗봇에 말이 쌓이면 여기에 보입니다.</p>
+            <p className="text-sm text-gray-500">아직 챗봇이 알아들은 단어가 없습니다. 챗봇에 말이 쌓이면 여기에 보입니다.</p>
           ) : (
             <ul className="space-y-1.5">
               {words.map((item) => (
@@ -130,6 +133,30 @@ export default function ChatbotWordAnalyticsAdminPanel({ onMessage }: ChatbotWor
             </ul>
           )}
         </AdminCollapsibleSection>
+        <AdminCollapsibleSection
+          title="찾지 못한 말"
+          description="챗봇이 제휴를 찾지 못했을 때 상대가 말한 이름입니다. 학습 문장에 넣을 후보를 모읍니다."
+        >
+          {missed.length === 0 ? (
+            <p className="text-sm text-gray-500">찾지 못한 말이 없습니다.</p>
+          ) : (
+            <ul className="space-y-1.5">
+              {missed.map((item) => (
+                <li key={item.word} className="flex items-center gap-2 text-sm">
+                  <span className="w-28 shrink-0 truncate font-medium text-gray-800">{item.word}</span>
+                  <span className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-gray-100">
+                    <span
+                      className="block h-full rounded-full bg-amber-500"
+                      style={{ width: `${Math.max(8, Math.round((item.count / missedMax) * 100))}%` }}
+                    />
+                  </span>
+                  <span className="w-10 shrink-0 text-right text-xs text-gray-500">{formatCount(item.count)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </AdminCollapsibleSection>
+        </>
       ) : (
         <p className="text-sm text-gray-500">단어 분석을 불러오지 못했습니다.</p>
       )}

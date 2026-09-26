@@ -7632,32 +7632,32 @@ html.dark-mode .partner-category-section__gear {
     flex-wrap: nowrap;
     width: 100%;
     margin-left: 0;
-    justify-content: stretch;
-    gap: 0.22rem;
+    justify-content: flex-start;
+    gap: 0.5rem;
   }
 
   html.ios-device .partner-list-toolbar__sort > button:not(.partner-list-refresh-btn) {
-    flex: 1 1 0;
+    flex: 0 0 auto;
     min-width: 0;
     justify-content: center;
-    gap: 0.15rem;
-    padding: 0.28rem 0.18rem;
-    font-size: 0.62rem;
-    line-height: 1.15;
-    letter-spacing: -0.04em;
+    gap: 0.25rem;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.75rem;
+    line-height: 1.25;
+    letter-spacing: 0;
     white-space: nowrap;
   }
 
   html.ios-device .partner-list-toolbar__sort .partner-favorites-filter-btn svg {
-    height: 0.7rem;
-    width: 0.7rem;
+    height: 0.875rem;
+    width: 0.875rem;
   }
 
   html.ios-device .partner-list-refresh-btn {
     flex: 0 0 auto;
-    width: 1.75rem;
-    min-width: 1.75rem;
-    height: 1.75rem;
+    width: 2rem;
+    min-width: 2rem;
+    height: 2rem;
     padding: 0;
   }
 

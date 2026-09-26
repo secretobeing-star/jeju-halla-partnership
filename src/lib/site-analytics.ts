@@ -48,6 +48,7 @@ export type SiteAnalyticsSummary = {
   seasonPassJoins: number;
   seasonPassRate: number;
   chatbotWords: ChatbotWordCount[];
+  chatbotMissedWords: ChatbotWordCount[];
   daily: SiteAnalyticsDaily[];
 };
 

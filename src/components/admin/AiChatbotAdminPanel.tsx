@@ -311,6 +311,7 @@ export default function AiChatbotAdminPanel({ onMessage }: AiChatbotAdminPanelPr
                     <option value="answer">직접 답변</option>
                     <option value="recommend">추천 분류 실행</option>
                     <option value="search">제휴 검색</option>
+                    <option value="list">제휴 목록 보여주기</option>
                     <option value="events">진행 중 이벤트 안내</option>
                     <option value="board">게시판 열기</option>
                     <option value="season">시즌패스 열기</option>
@@ -321,6 +322,10 @@ export default function AiChatbotAdminPanel({ onMessage }: AiChatbotAdminPanelPr
                   <p className="mt-2 text-xs leading-5 text-gray-500">
                     시즌패스·지도 이벤트·사이트 이벤트의 이름과 기간을 지금 진행 중인 것만 보여 줍니다. 문구를 따로 적을
                     필요는 없습니다.
+                  </p>
+                ) : lesson.kind === "list" ? (
+                  <p className="mt-2 text-xs leading-5 text-gray-500">
+                    말한 문장에 위 표현이 들어 있으면 제휴 분류 목록을 보여 줍니다. 앞뒤에 다른 말이 있어도 됩니다.
                   </p>
                 ) : lesson.kind === "board" ? (
                   <p className="mt-2 text-xs leading-5 text-gray-500">

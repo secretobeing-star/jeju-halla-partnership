@@ -1,9 +1,9 @@
-import { parsePartnerRegion } from "@/lib/partner-regions";
+import { DEFAULT_PARTNER_REGION_GROUPS, parsePartnerRegion } from "@/lib/partner-regions";
 
 export const AI_CHATBOT_PROVIDERS = ["openai", "gemini"] as const;
 export type AiChatbotProvider = (typeof AI_CHATBOT_PROVIDERS)[number];
 
-export type AiChatbotLessonKind = "answer" | "recommend" | "search" | "events" | "board" | "season" | "shop";
+export type AiChatbotLessonKind = "answer" | "recommend" | "search" | "list" | "events" | "board" | "season" | "shop";
 
 export type AiChatbotLesson = {
   id: string;
@@ -93,6 +93,7 @@ export function asAiChatbotLessonKind(value: unknown): AiChatbotLessonKind {
   if (
     value === "recommend" ||
     value === "search" ||
+    value === "list" ||
     value === "events" ||
     value === "board" ||
     value === "season" ||
@@ -259,7 +260,46 @@ function toCard(partner: SitePartnerHint): ChatbotPartnerCard {
 }
 
 function compactText(value: string) {
-  return value.replace(/\s+/g, "").toLowerCase();
+  return value.replace(/[\s.,。…·!?~'"“”‘’_\-]/g, "").toLowerCase();
+}
+
+const FILLER_LEFTOVERS = new Set([
+  "음",
+  "어",
+  "아",
+  "흠",
+  "엇",
+  "엥",
+  "좀",
+  "요",
+  "네",
+  "예",
+  "그",
+  "그냥",
+  "근데",
+  "저기",
+  "저기요",
+  "있잖아",
+  "약간",
+  "진짜",
+  "아무튼",
+  "일단",
+  "뭐지",
+  "글쎄",
+  "그럼",
+  "아니",
+]);
+
+function isFillerLeftover(value: string) {
+  let rest = compactText(value);
+  if (!rest) return true;
+  for (let step = 0; step < 8 && rest; step += 1) {
+    const hit = [...FILLER_LEFTOVERS].sort((a, b) => b.length - a.length).find((item) => rest === item || rest.startsWith(item));
+    if (!hit) break;
+    if (rest === hit) return true;
+    rest = rest.slice(hit.length);
+  }
+  return !rest;
 }
 
 export function isLiveEventsQuestion(question: string) {
@@ -664,11 +704,7 @@ export function isSeasonPassPopupQuestion(question: string) {
   ) {
     return true;
   }
-  if (compact === "시즌패스" || compact === "시즌빠스" || compact === "시즌패쓰") return true;
-  return (
-    includesAny(compact, ["시즌패스", "시즌빠스", "시즌패쓰"]) &&
-    includesAny(compact, ["열어", "보여", "창", "팝업", "켜", "실행"])
-  );
+  return includesAny(compact, ["시즌패스", "시즌빠스", "시즌패쓰"]);
 }
 
 export function isGoldShopPopupQuestion(question: string) {
@@ -690,11 +726,7 @@ export function isGoldShopPopupQuestion(question: string) {
   ) {
     return true;
   }
-  if (compact === "골드상점" || compact === "골드샵" || compact === "골상점") return true;
-  return (
-    includesAny(compact, ["골드상점", "골드샵", "골상점"]) &&
-    includesAny(compact, ["열어", "보여", "창", "팝업", "켜", "실행"])
-  );
+  return includesAny(compact, ["골드상점", "골드샵", "골상점"]);
 }
 
 export function formatSeasonPassPopupReply(): ChatbotReply {
@@ -1346,6 +1378,13 @@ function detectMentionedRegion(question: string, partners: SitePartnerHint[]): R
     }
   }
 
+  for (const group of DEFAULT_PARTNER_REGION_GROUPS) {
+    for (const area of group.areas) {
+      if (area === "전체" || area === "기타") continue;
+      for (const token of regionAliasTokens(area)) add(token, area);
+    }
+  }
+
   add("제주시", "제주시");
   add("서귀포시", "서귀포시");
   add("서귀포", "서귀포시");
@@ -1568,8 +1607,15 @@ function randomRegionCards(
     offset,
     { type: "partner_search", query: region.needle, offset, seed: shuffleSeed, region: region.needle },
     `${region.label} 제휴가 없습니다.`,
-    `${region.label} 제휴를 랜덤으로 골랐어요. 카드를 누르면 자세히 볼 수 있습니다.`,
+    `${region.label} 제휴 목록입니다. 카드를 누르면 자세히 볼 수 있습니다.`,
   );
+}
+
+function partnerListReply(partners: SitePartnerHint[], region: RegionHit | null): ChatbotReply {
+  if (region) {
+    return randomRegionCards(partners, region, 0);
+  }
+  return categoryChoices(partners, 0);
 }
 
 function paginateCards(
@@ -1640,7 +1686,8 @@ function searchCards(partners: SitePartnerHint[], query: string, offset: number)
 }
 
 function extractSearchQuery(question: string) {
-  return stripIntentPhrases(question);
+  const leftover = stripIntentPhrases(question);
+  return isFillerLeftover(leftover) ? "" : leftover;
 }
 
 function isListQuestion(question: string) {
@@ -1698,8 +1745,7 @@ function isListQuestion(question: string) {
   ) {
     return true;
   }
-  const leftover = stripIntentPhrases(question);
-  if (!leftover && includesAny(compact, ["목록", "리스트", "list"])) {
+  if (includesAny(compact, ["목록", "리스트", "list"])) {
     return true;
   }
   return (
@@ -1839,12 +1885,18 @@ function applyChatbotLessons(
   if (best.kind === "shop") {
     return formatGoldShopPopupReply();
   }
+  if (best.kind === "list") {
+    return { ...partnerListReply(partners, detectMentionedRegion(question, partners)), taught: true };
+  }
   if (best.kind === "recommend") {
     const key = asRecoKey(best.reco) ?? "hangout";
     return { ...recommendCards(partners, key, 0, undefined, false, detectMentionedRegion(question, partners)), taught: true };
   }
   if (best.kind === "search") {
-    const query = best.answer.trim() || best.reco.trim() || question;
+    const query = best.answer.trim();
+    if (!query) {
+      return { ...categoryChoices(partners, 0), taught: true };
+    }
     return { ...searchCards(partners, query, 0), taught: true };
   }
   const text = best.answer.trim();
@@ -1917,7 +1969,14 @@ export function buildChatbotReply(
   }
 
   if (isListQuestion(question)) {
-    return categoryChoices(partners, 0);
+    if (region) {
+      return partnerListReply(partners, region);
+    }
+    const listCategory = mentionedCategory(question, uniqueCategories(partners));
+    if (listCategory) {
+      return cardsForCategory(partners, listCategory, 0);
+    }
+    return partnerListReply(partners, null);
   }
 
   if (isRecommendQuestion(question)) {
@@ -2006,6 +2065,7 @@ export function buildChatbotReply(
 
   return {
     text: "사이트에 있는 제휴·혜택·이벤트 정보로만 안내합니다. 「제휴 목록이 뭐있어?」 또는 「업체이름 찾아줘」로 물어보세요.",
+    missedPartnerQuery: extractSearchQuery(question) || question,
   };
 }
 

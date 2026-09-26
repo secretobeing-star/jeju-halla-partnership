@@ -301,9 +301,12 @@ ${context}`;
   }
 
   const missedQuery = structured.missedPartnerQuery?.trim();
+  const questionPart = question.slice(0, 140);
   void admin.from("site_analytics_events").insert({
     event_type: "chatbot_message",
-    path: `q:${(missedQuery || question).slice(0, 180)}`,
+    path: missedQuery
+      ? `q:${questionPart}|m:${missedQuery.slice(0, 80)}`
+      : `q:${question.slice(0, 180)}`,
   });
 
   return NextResponse.json({
