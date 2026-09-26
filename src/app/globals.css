@@ -5010,6 +5010,37 @@ html.dark-mode .partner-map-locate-button:hover:not(:disabled) {
   justify-content: center;
 }
 
+.partner-list-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.partner-list-refresh-btn__icon {
+  display: none;
+}
+
+html.ios-device .partner-list-refresh-btn {
+  width: 2rem;
+  min-width: 2rem;
+  height: 2rem;
+  padding: 0;
+}
+
+html.ios-device .partner-list-refresh-btn__label {
+  display: none;
+}
+
+html.ios-device .partner-list-refresh-btn__icon {
+  display: block;
+  width: 1rem;
+  height: 1rem;
+}
+
+html.ios-device .partner-list-refresh-btn.is-refreshing .partner-list-refresh-btn__icon {
+  animation: partner-map-locate-spin 0.75s linear infinite;
+}
+
 .partner-map-mini-card__title-row {
   display: flex;
   flex-wrap: wrap;
@@ -7595,6 +7626,53 @@ html.dark-mode .partner-category-section__gear {
     min-width: 2.4rem;
     padding-left: 0.6rem;
     padding-right: 0.6rem;
+  }
+
+  html.ios-device .partner-list-toolbar__sort {
+    flex-wrap: nowrap;
+    width: 100%;
+    margin-left: 0;
+    justify-content: stretch;
+    gap: 0.22rem;
+  }
+
+  html.ios-device .partner-list-toolbar__sort > button:not(.partner-list-refresh-btn) {
+    flex: 1 1 0;
+    min-width: 0;
+    justify-content: center;
+    gap: 0.15rem;
+    padding: 0.28rem 0.18rem;
+    font-size: 0.62rem;
+    line-height: 1.15;
+    letter-spacing: -0.04em;
+    white-space: nowrap;
+  }
+
+  html.ios-device .partner-list-toolbar__sort .partner-favorites-filter-btn svg {
+    height: 0.7rem;
+    width: 0.7rem;
+  }
+
+  html.ios-device .partner-list-refresh-btn {
+    flex: 0 0 auto;
+    width: 1.75rem;
+    min-width: 1.75rem;
+    height: 1.75rem;
+    padding: 0;
+  }
+
+  html.ios-device .partner-list-refresh-btn__label {
+    display: none;
+  }
+
+  html.ios-device .partner-list-refresh-btn__icon {
+    display: block;
+    width: 0.9rem;
+    height: 0.9rem;
+  }
+
+  html.ios-device .partner-list-refresh-btn.is-refreshing .partner-list-refresh-btn__icon {
+    animation: partner-map-locate-spin 0.75s linear infinite;
   }
 }
 

@@ -1361,9 +1361,29 @@ export default function HomePage() {
           type="button"
           onClick={() => void loadPartners({ silent: true })}
           disabled={partnersRefreshing || loading}
-          className="partner-list-refresh-btn shrink-0 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-60 sm:text-sm"
+          className={`partner-list-refresh-btn shrink-0 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-60 sm:text-sm${
+            partnersRefreshing ? " is-refreshing" : ""
+          }`}
+          aria-label={partnersRefreshing ? "새로고침 중" : "새로고침"}
+          title={partnersRefreshing ? "새로고침 중" : "새로고침"}
         >
-          {partnersRefreshing ? "새로고침 중..." : "새로고침"}
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="partner-list-refresh-btn__icon"
+            aria-hidden
+          >
+            <path d="M21 12a9 9 0 1 1-3.2-6.9" />
+            <path d="M21 3v6h-6" />
+          </svg>
+          <span className="partner-list-refresh-btn__label">
+            {partnersRefreshing ? "새로고침 중..." : "새로고침"}
+          </span>
         </button>
       )}
     </>
