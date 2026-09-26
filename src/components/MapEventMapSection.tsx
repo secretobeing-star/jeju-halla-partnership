@@ -132,6 +132,8 @@ type GoldGrantModalState = {
   goldAfter: number;
   goldIconUrl: string | null;
 };
+
+type RewardModalState = {
   kind: "win" | "lose" | "completion" | "distance" | "login_required";
   title: string;
   body: string;
