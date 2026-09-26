@@ -816,6 +816,19 @@ export default function HomePage() {
       return;
     }
     void hydrateUserCustomCategoriesFromServer();
+    function refresh() {
+      if (document.visibilityState === "visible") {
+        void hydrateUserCustomCategoriesFromServer();
+      }
+    }
+    document.addEventListener("visibilitychange", refresh);
+    window.addEventListener("focus", refresh);
+    const timer = window.setInterval(refresh, 8000);
+    return () => {
+      document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("focus", refresh);
+      window.clearInterval(timer);
+    };
   }, [memberStudentLoggedIn]);
 
   useEffect(() => {

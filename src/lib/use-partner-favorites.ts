@@ -2,13 +2,56 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
+  hasUploadedAccountFavorites,
+  loadGuestPartnerFavoriteIds,
   loadPartnerFavoriteIds,
+  markAccountFavoritesUploaded,
   PARTNER_FAVORITES_EVENT,
   replacePartnerFavoriteIds,
   togglePartnerFavorite,
 } from "@/lib/partner-favorites";
 import { getSiteMemberSession, SITE_MEMBER_SESSION_EVENT } from "@/lib/site-member-session";
 import { studentAuthFetch } from "@/lib/student-session";
+
+async function hydrateRemoteFavorites() {
+  const userId = getSiteMemberSession()?.student?.studentId?.trim();
+  if (!userId) {
+    return;
+  }
+
+  try {
+    const response = await studentAuthFetch(`/api/favorites?userId=${encodeURIComponent(userId)}`);
+    const payload = (await response.json()) as { placeIds?: string[] };
+    const remote = Array.isArray(payload.placeIds)
+      ? payload.placeIds.filter((id): id is string => typeof id === "string" && id.trim().length > 0)
+      : [];
+
+    const local = [...loadPartnerFavoriteIds()];
+    const guest = loadGuestPartnerFavoriteIds();
+    const seed = local.length > 0 ? local : guest;
+    const needsFirstUpload = !hasUploadedAccountFavorites(userId) && remote.length === 0 && seed.length > 0;
+
+    if (needsFirstUpload) {
+      replacePartnerFavoriteIds(seed);
+      markAccountFavoritesUploaded(userId);
+      await Promise.all(
+        seed.map((placeId) =>
+          studentAuthFetch("/api/favorites", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userId, placeId, favorited: true }),
+          }),
+        ),
+      );
+      return;
+    }
+
+    markAccountFavoritesUploaded(userId);
+    replacePartnerFavoriteIds(remote);
+  } catch {
+    // 로컬 즐겨찾기 유지
+  }
+}
 
 export function usePartnerFavorites() {
   const [favoriteIds, setFavoriteIds] = useState<ReadonlySet<string>>(() => new Set());
@@ -24,25 +67,26 @@ export function usePartnerFavorites() {
   }, []);
 
   useEffect(() => {
-    async function hydrateRemote() {
-      const userId = getSiteMemberSession()?.student?.studentId?.trim();
-      if (!userId) {
-        return;
-      }
-      try {
-        const response = await studentAuthFetch(`/api/favorites?userId=${encodeURIComponent(userId)}`);
-        const payload = (await response.json()) as { placeIds?: string[] };
-        if (Array.isArray(payload.placeIds)) {
-          replacePartnerFavoriteIds([...loadPartnerFavoriteIds(), ...payload.placeIds]);
-        }
-      } catch {
-        // 로컬 즐겨찾기 유지
+    void hydrateRemoteFavorites();
+    const onSession = () => {
+      setFavoriteIds(loadPartnerFavoriteIds());
+      void hydrateRemoteFavorites();
+    };
+    function refresh() {
+      if (document.visibilityState === "visible") {
+        void hydrateRemoteFavorites();
       }
     }
-    void hydrateRemote();
-    const onSession = () => void hydrateRemote();
     window.addEventListener(SITE_MEMBER_SESSION_EVENT, onSession);
-    return () => window.removeEventListener(SITE_MEMBER_SESSION_EVENT, onSession);
+    document.addEventListener("visibilitychange", refresh);
+    window.addEventListener("focus", refresh);
+    const timer = window.setInterval(refresh, 8000);
+    return () => {
+      window.removeEventListener(SITE_MEMBER_SESSION_EVENT, onSession);
+      document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("focus", refresh);
+      window.clearInterval(timer);
+    };
   }, []);
 
   const toggle = useCallback((partnerId: string) => {

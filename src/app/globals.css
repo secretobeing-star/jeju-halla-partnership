@@ -4559,25 +4559,29 @@ html.dark-mode .board-post-popup-close:hover {
 }
 
 html.ios-device .partner-main-map__status-overlay {
-  left: 0.4rem;
-  right: 3.2rem;
+  left: 0;
+  right: 0;
+  padding: 0 0.75rem;
+  box-sizing: border-box;
   justify-content: center;
 }
 
 html.ios-device .map-event-status-chip {
-  display: inline-block;
+  display: block;
+  width: fit-content;
   max-width: 100%;
+  margin: 0 auto;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   word-break: normal;
   overflow-wrap: normal;
-  padding: 0.22rem 0.5rem;
-  font-size: clamp(0.42rem, 2.05vw, 0.54rem);
-  line-height: 1.15;
+  padding: 0.26rem 0.65rem;
+  font-size: clamp(0.5rem, 2.4vw, 0.64rem);
+  line-height: 1.2;
   text-align: center;
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 .map-event-status-chip--green {

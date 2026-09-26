@@ -1,3 +1,5 @@
+import { getLoggedInStudentId } from "@/lib/site-member-session";
+
 export const USER_CUSTOM_CATEGORY_PREFIX = "custom::";
 export const USER_CUSTOM_CATEGORIES_EVENT = "user-custom-categories-changed";
 export const OPEN_USER_CUSTOM_CATEGORY_EDITOR_EVENT = "open-user-custom-category-editor";
@@ -133,13 +135,22 @@ export function createUserCustomCategoryId() {
   return `c-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function currentStorageKey() {
+  const userId = getLoggedInStudentId();
+  return userId ? `${STORAGE_KEY}:${userId}` : STORAGE_KEY;
+}
+
+function syncedFlagKey(userId: string) {
+  return `${STORAGE_KEY}-synced:${userId}`;
+}
+
 export function loadUserCustomCategories(): UserCustomCategory[] {
   if (typeof window === "undefined") {
     return [];
   }
 
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw = window.localStorage.getItem(currentStorageKey()) ?? window.localStorage.getItem(STORAGE_KEY);
     if (!raw) {
       return [];
     }
@@ -205,7 +216,7 @@ export function saveUserCustomCategories(next: UserCustomCategory[]) {
   }
 
   const categories = sanitizeCategoryList(next);
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(categories));
+  window.localStorage.setItem(currentStorageKey(), JSON.stringify(categories));
   window.dispatchEvent(new CustomEvent(USER_CUSTOM_CATEGORIES_EVENT));
   void syncUserCustomCategoriesToServer(categories);
 }
@@ -250,14 +261,19 @@ export async function hydrateUserCustomCategoriesFromServer(): Promise<UserCusto
     const payload = (await response.json()) as { categories?: unknown };
     const remote = normalizeUserCustomCategoryList(payload.categories);
     const local = loadUserCustomCategories();
-    const merged = mergeUserCustomCategories(local, remote);
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
-    window.dispatchEvent(new CustomEvent(USER_CUSTOM_CATEGORIES_EVENT));
-    const remoteJson = JSON.stringify(remote);
-    if (JSON.stringify(merged) !== remoteJson) {
-      void syncUserCustomCategoriesToServer(merged);
+    const alreadySynced = window.localStorage.getItem(syncedFlagKey(userId)) === "1";
+    if (!alreadySynced && remote.length === 0 && local.length > 0) {
+      window.localStorage.setItem(currentStorageKey(), JSON.stringify(local));
+      window.localStorage.setItem(syncedFlagKey(userId), "1");
+      window.dispatchEvent(new CustomEvent(USER_CUSTOM_CATEGORIES_EVENT));
+      void syncUserCustomCategoriesToServer(local);
+      return local;
     }
-    return merged;
+
+    window.localStorage.setItem(currentStorageKey(), JSON.stringify(remote));
+    window.localStorage.setItem(syncedFlagKey(userId), "1");
+    window.dispatchEvent(new CustomEvent(USER_CUSTOM_CATEGORIES_EVENT));
+    return remote;
   } catch {
     return null;
   }
