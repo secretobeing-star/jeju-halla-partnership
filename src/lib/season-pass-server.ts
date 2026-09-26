@@ -788,6 +788,8 @@ export async function completeVisit(input: {
   partnerName?: string;
   studentName?: string;
   department?: string;
+  visitExp?: number;
+  visitGold?: number;
 }): Promise<{ applied: boolean; reason?: string; state?: SeasonPassWidgetState }> {
   const userId = input.userId.trim();
   const partnerId = String(input.partnerId ?? "").trim();
@@ -833,10 +835,15 @@ export async function completeVisit(input: {
       .eq("season_id", season.id)
       .maybeSingle();
 
+    const visitExp =
+      input.visitExp === undefined ? season.visit_exp : Math.max(0, Number(input.visitExp) || 0);
+    const visitGold =
+      input.visitGold === undefined ? season.visit_gold : Math.max(0, Number(input.visitGold) || 0);
+
     await upsertProgress(admin, userId, season, {
-      exp: Number(existing?.exp || 0) + season.visit_exp,
+      exp: Number(existing?.exp || 0) + visitExp,
     });
-    await adjustGold(admin, userId, season, season.visit_gold, "visit");
+    await adjustGold(admin, userId, season, visitGold, "visit");
 
     await bumpQuestsByType(admin, userId, season, "partner_visit");
 

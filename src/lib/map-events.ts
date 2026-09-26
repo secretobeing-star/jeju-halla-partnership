@@ -20,6 +20,19 @@ export function resolveMapTabName(value?: string | null) {
 export const DEFAULT_BENEFIT_BTN_LABEL = "자세히 보기";
 export const DEFAULT_STAMP_BTN_LABEL = "도장 찍기";
 export const DEFAULT_RADIUS_METERS = 30;
+export const DEFAULT_STAMP_EXP = 100;
+export const DEFAULT_STAMP_GOLD = 10;
+
+export function parseStampRewardAmount(value: unknown, fallback: number) {
+  if (value === undefined || value === null || value === "") {
+    return fallback;
+  }
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return fallback;
+  }
+  return Math.floor(parsed);
+}
 
 export const MAP_EVENT_REWARD_TYPES = ["RANDOM_STEP", "GUARANTEED", "COMPLETION"] as const;
 export const MAP_EVENT_REWARD_CATEGORIES = ["CARD_SKIN", "CARD_STICKER", "COUPON"] as const;
@@ -47,6 +60,8 @@ export type MapEvent = {
   step_probabilities: number[];
   radius_meters: number;
   cooldown_minutes: number;
+  stamp_exp: number;
+  stamp_gold: number;
   stamp_active_img: string | null;
   stamp_inactive_img: string | null;
   marker_icon_img: string | null;

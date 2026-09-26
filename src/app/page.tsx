@@ -72,7 +72,9 @@ import { readPwaDeviceViewportHeight, readPwaDeviceViewportWidth } from "@/lib/p
 import { subscribeLayoutViewport } from "@/lib/layout-viewport";
 import { useStandaloneDisplayMode } from "@/hooks/useStandaloneDisplayMode";
 import { SitePwaInstallProvider } from "@/components/SitePwaInstallProvider";
-import SitePwaAppSettingsButton from "@/components/SitePwaAppSettingsButton";
+import SitePwaAppSettingsButton, {
+  OPEN_SITE_PWA_SETTINGS_EVENT,
+} from "@/components/SitePwaAppSettingsButton";
 import SitePwaFirstRunPermissions from "@/components/SitePwaFirstRunPermissions";
 import SitePwaRuntime from "@/components/SitePwaRuntime";
 import SiteTitleApplier from "@/components/SiteTitleApplier";
@@ -316,6 +318,7 @@ export default function HomePage() {
   const [editorPresetPartnerIds, setEditorPresetPartnerIds] = useState<string[]>([]);
   const [assignPartnerId, setAssignPartnerId] = useState<string | null>(null);
   const [categoryGearOpen, setCategoryGearOpen] = useState(false);
+  const categoryGearWrapRef = useRef<HTMLDivElement | null>(null);
   const [selectedYear, setSelectedYear] = useState<PartnerYearFilterValue>("전체");
   const [selectedRegions, setSelectedRegions] = useState<PartnerRegionFilters>(
     DEFAULT_PARTNER_REGION_FILTERS,
@@ -827,6 +830,32 @@ export default function HomePage() {
     saveUserCustomCategories(pruned);
     setCustomCategories(pruned);
   }, [customCategories, partners]);
+
+  useEffect(() => {
+    function closeCategoryGear() {
+      setCategoryGearOpen(false);
+    }
+    window.addEventListener(OPEN_SITE_PWA_SETTINGS_EVENT, closeCategoryGear);
+    return () => window.removeEventListener(OPEN_SITE_PWA_SETTINGS_EVENT, closeCategoryGear);
+  }, []);
+
+  useEffect(() => {
+    if (!categoryGearOpen) {
+      return;
+    }
+    function onPointerDown(event: PointerEvent) {
+      const target = event.target;
+      if (!(target instanceof Node)) {
+        return;
+      }
+      if (categoryGearWrapRef.current?.contains(target)) {
+        return;
+      }
+      setCategoryGearOpen(false);
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [categoryGearOpen]);
 
   useEffect(() => {
     if (memberStudentLoggedIn) {
@@ -1392,7 +1421,12 @@ export default function HomePage() {
   const categorySection = showCategoryRegionSection ? (
     <section className="partner-category-section partner-category-section--boxed mb-4">
       {memberStudentLoggedIn ? (
-        <div className="partner-category-section__gear-wrap">
+        <div
+          ref={categoryGearWrapRef}
+          className={`partner-category-section__gear-wrap${
+            categoryGearOpen ? " partner-category-section__gear-wrap--open" : ""
+          }`}
+        >
           <button
             type="button"
             className="partner-category-section__gear"

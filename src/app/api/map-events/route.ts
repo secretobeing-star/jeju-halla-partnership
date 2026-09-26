@@ -3,7 +3,10 @@ import { createSupabaseAdmin } from "@/lib/supabase-admin";
 import {
   asStringArray,
   DEFAULT_RADIUS_METERS,
+  DEFAULT_STAMP_EXP,
+  DEFAULT_STAMP_GOLD,
   isEventLive,
+  parseStampRewardAmount,
   parseStepProbabilities,
   type MapEvent,
   type MapEventReward,
@@ -21,6 +24,8 @@ type EventRow = {
   step_probabilities: unknown;
   radius_meters?: number | null;
   cooldown_minutes?: number | null;
+  stamp_exp?: number | null;
+  stamp_gold?: number | null;
   stamp_active_img: string | null;
   stamp_inactive_img: string | null;
   marker_icon_img: string | null;
@@ -60,6 +65,8 @@ function mapEventRow(row: EventRow, extras?: Partial<MapEvent>): MapEvent {
     step_probabilities: parseStepProbabilities(row.step_probabilities, row.max_stamps),
     radius_meters: Math.max(1, Number(row.radius_meters) || DEFAULT_RADIUS_METERS),
     cooldown_minutes: Math.max(0, Number(row.cooldown_minutes) || 0),
+    stamp_exp: parseStampRewardAmount(row.stamp_exp, DEFAULT_STAMP_EXP),
+    stamp_gold: parseStampRewardAmount(row.stamp_gold, DEFAULT_STAMP_GOLD),
     stamp_active_img: row.stamp_active_img,
     stamp_inactive_img: row.stamp_inactive_img,
     marker_icon_img: row.marker_icon_img,
@@ -202,6 +209,8 @@ export async function POST(request: NextRequest) {
     step_probabilities: parseStepProbabilities(body.step_probabilities, maxStamps),
     radius_meters: Math.max(1, Number(body.radius_meters) || DEFAULT_RADIUS_METERS),
     cooldown_minutes: Math.max(0, Number(body.cooldown_minutes) || 0),
+    stamp_exp: parseStampRewardAmount(body.stamp_exp, DEFAULT_STAMP_EXP),
+    stamp_gold: parseStampRewardAmount(body.stamp_gold, DEFAULT_STAMP_GOLD),
     stamp_active_img: body.stamp_active_img?.trim() || null,
     stamp_inactive_img: body.stamp_inactive_img?.trim() || null,
     marker_icon_img: body.marker_icon_img?.trim() || null,
@@ -222,7 +231,13 @@ export async function POST(request: NextRequest) {
     updated_at: new Date().toISOString(),
   };
 
-  const { data, error } = await admin.from("events").insert(payload).select("*").maybeSingle();
+  let { data, error } = await admin.from("events").insert(payload).select("*").maybeSingle();
+  if (error && /stamp_exp|stamp_gold|schema cache|does not exist/i.test(error.message)) {
+    const { stamp_exp: _stampExp, stamp_gold: _stampGold, ...retryPayload } = payload;
+    const retry = await admin.from("events").insert(retryPayload).select("*").maybeSingle();
+    data = retry.data;
+    error = retry.error;
+  }
   if (error || !data) {
     return NextResponse.json({ error: error?.message || "이벤트 생성에 실패했습니다." }, { status: 500 });
   }

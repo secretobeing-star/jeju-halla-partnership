@@ -49,6 +49,8 @@ import { getSiteMemberSession, clearSiteMemberSession } from "@/lib/site-member-
 import { supabase } from "@/lib/supabase";
 import DeleteAccountConfirmDialog from "@/components/DeleteAccountConfirmDialog";
 
+export const OPEN_SITE_PWA_SETTINGS_EVENT = "open-site-pwa-app-settings";
+
 type PermissionGuidePrompt = {
   kind: "notification" | "location";
   message: string;
@@ -576,7 +578,9 @@ export default function SitePwaAppSettingsButton({
 
   const rootClassName =
     layout === "toolbar"
-      ? "site-pwa-app-settings-root site-pwa-app-settings-root--toolbar relative"
+      ? `site-pwa-app-settings-root site-pwa-app-settings-root--toolbar relative${
+          open ? " z-[210]" : ""
+        }`
       : "site-pwa-app-settings-root fixed right-3 top-3 z-50 sm:right-4 sm:top-4";
 
   const triggerClassName =
@@ -726,7 +730,15 @@ export default function SitePwaAppSettingsButton({
       />
       <button
         type="button"
-        onClick={() => setOpen((prev) => !prev)}
+        onClick={() =>
+          setOpen((prev) => {
+            const next = !prev;
+            if (next) {
+              window.dispatchEvent(new Event(OPEN_SITE_PWA_SETTINGS_EVENT));
+            }
+            return next;
+          })
+        }
         className={triggerClassName}
         aria-label="설정"
         title="설정"
@@ -751,7 +763,7 @@ export default function SitePwaAppSettingsButton({
         <>
           <button
             type="button"
-            className="fixed inset-0 z-40 cursor-default bg-transparent"
+            className="fixed inset-0 z-[200] cursor-default bg-transparent"
             aria-label="설정 닫기"
             onClick={() => setOpen(false)}
           />

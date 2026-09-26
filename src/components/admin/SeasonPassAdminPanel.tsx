@@ -2,6 +2,8 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import AdminCollapsibleSection from "@/components/admin/AdminCollapsibleSection";
+import { usePromptModal } from "@/components/PromptModalProvider";
+import { confirmDeletion } from "@/lib/app-modal-messages";
 import { adminApiFetch, getAdminAccessToken, reloadAfterAdminSave } from "@/lib/admin-api";
 import { fromDatetimeLocalValue, toDatetimeLocalValue } from "@/lib/site-events";
 import { getStorageErrorMessage } from "@/lib/storage";
@@ -55,6 +57,7 @@ function ImageField({
 }
 
 export default function SeasonPassAdminPanel({ onMessage }: SeasonPassAdminPanelProps) {
+  const { confirm } = usePromptModal();
   const [seasons, setSeasons] = useState<SeasonRow[]>([]);
   const [items, setItems] = useState<RewardItem[]>([]);
   const [levels, setLevels] = useState<SeasonPassLevel[]>([]);
@@ -173,7 +176,8 @@ export default function SeasonPassAdminPanel({ onMessage }: SeasonPassAdminPanel
   async function handleDeleteSeason() {
     if (!selected) return;
     const title = selected.title || selected.code || "이 시즌";
-    const confirmed = window.confirm(
+    const confirmed = await confirmDeletion(
+      confirm,
       selected.is_active
         ? `"${title}"은(는) 현재 진행 중인 시즌입니다. 진행도·보상 기록까지 모두 삭제됩니다. 삭제할까요?`
         : `"${title}" 시즌을 삭제할까요? 진행도·보상 기록도 함께 삭제됩니다.`,
@@ -304,38 +308,6 @@ export default function SeasonPassAdminPanel({ onMessage }: SeasonPassAdminPanel
               />
             </label>
             <label className="text-sm font-medium text-gray-700">
-              제휴 도장 EXP
-              <input
-                type="number"
-                min={0}
-                className="mt-1 w-full rounded-lg border px-3 py-2"
-                value={selected.visit_exp}
-                onChange={(e) =>
-                  setSeasons((prev) =>
-                    prev.map((item) =>
-                      item.id === selected.id ? { ...item, visit_exp: Number(e.target.value) || 0 } : item,
-                    ),
-                  )
-                }
-              />
-            </label>
-            <label className="text-sm font-medium text-gray-700">
-              제휴 도장 골드
-              <input
-                type="number"
-                min={0}
-                className="mt-1 w-full rounded-lg border px-3 py-2"
-                value={selected.visit_gold}
-                onChange={(e) =>
-                  setSeasons((prev) =>
-                    prev.map((item) =>
-                      item.id === selected.id ? { ...item, visit_gold: Number(e.target.value) || 0 } : item,
-                    ),
-                  )
-                }
-              />
-            </label>
-            <label className="text-sm font-medium text-gray-700">
               출석 EXP / 골드
               <div className="mt-1 grid grid-cols-2 gap-2">
                 <input
@@ -412,8 +384,6 @@ export default function SeasonPassAdminPanel({ onMessage }: SeasonPassAdminPanel
                   starts_at: selected.starts_at,
                   ends_at: selected.ends_at,
                   exp_per_level: selected.exp_per_level,
-                  visit_exp: selected.visit_exp,
-                  visit_gold: selected.visit_gold,
                   attendance_exp: selected.attendance_exp,
                   attendance_gold: selected.attendance_gold,
                   bg_image_url: selected.bg_image_url,

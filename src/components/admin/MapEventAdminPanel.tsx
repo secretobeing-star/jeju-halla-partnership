@@ -8,6 +8,8 @@ import {
   DEFAULT_BENEFIT_BTN_LABEL,
   DEFAULT_MAP_TAB_NAME,
   DEFAULT_STAMP_BTN_LABEL,
+  DEFAULT_STAMP_EXP,
+  DEFAULT_STAMP_GOLD,
   probabilityToPercent,
   type MapAppConfig,
   type MapEvent,
@@ -36,6 +38,8 @@ type EventForm = {
   percents: number[];
   radius_meters: number;
   cooldown_minutes: number;
+  stamp_exp: number;
+  stamp_gold: number;
   stamp_btn_label: string;
   stamp_active_img: string;
   stamp_inactive_img: string;
@@ -67,6 +71,8 @@ const EMPTY_FORM: EventForm = {
   percents: [10],
   radius_meters: 30,
   cooldown_minutes: 0,
+  stamp_exp: DEFAULT_STAMP_EXP,
+  stamp_gold: DEFAULT_STAMP_GOLD,
   stamp_btn_label: "",
   stamp_active_img: "",
   stamp_inactive_img: "",
@@ -109,6 +115,8 @@ function eventToForm(event: MapEvent): EventForm {
     ),
     radius_meters: event.radius_meters || 30,
     cooldown_minutes: event.cooldown_minutes || 0,
+    stamp_exp: Math.max(0, Number(event.stamp_exp) || 0),
+    stamp_gold: Math.max(0, Number(event.stamp_gold) || 0),
     stamp_btn_label: event.stamp_btn_label ?? "",
     stamp_active_img: event.stamp_active_img ?? "",
     stamp_inactive_img: event.stamp_inactive_img ?? "",
@@ -339,6 +347,8 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
         step_probabilities: form.percents.map((value) => value / 100),
         radius_meters: form.radius_meters,
         cooldown_minutes: form.cooldown_minutes,
+        stamp_exp: form.stamp_exp,
+        stamp_gold: form.stamp_gold,
         stamp_btn_label: form.stamp_btn_label?.trim() || null,
         stamp_active_img: form.stamp_active_img || null,
         stamp_inactive_img: form.stamp_inactive_img || null,
@@ -714,6 +724,36 @@ export default function MapEventAdminPanel({ onMessage }: MapEventAdminPanelProp
               />
               <span className="mt-1 block text-xs font-normal text-gray-500">
                 0이면 바로 다음 도장을 찍을 수 있고, N이면 직전 도장 후 N분이 지나야 합니다.
+              </span>
+            </label>
+            <label className="text-sm font-medium text-gray-700">
+              제휴 도장 EXP
+              <input
+                type="number"
+                min={0}
+                value={form.stamp_exp}
+                onChange={(e) =>
+                  setForm((prev) => ({ ...prev, stamp_exp: Math.max(0, Number(e.target.value) || 0) }))
+                }
+                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+              />
+              <span className="mt-1 block text-xs font-normal text-gray-500">
+                도장을 찍을 때마다 시즌패스 EXP가 지급됩니다.
+              </span>
+            </label>
+            <label className="text-sm font-medium text-gray-700">
+              제휴 도장 골드
+              <input
+                type="number"
+                min={0}
+                value={form.stamp_gold}
+                onChange={(e) =>
+                  setForm((prev) => ({ ...prev, stamp_gold: Math.max(0, Number(e.target.value) || 0) }))
+                }
+                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+              />
+              <span className="mt-1 block text-xs font-normal text-gray-500">
+                도장을 찍을 때마다 골드가 지급됩니다.
               </span>
             </label>
           </div>

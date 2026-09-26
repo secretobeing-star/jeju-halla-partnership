@@ -8,6 +8,7 @@ import {
   DEFAULT_RADIUS_METERS,
   haversineMeters,
   isEventLive,
+  parseStampRewardAmount,
   parseStepProbabilities,
   resolveFrameValue,
   rollStepWin,
@@ -390,6 +391,14 @@ export async function POST(request: NextRequest) {
     partnerName: partner?.name || placeName,
     studentName: name,
     department,
+    visitExp:
+      event.stamp_exp === undefined || event.stamp_exp === null
+        ? undefined
+        : parseStampRewardAmount(event.stamp_exp, 0),
+    visitGold:
+      event.stamp_gold === undefined || event.stamp_gold === null
+        ? undefined
+        : parseStampRewardAmount(event.stamp_gold, 0),
   });
 
   return NextResponse.json({

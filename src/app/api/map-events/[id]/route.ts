@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
-import { asStringArray, DEFAULT_RADIUS_METERS, parseStepProbabilities } from "@/lib/map-events";
+import {
+  asStringArray,
+  DEFAULT_RADIUS_METERS,
+  DEFAULT_STAMP_EXP,
+  DEFAULT_STAMP_GOLD,
+  parseStampRewardAmount,
+  parseStepProbabilities,
+} from "@/lib/map-events";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -39,6 +46,12 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   }
   if (body.cooldown_minutes !== undefined) {
     patch.cooldown_minutes = Math.max(0, Number(body.cooldown_minutes) || 0);
+  }
+  if (body.stamp_exp !== undefined) {
+    patch.stamp_exp = parseStampRewardAmount(body.stamp_exp, DEFAULT_STAMP_EXP);
+  }
+  if (body.stamp_gold !== undefined) {
+    patch.stamp_gold = parseStampRewardAmount(body.stamp_gold, DEFAULT_STAMP_GOLD);
   }
   if (typeof body.guide_text === "string") patch.guide_text = body.guide_text.trim() || null;
   if (typeof body.distance_error_message === "string") patch.distance_error_message = body.distance_error_message.trim() || null;
@@ -104,7 +117,9 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     .select("*")
     .maybeSingle();
 
-  if (error && /marker_border_color|marker_time_icon|marker_time_format|schema cache|does not exist/i.test(error.message)) {
+  if (error && /stamp_exp|stamp_gold|marker_border_color|marker_time_icon|marker_time_format|schema cache|does not exist/i.test(error.message)) {
+    delete patch.stamp_exp;
+    delete patch.stamp_gold;
     delete patch.marker_border_color;
     delete patch.marker_time_icon;
     delete patch.marker_time_format;
