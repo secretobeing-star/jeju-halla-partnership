@@ -6,6 +6,7 @@ import { getClientIpBanStateForServer } from "@/lib/ip-ban-server";
 import { getClientIp } from "@/lib/client-ip";
 import { containsProfanity, profanityBlockedResponse } from "@/lib/profanity-filter";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
+import { resolveContentPassword } from "@/lib/student-content-password";
 
 type CreateCommentBody = {
   author_name?: string;
@@ -41,7 +42,7 @@ export async function POST(
 
   const authorName = body.author_name?.trim() ?? "";
   const content = body.content?.trim() ?? "";
-  const password = body.password ?? "";
+  const password = (await resolveContentPassword(request, body.password)) ?? "";
   const parentId = body.parent_id?.trim() || null;
   const voterKey = body.voter_key?.trim() ?? "";
   const requestedSecret = body.is_secret === true;

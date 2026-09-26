@@ -11,7 +11,8 @@ import { confirmDeletion, maybeAlertPasswordError, resolveBoardActionError, aler
 import { containsProfanity } from "@/lib/profanity-filter";
 import { trackSiteAnalytics } from "@/lib/site-analytics";
 import { BoardComment, SiteSettings, supabase } from "@/lib/supabase";
-import { getLoggedInStudentId, SITE_MEMBER_SESSION_EVENT } from "@/lib/site-member-session";
+import { getLoggedInAuthorNickname, getLoggedInStudentId, saveLoggedInAuthorNickname, SITE_MEMBER_SESSION_EVENT } from "@/lib/site-member-session";
+import { studentAuthFetch } from "@/lib/student-session";
 
 type BoardCommentsProps = {
   postId: string;
@@ -219,9 +220,9 @@ export default function BoardComments({
 
   useEffect(() => {
     const fillAuthor = () => {
-      const studentId = getLoggedInStudentId();
-      if (!studentId) return;
-      setAuthorName((current) => (current.trim() ? current : studentId));
+      const nickname = getLoggedInAuthorNickname();
+      if (!nickname) return;
+      setAuthorName((current) => (current.trim() ? current : nickname));
     };
     fillAuthor();
     window.addEventListener(SITE_MEMBER_SESSION_EVENT, fillAuthor);
@@ -298,7 +299,7 @@ export default function BoardComments({
   }, [interactionEnabled]);
 
   function resetWriteForm() {
-    setAuthorName(getLoggedInStudentId());
+    setAuthorName(getLoggedInAuthorNickname());
     setContent("");
     setPassword("");
     setWriteIsSecret(false);
@@ -465,13 +466,13 @@ export default function BoardComments({
   }
 
   async function createCommentViaApi(parentId: string | null) {
-    const response = await fetch(`/api/board/${postId}/comments`, {
+    const response = await (getLoggedInStudentId() ? studentAuthFetch : fetch)(`/api/board/${postId}/comments`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         author_name: authorName.trim(),
         content: content.trim(),
-        password,
+        password: getLoggedInStudentId() ? "" : password,
         parent_id: parentId,
         is_secret: secretCommentsEnabled && writeIsSecret,
         voter_key: getBoardVoterKey(),
@@ -553,8 +554,12 @@ export default function BoardComments({
   async function handleCreate(e: FormEvent, parentId: string | null) {
     e.preventDefault();
 
-    if (!authorName.trim() || !content.trim() || !password.trim()) {
-      setMessage("작성자, 댓글, 비밀번호를 모두 입력해 주세요.");
+    if (!authorName.trim() || !content.trim() || (!getLoggedInStudentId() && !password.trim())) {
+      setMessage(
+        getLoggedInStudentId()
+          ? "작성자와 댓글을 입력해 주세요."
+          : "작성자, 댓글, 비밀번호를 모두 입력해 주세요.",
+      );
       return;
     }
 
@@ -577,6 +582,12 @@ export default function BoardComments({
           apiResult.ban_type,
         )
       ) {
+        setSubmitting(false);
+        return;
+      }
+
+      if (getLoggedInStudentId()) {
+        setMessage(`${parentId ? "답글" : "댓글"} 등록 실패: ${apiResult.error}`);
         setSubmitting(false);
         return;
       }
@@ -609,6 +620,7 @@ export default function BoardComments({
       }
     }
 
+    saveLoggedInAuthorNickname(authorName);
     resetWriteForm();
     setShowWriteForm(false);
     setReplyToComment(null);
@@ -1110,6 +1122,7 @@ export default function BoardComments({
               onAuthorNameChange={setAuthorName}
               onContentChange={setContent}
               onPasswordChange={setPassword}
+              hidePassword={Boolean(getLoggedInStudentId())}
             />
             <div className="mt-3 flex flex-wrap gap-2">
               <button
@@ -1190,6 +1203,7 @@ export default function BoardComments({
                 onAuthorNameChange={setAuthorName}
                 onContentChange={setContent}
                 onPasswordChange={setPassword}
+              hidePassword={Boolean(getLoggedInStudentId())}
               />
               <div className="mt-3 flex flex-wrap gap-2">
                 <button
@@ -1233,6 +1247,7 @@ function WriteFields({
   password,
   secretCommentsEnabled = false,
   isSecret = false,
+  hidePassword = false,
   onIsSecretChange,
   onAuthorNameChange,
   onContentChange,
@@ -1243,6 +1258,7 @@ function WriteFields({
   password: string;
   secretCommentsEnabled?: boolean;
   isSecret?: boolean;
+  hidePassword?: boolean;
   onIsSecretChange?: (value: boolean) => void;
   onAuthorNameChange: (value: string) => void;
   onContentChange: (value: string) => void;
@@ -1258,10 +1274,13 @@ function WriteFields({
             onChange={(e) => onAuthorNameChange(e.target.value)}
             required
             autoFocus={false}
-            placeholder={getLoggedInStudentId() ? "학번" : "닉네임 또는 이름"}
+            placeholder="닉네임"
             className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
           />
         </label>
+        {hidePassword ? (
+          <p className="flex items-end text-sm text-gray-500">학번 로그인 중이라 비밀번호는 필요 없습니다.</p>
+        ) : (
         <label className="block text-sm font-medium text-gray-700">
           비밀번호
           <input
@@ -1274,6 +1293,7 @@ function WriteFields({
             className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
           />
         </label>
+        )}
       </div>
       <label className="mt-3 block text-sm font-medium text-gray-700">
         댓글

@@ -6,6 +6,7 @@ import { getClientIpBanStateForServer } from "@/lib/ip-ban-server";
 import { getClientIp } from "@/lib/client-ip";
 import { containsProfanity, profanityBlockedResponse } from "@/lib/profanity-filter";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
+import { resolveContentPassword } from "@/lib/student-content-password";
 
 type CreateBoardPostBody = {
   board_type?: string;
@@ -39,7 +40,7 @@ export async function POST(request: Request) {
   const title = body.title?.trim() ?? "";
   const authorName = body.author_name?.trim() ?? "";
   const content = body.content ?? "";
-  const password = body.password ?? "";
+  const password = (await resolveContentPassword(request, body.password)) ?? "";
   const isSecret = Boolean(body.is_secret);
   const voterKey = body.voter_key?.trim() ?? "";
   const clientIp = getClientIp(request);

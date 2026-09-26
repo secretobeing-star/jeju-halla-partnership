@@ -25,7 +25,8 @@ import {
   mapEventCommentRpcError,
 } from "@/lib/site-event-comments";
 import { SiteEventComment, SiteSettings, supabase } from "@/lib/supabase";
-import { getLoggedInStudentId, SITE_MEMBER_SESSION_EVENT } from "@/lib/site-member-session";
+import { getLoggedInAuthorNickname, getLoggedInStudentId, saveLoggedInAuthorNickname, SITE_MEMBER_SESSION_EVENT } from "@/lib/site-member-session";
+import { studentAuthFetch } from "@/lib/student-session";
 
 type EventCommentsProps = {
   tabId: string;
@@ -52,9 +53,9 @@ export default function EventComments({
 
   useEffect(() => {
     const fillAuthor = () => {
-      const studentId = getLoggedInStudentId();
-      if (!studentId) return;
-      setAuthorName((current) => (current.trim() ? current : studentId));
+      const nickname = getLoggedInAuthorNickname();
+      if (!nickname) return;
+      setAuthorName((current) => (current.trim() ? current : nickname));
     };
     fillAuthor();
     window.addEventListener(SITE_MEMBER_SESSION_EVENT, fillAuthor);
@@ -292,13 +293,13 @@ export default function EventComments({
     setSubmitting(true);
     setMessage("");
 
-    const response = await fetch(`/api/events/tabs/${tabId}/comments`, {
+    const response = await (getLoggedInStudentId() ? studentAuthFetch : fetch)(`/api/events/tabs/${tabId}/comments`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         author_name: authorName.trim(),
         content: content.trim(),
-        password,
+        password: getLoggedInStudentId() ? "" : password,
         voter_key: getPartnerVoterKey(),
       }),
     });
@@ -326,6 +327,7 @@ export default function EventComments({
     }
 
     setSubmitting(false);
+    saveLoggedInAuthorNickname(authorName);
     setContent("");
     setPassword("");
     setMessage("댓글이 등록되었습니다.");
@@ -472,7 +474,7 @@ export default function EventComments({
                     <input
                       value={editAuthorName}
                       onChange={(e) => setEditAuthorName(e.target.value)}
-                      placeholder="닉네임 또는 이름"
+                      placeholder="닉네임"
                       required
                       className="site-event-comments__input"
                     />
@@ -547,7 +549,7 @@ export default function EventComments({
         <input
           value={authorName}
           onChange={(e) => setAuthorName(e.target.value)}
-          placeholder={getLoggedInStudentId() ? "학번" : "닉네임 또는 이름"}
+          placeholder="닉네임"
           required
           maxLength={20}
           className="site-event-comments__input"
@@ -560,6 +562,9 @@ export default function EventComments({
           rows={3}
           className="site-event-comments__textarea"
         />
+        {getLoggedInStudentId() ? (
+          <p className="text-xs text-gray-500">학번 로그인 중이라 비밀번호는 필요 없습니다.</p>
+        ) : (
         <input
           type="password"
           value={password}
@@ -570,6 +575,7 @@ export default function EventComments({
           maxLength={40}
           className="site-event-comments__input"
         />
+        )}
         <button type="submit" disabled={submitting} className="site-event-comments__submit">
           {submitting ? "등록 중..." : "댓글 등록"}
         </button>

@@ -27,7 +27,8 @@ import {
   getStoredPostReaction,
   setStoredPostReaction,
 } from "@/lib/board-voter";
-import { getLoggedInStudentId, SITE_MEMBER_SESSION_EVENT } from "@/lib/site-member-session";
+import { getLoggedInAuthorNickname, getLoggedInStudentId, saveLoggedInAuthorNickname, SITE_MEMBER_SESSION_EVENT } from "@/lib/site-member-session";
+import { studentAuthFetch } from "@/lib/student-session";
 import {
   BOARD_PINNED_LIST_FIELDS,
   BOARD_PINNED_LIST_FIELDS_BASE,
@@ -138,9 +139,9 @@ export default function BoardSection({
 
   useEffect(() => {
     const fillAuthor = () => {
-      const studentId = getLoggedInStudentId();
-      if (!studentId) return;
-      setAuthorName((current) => (current.trim() ? current : studentId));
+      const nickname = getLoggedInAuthorNickname();
+      if (!nickname) return;
+      setAuthorName((current) => (current.trim() ? current : nickname));
     };
     fillAuthor();
     window.addEventListener(SITE_MEMBER_SESSION_EVENT, fillAuthor);
@@ -564,7 +565,7 @@ export default function BoardSection({
 
   function resetWriteForm() {
     setTitle("");
-    setAuthorName(getLoggedInStudentId());
+    setAuthorName(getLoggedInAuthorNickname());
     setContent("");
     setPassword("");
     setWriteIsSecret(false);
@@ -749,8 +750,12 @@ export default function BoardSection({
       return;
     }
 
-    if (!title.trim() || !authorName.trim() || !content.trim() || !password.trim()) {
-      setMessage("제목, 작성자, 내용, 비밀번호를 모두 입력해 주세요.");
+    if (!title.trim() || !authorName.trim() || !content.trim() || (!getLoggedInStudentId() && !password.trim())) {
+      setMessage(
+        getLoggedInStudentId()
+          ? "제목, 작성자, 내용을 입력해 주세요."
+          : "제목, 작성자, 내용, 비밀번호를 모두 입력해 주세요.",
+      );
       return;
     }
 
@@ -762,7 +767,7 @@ export default function BoardSection({
     setSubmitting(true);
     setMessage("");
 
-    const response = await fetch("/api/board", {
+    const response = await (getLoggedInStudentId() ? studentAuthFetch : fetch)("/api/board", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -770,7 +775,7 @@ export default function BoardSection({
         title: title.trim(),
         author_name: authorName.trim(),
         content,
-        password,
+        password: getLoggedInStudentId() ? "" : password,
         is_secret: secretPostsEnabled && writeIsSecret,
         voter_key: getBoardVoterKey(),
       }),
@@ -802,6 +807,12 @@ export default function BoardSection({
         }
 
         setMessage(errorMessage);
+        setSubmitting(false);
+        return;
+      }
+
+      if (getLoggedInStudentId()) {
+        setMessage(apiError);
         setSubmitting(false);
         return;
       }
@@ -846,6 +857,7 @@ export default function BoardSection({
       }
     }
 
+    saveLoggedInAuthorNickname(authorName);
     resetWriteForm();
     setShowWriteForm(false);
     setMessage("게시글이 등록되었습니다.");
@@ -1351,10 +1363,15 @@ export default function BoardSection({
                   value={authorName}
                   onChange={(e) => setAuthorName(e.target.value)}
                   required
-                  placeholder={getLoggedInStudentId() ? "학번" : "닉네임 또는 이름"}
+                  placeholder="닉네임"
                   className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 outline-none focus:border-emerald-500"
                 />
               </label>
+              {getLoggedInStudentId() ? (
+                <p className="flex items-end text-sm text-gray-500">
+                  학번 로그인 중이라 글 비밀번호는 필요 없습니다.
+                </p>
+              ) : (
               <label className="block text-sm font-medium text-gray-700">
                 비밀번호
                 <input
@@ -1367,6 +1384,7 @@ export default function BoardSection({
                   className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 outline-none focus:border-emerald-500"
                 />
               </label>
+              )}
             </div>
 
             <div className="mt-4">

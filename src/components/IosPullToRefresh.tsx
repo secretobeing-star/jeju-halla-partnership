@@ -45,6 +45,7 @@ function hasInnerScroll(target: EventTarget | null) {
 
 export default function IosPullToRefresh() {
   const [visible, setVisible] = useState(false);
+  const [ready, setReady] = useState(false);
   const [enabled, setEnabled] = useState(false);
   const startY = useRef(0);
   const pulling = useRef(false);
@@ -61,16 +62,23 @@ export default function IosPullToRefresh() {
       if (event.touches.length !== 1) return;
       if (isBlocked(event.target) || isTextEntryElement(event.target) || hasInnerScroll(event.target)) {
         pulling.current = false;
+        pullRef.current = 0;
+        setVisible(false);
+        setReady(false);
         return;
       }
       if (pageScrollTop() > 2) {
         pulling.current = false;
+        pullRef.current = 0;
+        setVisible(false);
+        setReady(false);
         return;
       }
       startY.current = event.touches[0].clientY;
       pulling.current = true;
       pullRef.current = 0;
       setVisible(false);
+      setReady(false);
     }
 
     function onMove(event: TouchEvent) {
@@ -79,16 +87,19 @@ export default function IosPullToRefresh() {
         pulling.current = false;
         pullRef.current = 0;
         setVisible(false);
+        setReady(false);
         return;
       }
       const delta = event.touches[0].clientY - startY.current;
       if (delta <= 8) {
         pullRef.current = 0;
         setVisible(false);
+        setReady(false);
         return;
       }
       pullRef.current = delta;
       setVisible(true);
+      setReady(delta >= PULL_THRESHOLD);
       if (delta > 12) {
         event.preventDefault();
       }
@@ -99,6 +110,7 @@ export default function IosPullToRefresh() {
       pulling.current = false;
       const amount = pullRef.current;
       pullRef.current = 0;
+      setReady(false);
       if (amount >= PULL_THRESHOLD) {
         window.location.reload();
         return;
@@ -122,7 +134,20 @@ export default function IosPullToRefresh() {
 
   return (
     <div className="ios-pull-refresh" aria-hidden>
-      <span className="ios-pull-refresh__label">새로고침</span>
+      <span className={`ios-pull-refresh__icon${ready ? " is-ready" : ""}`}>
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M21 12a9 9 0 1 1-3.2-6.9" />
+          <path d="M21 3v6h-6" />
+        </svg>
+      </span>
     </div>
   );
 }

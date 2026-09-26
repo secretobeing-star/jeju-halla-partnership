@@ -3,6 +3,7 @@ import { isAdminManagedComment } from "@/lib/board-comments";
 import { shouldStoreAdminVisiblePassword } from "@/lib/admin-password-settings";
 import { containsProfanity, profanityBlockedResponse } from "@/lib/profanity-filter";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
+import { resolveContentPassword } from "@/lib/student-content-password";
 
 type UpdateCommentBody = {
   password?: string;
@@ -33,7 +34,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const password = body.password ?? "";
+  const password = (await resolveContentPassword(request, body.password)) ?? "";
   const authorName = body.author_name?.trim() ?? "";
   const content = body.content?.trim() ?? "";
 
@@ -123,7 +124,7 @@ export async function DELETE(
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const password = body.password ?? "";
+  const password = (await resolveContentPassword(request, body.password)) ?? "";
 
   if (!password) {
     return NextResponse.json({ error: "Password is required." }, { status: 400 });

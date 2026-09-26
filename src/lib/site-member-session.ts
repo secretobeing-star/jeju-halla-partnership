@@ -1,5 +1,5 @@
 import { getBoardVoterKey } from "@/lib/board-voter";
-import { readDeviceJson, writeDeviceJson } from "@/lib/device-storage";
+import { readDeviceJson, readDeviceRaw, writeDeviceJson, writeDeviceRaw } from "@/lib/device-storage";
 import type {
   StudentApprovalStatus,
   StudentGraduationStatus,
@@ -29,8 +29,22 @@ export type SiteMemberSession = {
   provider_token?: string;
 };
 
+export const SITE_MEMBER_NICKNAME_KEY = "jeju-halla-author-nickname";
+
 export function getLoggedInStudentId(): string {
   return getSiteMemberSession()?.student?.studentId?.trim() || "";
+}
+
+export function getLoggedInAuthorNickname(): string {
+  if (!getLoggedInStudentId()) return "";
+  return (readDeviceRaw(SITE_MEMBER_NICKNAME_KEY) ?? "").trim();
+}
+
+export function saveLoggedInAuthorNickname(value: string) {
+  if (!getLoggedInStudentId()) return;
+  const next = value.trim();
+  if (!next) return;
+  writeDeviceRaw(SITE_MEMBER_NICKNAME_KEY, next);
 }
 
 export function getSiteMemberSession(): SiteMemberSession | null {

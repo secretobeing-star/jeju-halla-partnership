@@ -15,7 +15,8 @@ import { usePromptModal } from "@/components/PromptModalProvider";
 import { getPartnerVoterKey } from "@/lib/partner-voter";
 import type { HiddenReviewDisplay } from "@/lib/partner-hidden-review";
 import { supabase, SiteSettings } from "@/lib/supabase";
-import { getLoggedInStudentId, SITE_MEMBER_SESSION_EVENT } from "@/lib/site-member-session";
+import { getLoggedInAuthorNickname, getLoggedInStudentId, saveLoggedInAuthorNickname, SITE_MEMBER_SESSION_EVENT } from "@/lib/site-member-session";
+import { studentAuthFetch } from "@/lib/student-session";
 
 type PartnerReviewsProps = {
   partnerId: string;
@@ -59,9 +60,9 @@ export default function PartnerReviews({
 
   useEffect(() => {
     const fillAuthor = () => {
-      const studentId = getLoggedInStudentId();
-      if (!studentId) return;
-      setAuthorName((current) => (current.trim() ? current : studentId));
+      const nickname = getLoggedInAuthorNickname();
+      if (!nickname) return;
+      setAuthorName((current) => (current.trim() ? current : nickname));
     };
     fillAuthor();
     window.addEventListener(SITE_MEMBER_SESSION_EVENT, fillAuthor);
@@ -286,13 +287,13 @@ export default function PartnerReviews({
     setSubmitting(true);
     setMessage("");
 
-    const response = await fetch(`/api/partners/${partnerId}/reviews`, {
+    const response = await (getLoggedInStudentId() ? studentAuthFetch : fetch)(`/api/partners/${partnerId}/reviews`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         author_name: authorName.trim(),
         content: content.trim(),
-        password,
+        password: getLoggedInStudentId() ? "" : password,
         voter_key: getPartnerVoterKey(),
       }),
     });
@@ -328,6 +329,7 @@ export default function PartnerReviews({
       onReviewCountChange(partnerId, payload.result.review_count);
     }
 
+    saveLoggedInAuthorNickname(authorName);
     setContent("");
     setPassword("");
     setMessage("후기가 등록되었습니다.");
@@ -503,7 +505,7 @@ export default function PartnerReviews({
                       <input
                         value={editAuthorName}
                         onChange={(e) => setEditAuthorName(e.target.value)}
-                        placeholder="닉네임 또는 이름"
+                        placeholder="닉네임"
                         required
                         className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs outline-none focus:border-sky-400 sm:text-sm"
                       />
@@ -583,7 +585,7 @@ export default function PartnerReviews({
             <input
               value={authorName}
               onChange={(e) => setAuthorName(e.target.value)}
-              placeholder={getLoggedInStudentId() ? "학번" : "닉네임 또는 이름"}
+              placeholder="닉네임"
               required
               className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs outline-none focus:border-sky-400 sm:text-sm"
             />
@@ -603,6 +605,9 @@ export default function PartnerReviews({
             >
               {submitting ? "등록 중..." : panelLayout ? "후기등록" : "후기 등록"}
             </button>
+            {getLoggedInStudentId() ? (
+              <p className="text-xs text-gray-500">학번 로그인 중이라 비밀번호는 필요 없습니다.</p>
+            ) : (
             <input
               type="password"
               value={password}
@@ -612,6 +617,7 @@ export default function PartnerReviews({
               minLength={4}
               className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs outline-none focus:border-sky-400 sm:text-sm"
             />
+            )}
           </form>
         </div>
       )}

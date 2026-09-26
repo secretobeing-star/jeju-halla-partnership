@@ -5,6 +5,7 @@ import { getClientIp } from "@/lib/client-ip";
 import { mapPartnerReviewRpcError } from "@/lib/partner-review";
 import { containsProfanity, profanityBlockedResponse } from "@/lib/profanity-filter";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
+import { resolveContentPassword } from "@/lib/student-content-password";
 
 type CreatePartnerReviewBody = {  author_name?: string;
   content?: string;
@@ -37,7 +38,7 @@ export async function POST(
 
   const authorName = body.author_name?.trim() ?? "";
   const content = body.content?.trim() ?? "";
-  const password = body.password ?? "";
+  const password = (await resolveContentPassword(request, body.password)) ?? "";
   const voterKey = body.voter_key?.trim() ?? "";
 
   if (!authorName || !content || !password || voterKey.length < 8) {
