@@ -4572,10 +4572,12 @@ html.ios-device .map-event-status-chip {
   white-space: nowrap;
   word-break: normal;
   overflow-wrap: normal;
-  padding: 0.28rem 0.6rem;
-  font-size: clamp(0.52rem, 2.55vw, 0.68rem);
-  line-height: 1.2;
+  padding: 0.22rem 0.5rem;
+  font-size: clamp(0.42rem, 2.05vw, 0.54rem);
+  line-height: 1.15;
   text-align: center;
+  font-weight: 600;
+  letter-spacing: -0.02em;
 }
 
 .map-event-status-chip--green {
