@@ -1934,6 +1934,11 @@ video.bottom-pc-ad-image {
   bottom: max(1.25rem, env(safe-area-inset-bottom, 0px));
 }
 
+body.site-app-settings-open .floating-page-controls {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 body {
   --site-fab-stack-bottom: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 4.85rem);
 }
@@ -4554,23 +4559,23 @@ html.dark-mode .board-post-popup-close:hover {
 }
 
 html.ios-device .partner-main-map__status-overlay {
-  right: 3.35rem;
-  justify-content: flex-start;
+  left: 0.4rem;
+  right: 3.2rem;
+  justify-content: center;
 }
 
 html.ios-device .map-event-status-chip {
-  display: inline-flex;
-  align-items: center;
+  display: inline-block;
   max-width: 100%;
-  overflow: visible;
-  text-overflow: unset;
-  white-space: normal;
-  word-break: keep-all;
-  overflow-wrap: anywhere;
-  padding: 0.3rem 0.55rem;
-  font-size: 0.625rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  word-break: normal;
+  overflow-wrap: normal;
+  padding: 0.28rem 0.6rem;
+  font-size: clamp(0.52rem, 2.55vw, 0.68rem);
   line-height: 1.2;
-  text-align: left;
+  text-align: center;
 }
 
 .map-event-status-chip--green {

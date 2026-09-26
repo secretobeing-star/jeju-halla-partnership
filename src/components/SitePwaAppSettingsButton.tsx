@@ -252,6 +252,11 @@ export default function SitePwaAppSettingsButton({
   }, []);
 
   useAppBackHandler(open, closePanel, "site-pwa-app-settings-panel");
+
+  useEffect(() => {
+    document.body.classList.toggle("site-app-settings-open", open);
+    return () => document.body.classList.remove("site-app-settings-open");
+  }, [open]);
   const [notificationState, setNotificationState] = useState<PermissionDisplayState>("prompt");
   const [notificationSubscribed, setNotificationSubscribed] = useState(false);
   const [locationState, setLocationState] = useState<PermissionDisplayState>("prompt");
