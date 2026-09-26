@@ -251,6 +251,8 @@ export default function AdminPage() {
   const [shopImageUploading, setShopImageUploading] = useState(false);
   const [partnerExtraPhotos, setPartnerExtraPhotos] = useState<string[]>([]);
   const [partnerPhotosUploading, setPartnerPhotosUploading] = useState(false);
+  const [partnerImageLink, setPartnerImageLink] = useState("");
+  const [partnerExtraPhotoLink, setPartnerExtraPhotoLink] = useState("");
   const [partnerSaving, setPartnerSaving] = useState(false);
   const [partnerMessage, setPartnerMessage] = useState("");
   const [partnerListSearch, setPartnerListSearch] = useState("");
@@ -1564,6 +1566,41 @@ export default function AdminPage() {
     } finally {
       setShopImageUploading(false);
     }
+  }
+
+  function applyHttpImageUrl(raw: string) {
+    const value = raw.trim();
+    try {
+      const parsed = new URL(value);
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+        throw new Error("invalid");
+      }
+      return parsed.toString();
+    } catch {
+      return null;
+    }
+  }
+
+  function applyPartnerMainImageLink() {
+    const url = applyHttpImageUrl(partnerImageLink);
+    if (!url) {
+      setPartnerMessage("http:// 또는 https:// 로 시작하는 사진 주소를 입력해 주세요.");
+      return;
+    }
+    setPartnerForm((prev) => ({ ...prev, image_url: url }));
+    setPartnerImageLink("");
+    setPartnerMessage("업체 대표 사진 링크가 적용되었습니다.");
+  }
+
+  function applyPartnerExtraPhotoLink() {
+    const url = applyHttpImageUrl(partnerExtraPhotoLink);
+    if (!url) {
+      setPartnerMessage("http:// 또는 https:// 로 시작하는 사진 주소를 입력해 주세요.");
+      return;
+    }
+    setPartnerExtraPhotos((prev) => [...prev, url]);
+    setPartnerExtraPhotoLink("");
+    setPartnerMessage("추가 사진 링크가 적용되었습니다.");
   }
 
   async function handlePartnerExtraPhotosUpload(files: FileList | File[]) {
@@ -3739,6 +3776,22 @@ export default function AdminPage() {
                       }}
                       className="mt-1 block w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-emerald-700"
                     />
+                    <span className="mt-2 flex gap-2">
+                      <input
+                        type="url"
+                        value={partnerImageLink}
+                        onChange={(e) => setPartnerImageLink(e.target.value)}
+                        placeholder="사진 링크 https://"
+                        className="min-w-0 flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={applyPartnerMainImageLink}
+                        className="shrink-0 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800 hover:bg-emerald-100"
+                      >
+                        링크 적용
+                      </button>
+                    </span>
                   </label>
                   {shopImageUploading && (
                     <p className="mt-2 text-sm text-gray-500">업로드 중...</p>
@@ -3782,8 +3835,23 @@ export default function AdminPage() {
                       }}
                       className="mt-1 block w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-emerald-700"
                     />
+                    <span className="mt-2 flex gap-2">
+                      <input
+                        type="url"
+                        value={partnerExtraPhotoLink}
+                        onChange={(e) => setPartnerExtraPhotoLink(e.target.value)}
+                        placeholder="추가 사진 링크 https://"
+                        className="min-w-0 flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={applyPartnerExtraPhotoLink}
+                        className="shrink-0 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800 hover:bg-emerald-100"
+                      >
+                        링크 적용
+                      </button>
+                    </span>
                   </label>
-                  {partnerPhotosUploading && (
                     <p className="mt-2 text-sm text-gray-500">추가 사진 업로드 중...</p>
                   )}
                   {partnerExtraPhotos.length > 0 && (

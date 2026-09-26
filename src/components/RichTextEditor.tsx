@@ -115,12 +115,28 @@ function IconLink() {
   );
 }
 
-function IconImage() {
+function IconImageLink() {
   return (
     <svg viewBox="0 0 16 16" aria-hidden className="rich-editor-toolbar-icon">
-      <path d="M2.5 3.5h11v9h-11v-9zm1.3 1.3v6.4l2.4-2.4 1.8 1.8 2.5-3.2 2 2.5V4.8H3.8zm1.8 1.4a1 1 0 1 0 0 2 1 1 0 0 0 0-2z" />
+      <path d="M2.2 3.2h7.6v6.8H2.2V3.2zm1.2 1.2v4.4l1.7-1.7 1.3 1.3 1.8-2.3 1.4 1.8V4.4H3.4zm1.3 1.1a.8.8 0 1 0 0 1.6.8.8 0 0 0 0-1.6zM9.4 9.1a2.1 2.1 0 0 1 3 0l.9.9-1 .9-.9-.9a.7.7 0 0 0-1 0l-.5.5-1-.9.5-.5zm-1.2 1.2.9.9a2.1 2.1 0 0 0 3 0l.5-.5 1 .9-.5.5a2.1 2.1 0 0 1-3 0l-.9-.9-1-.9z" />
     </svg>
   );
+}
+
+function parseHttpUrl(input: string) {
+  try {
+    const parsed = new URL(input.trim());
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return null;
+    }
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
+function escapeHtmlAttr(value: string) {
+  return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 }
 
 function IconYoutube() {
@@ -278,7 +294,7 @@ export default function RichTextEditor({
   const imageAccept = isMobile ? MOBILE_IMAGE_UPLOAD_ACCEPT : IMAGE_UPLOAD_ACCEPT;
 
   function buildImageHtml(url: string) {
-    return `<img src="${url}" alt="" loading="lazy" decoding="async" class="rich-editor-image" style="width:50%;max-width:100%;height:auto;display:inline-block;vertical-align:top;margin:0.5rem;" />`;
+    return `<img src="${escapeHtmlAttr(url)}" alt="" loading="lazy" decoding="async" class="rich-editor-image" style="width:50%;max-width:100%;height:auto;display:inline-block;vertical-align:top;margin:0.5rem;" />`;
   }
 
   function insertImageHtml(url: string) {
@@ -318,6 +334,30 @@ export default function RichTextEditor({
     editorRef.current?.focus();
     document.execCommand("hiliteColor", false, color);
     syncContent();
+  }
+
+  async function handleInsertImageLink() {
+    const input = await prompt({
+      title: "사진 링크",
+      description: "사진 주소(URL)를 입력하면 글에 이미지가 삽입됩니다.",
+      placeholder: "https://example.com/photo.jpg",
+      confirmLabel: "추가",
+    });
+
+    if (!input?.trim()) {
+      return;
+    }
+
+    const url = parseHttpUrl(input);
+    if (!url) {
+      await alert({
+        title: "입력 오류",
+        message: "http:// 또는 https:// 로 시작하는 사진 주소를 입력해 주세요.",
+      });
+      return;
+    }
+
+    insertImageHtml(url);
   }
 
   async function handleInsertLink() {
@@ -711,6 +751,9 @@ export default function RichTextEditor({
               </label>
             </>
           ) : null}
+          <ToolbarButton title="사진 링크" onClick={() => void handleInsertImageLink()}>
+            <IconImageLink />
+          </ToolbarButton>
           <ToolbarButton title="유튜브 링크" onClick={() => void handleInsertVideoLink()}>
             <IconYoutube />
           </ToolbarButton>

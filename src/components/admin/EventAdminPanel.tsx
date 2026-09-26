@@ -613,6 +613,17 @@ export default function EventAdminPanel({
               }}
               className="mt-1 block w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-emerald-700"
             />
+            <span className="mt-2 flex gap-2">
+              <input
+                type="url"
+                value={eventForm.thumbnail_url ?? ""}
+                onChange={(e) =>
+                  setEventForm((prev) => ({ ...prev, thumbnail_url: e.target.value.trim() || null }))
+                }
+                placeholder="썸네일 사진 링크 https://"
+                className="min-w-0 flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
+              />
+            </span>
             {thumbnailUploading ? <p className="mt-1 text-sm text-gray-500">업로드 중...</p> : null}
             {eventForm.thumbnail_url?.trim() ? (
               <div className="mt-2 flex items-center gap-3">
@@ -849,6 +860,17 @@ export default function EventAdminPanel({
                     }}
                     className="mt-1 block w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-emerald-700"
                   />
+                  <span className="mt-2 flex gap-2">
+                    <input
+                      type="url"
+                      value={tabForm.image_url ?? ""}
+                      onChange={(e) =>
+                        setTabForm((prev) => ({ ...prev, image_url: e.target.value.trim() || null }))
+                      }
+                      placeholder="사진 링크 https://"
+                      className="min-w-0 flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                    />
+                  </span>
                 </label>
                 {uploading ? <p className="mt-2 text-sm text-gray-500">업로드 중...</p> : null}
                 {tabForm.image_url ? (
