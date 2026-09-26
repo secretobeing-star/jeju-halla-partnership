@@ -7632,7 +7632,7 @@ html.dark-mode .partner-category-section__gear {
     flex-wrap: nowrap;
     width: 100%;
     margin-left: 0;
-    justify-content: flex-start;
+    justify-content: flex-end;
     gap: 0.5rem;
   }
 

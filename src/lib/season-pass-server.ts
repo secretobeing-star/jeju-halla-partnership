@@ -19,7 +19,7 @@ import {
   type UserSeasonProgress,
 } from "@/lib/season-pass";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
-import { logSeasonPassToSheets } from "@/lib/google-sheets-student";
+import { logGachaToSheets, logSeasonPassToSheets } from "@/lib/google-sheets-student";
 import type { GoldLedgerSource } from "@/lib/gold-analytics";
 import { encodeGiftCouponValue, encodeGiftGachaValue, parseGiftPayload } from "@/lib/map-events";
 import {
@@ -1429,11 +1429,11 @@ export async function pullGoldShopGacha(
             : holdError.message,
         );
       }
-      logSeasonPassToSheets({
+      logGachaToSheets({
         studentId: userId,
-        action: "shop",
         seasonTitle: season.title,
         detail: `${box.name} 보관함 지급 ${count}개 · 골드 ${spend}`,
+        held: true,
       });
       return {
         gold,
@@ -1537,11 +1537,12 @@ export async function pullGoldShopGacha(
   }
 
   const first = prizes[0];
-  logSeasonPassToSheets({
+  const prizeNames = prizes.map((item) => item.name).filter(Boolean).join(", ");
+  logGachaToSheets({
     studentId: userId,
-    action: "shop",
     seasonTitle: season.title,
-    detail: `${target.name} 뽑기 ${count}회 · 골드 ${spend}`,
+    detail: `${target.name} 뽑기 ${count}회 · 골드 ${spend}${prizeNames ? ` · ${prizeNames}` : ""}`,
+    held: false,
   });
 
   return {

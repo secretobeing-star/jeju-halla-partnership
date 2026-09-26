@@ -29,6 +29,10 @@ export type SiteMemberSession = {
   provider_token?: string;
 };
 
+export function getLoggedInStudentId(): string {
+  return getSiteMemberSession()?.student?.studentId?.trim() || "";
+}
+
 export function getSiteMemberSession(): SiteMemberSession | null {
   const session = readDeviceJson<SiteMemberSession | null>(SITE_MEMBER_SESSION_KEY, null);
   if (!session?.displayName?.trim()) {

@@ -15,6 +15,7 @@ import { usePromptModal } from "@/components/PromptModalProvider";
 import { getPartnerVoterKey } from "@/lib/partner-voter";
 import type { HiddenReviewDisplay } from "@/lib/partner-hidden-review";
 import { supabase, SiteSettings } from "@/lib/supabase";
+import { getLoggedInStudentId, SITE_MEMBER_SESSION_EVENT } from "@/lib/site-member-session";
 
 type PartnerReviewsProps = {
   partnerId: string;
@@ -55,6 +56,17 @@ export default function PartnerReviews({
   const [editPassword, setEditPassword] = useState("");
   const [deletePromptId, setDeletePromptId] = useState<string | null>(null);
   const [deletePassword, setDeletePassword] = useState("");
+
+  useEffect(() => {
+    const fillAuthor = () => {
+      const studentId = getLoggedInStudentId();
+      if (!studentId) return;
+      setAuthorName((current) => (current.trim() ? current : studentId));
+    };
+    fillAuthor();
+    window.addEventListener(SITE_MEMBER_SESSION_EVENT, fillAuthor);
+    return () => window.removeEventListener(SITE_MEMBER_SESSION_EVENT, fillAuthor);
+  }, [open]);
 
   const loadReviews = useCallback(async (options?: { silent?: boolean }) => {
     if (!options?.silent) {
@@ -571,7 +583,7 @@ export default function PartnerReviews({
             <input
               value={authorName}
               onChange={(e) => setAuthorName(e.target.value)}
-              placeholder="닉네임 또는 이름"
+              placeholder={getLoggedInStudentId() ? "학번" : "닉네임 또는 이름"}
               required
               className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs outline-none focus:border-sky-400 sm:text-sm"
             />

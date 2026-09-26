@@ -27,6 +27,7 @@ import {
   getStoredPostReaction,
   setStoredPostReaction,
 } from "@/lib/board-voter";
+import { getLoggedInStudentId, SITE_MEMBER_SESSION_EVENT } from "@/lib/site-member-session";
 import {
   BOARD_PINNED_LIST_FIELDS,
   BOARD_PINNED_LIST_FIELDS_BASE,
@@ -134,6 +135,17 @@ export default function BoardSection({
   const [selectedPostContent, setSelectedPostContent] = useState<string | null>(null);
   const [secretUnlockPassword, setSecretUnlockPassword] = useState("");
   const [secretContentCache, setSecretContentCache] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const fillAuthor = () => {
+      const studentId = getLoggedInStudentId();
+      if (!studentId) return;
+      setAuthorName((current) => (current.trim() ? current : studentId));
+    };
+    fillAuthor();
+    window.addEventListener(SITE_MEMBER_SESSION_EVENT, fillAuthor);
+    return () => window.removeEventListener(SITE_MEMBER_SESSION_EVENT, fillAuthor);
+  }, [showWriteForm]);
 
   const visibleTabs = useMemo(() => getVisibleBoards(boards), [boards]);
   const tabGridClass = getTabGridClass(visibleTabs.length);
@@ -552,7 +564,7 @@ export default function BoardSection({
 
   function resetWriteForm() {
     setTitle("");
-    setAuthorName("");
+    setAuthorName(getLoggedInStudentId());
     setContent("");
     setPassword("");
     setWriteIsSecret(false);
@@ -1339,7 +1351,7 @@ export default function BoardSection({
                   value={authorName}
                   onChange={(e) => setAuthorName(e.target.value)}
                   required
-                  placeholder="닉네임 또는 이름"
+                  placeholder={getLoggedInStudentId() ? "학번" : "닉네임 또는 이름"}
                   className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 outline-none focus:border-emerald-500"
                 />
               </label>

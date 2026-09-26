@@ -70,6 +70,10 @@ export default function StudentSheetsAdminPanel({
             비우면 기본값 <code>승인</code>
           </span>
         </label>
+        <p className="sm:col-span-2 rounded-lg bg-gray-50 px-3 py-2 text-xs leading-relaxed text-gray-600">
+          확률형 아이템 뽑기·보관함 지급은 <code>확률형_로그</code> 탭에 따로 쌓입니다. 탭이 없으면
+          시트에 자동으로 만들어집니다.
+        </p>
       </div>
     </AdminCollapsibleSection>
   );

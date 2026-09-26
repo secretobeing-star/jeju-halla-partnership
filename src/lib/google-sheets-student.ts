@@ -1,5 +1,6 @@
 import { google } from "googleapis";
 import {
+  DEFAULT_GACHA_SHEETS_TAB,
   DEFAULT_SEASON_PASS_SHEETS_TAB,
   DEFAULT_STUDENT_SHEETS_APPROVAL_TAB,
   DEFAULT_STUDENT_SHEETS_LOG_TAB,
@@ -1029,7 +1030,7 @@ export async function loadStudentSheetsConfigFromDb(): Promise<StudentSheetsConf
   });
 }
 
-async function ensureSeasonPassLogTab(spreadsheetId: string, tabName: string) {
+async function ensureActivityLogTab(spreadsheetId: string, tabName: string) {
   const sheets = await getSheetsClient();
   const meta = await sheets.spreadsheets.get({
     spreadsheetId,
@@ -1056,8 +1057,9 @@ async function ensureSeasonPassLogTab(spreadsheetId: string, tabName: string) {
   });
 }
 
-async function appendSeasonPassLogRow(
+async function appendActivityLogRow(
   config: StudentSheetsConfig,
+  tabName: string,
   row: {
     createdAt: string;
     department: string;
@@ -1068,8 +1070,7 @@ async function appendSeasonPassLogRow(
     detail: string;
   },
 ) {
-  const tabName = DEFAULT_SEASON_PASS_SHEETS_TAB;
-  await ensureSeasonPassLogTab(config.spreadsheetId, tabName);
+  await ensureActivityLogTab(config.spreadsheetId, tabName);
   const sheets = await getSheetsClient();
   await sheets.spreadsheets.values.append({
     spreadsheetId: config.spreadsheetId,
@@ -1093,16 +1094,26 @@ async function appendSeasonPassLogRow(
   });
 }
 
-async function logSeasonPassToSheetsAsync(input: SeasonPassLogInput) {
+async function logActivityToSheetsAsync(input: {
+  studentId: string;
+  actionLabel: string;
+  action: string;
+  seasonTitle?: string;
+  detail?: string;
+  name?: string | null;
+  department?: string | null;
+  tabName: string;
+  webhookType: string;
+}) {
   const studentId = input.studentId.trim();
   if (!studentId) {
     return;
   }
 
-  const actionLabel = SEASON_PASS_ACTION_LABEL[input.action];
   const seasonTitle = input.seasonTitle?.trim() || "";
   const detail = input.detail?.trim() || "";
   const createdAt = new Date().toISOString();
+  const actionLabel = input.actionLabel;
 
   let name = input.name?.trim() || "";
   let department = input.department?.trim() || "";
@@ -1114,13 +1125,13 @@ async function logSeasonPassToSheetsAsync(input: SeasonPassLogInput) {
       name = name || profile.name?.trim() || "";
       department = department || profile.department?.trim() || profile.major?.trim() || "";
     } catch (error) {
-      console.error("season pass sheet profile lookup failed:", error);
+      console.error("sheet profile lookup failed:", error);
     }
   }
 
   const webhookBody: Record<string, unknown> = {
-    type: "season_pass_log",
-    sheetName: DEFAULT_SEASON_PASS_SHEETS_TAB,
+    type: input.webhookType,
+    sheetName: input.tabName,
     student_id: studentId,
     name,
     status: actionLabel,
@@ -1136,7 +1147,7 @@ async function logSeasonPassToSheetsAsync(input: SeasonPassLogInput) {
   let wroteViaApi = false;
   if (config) {
     try {
-      await appendSeasonPassLogRow(config, {
+      await appendActivityLogRow(config, input.tabName, {
         createdAt,
         department,
         studentId,
@@ -1147,7 +1158,7 @@ async function logSeasonPassToSheetsAsync(input: SeasonPassLogInput) {
       });
       wroteViaApi = true;
     } catch (error) {
-      console.error("season pass sheet append failed:", error);
+      console.error("sheet append failed:", error);
     }
   }
 
@@ -1157,13 +1168,57 @@ async function logSeasonPassToSheetsAsync(input: SeasonPassLogInput) {
 
   const webhookResult = await postPlainJsonWebhook(webhookBody);
   if (!webhookResult.ok && "error" in webhookResult) {
-    console.error("season pass webhook failed:", webhookResult.error);
+    console.error("sheet webhook failed:", webhookResult.error);
   }
+}
+
+async function logSeasonPassToSheetsAsync(input: SeasonPassLogInput) {
+  await logActivityToSheetsAsync({
+    studentId: input.studentId,
+    actionLabel: SEASON_PASS_ACTION_LABEL[input.action],
+    action: input.action,
+    seasonTitle: input.seasonTitle,
+    detail: input.detail,
+    name: input.name,
+    department: input.department,
+    tabName: DEFAULT_SEASON_PASS_SHEETS_TAB,
+    webhookType: "season_pass_log",
+  });
+}
+
+export type GachaSheetLogInput = {
+  studentId: string;
+  seasonTitle?: string;
+  detail?: string;
+  name?: string | null;
+  department?: string | null;
+  held?: boolean;
+};
+
+async function logGachaToSheetsAsync(input: GachaSheetLogInput) {
+  await logActivityToSheetsAsync({
+    studentId: input.studentId,
+    actionLabel: input.held ? "확률 보관함" : "확률 뽑기",
+    action: input.held ? "gacha_hold" : "gacha_pull",
+    seasonTitle: input.seasonTitle,
+    detail: input.detail,
+    name: input.name,
+    department: input.department,
+    tabName: DEFAULT_GACHA_SHEETS_TAB,
+    webhookType: "gacha_log",
+  });
 }
 
 /** 시즌패스 활동을 구글 시트 / Apps Script 웹훅에 남깁니다. 실패해도 본 기능은 계속됩니다. */
 export function logSeasonPassToSheets(input: SeasonPassLogInput) {
   void logSeasonPassToSheetsAsync(input).catch((error) => {
     console.error("season pass sheet log failed:", error);
+  });
+}
+
+/** 확률형 아이템 뽑기·보관을 구글 시트 전용 탭에 남깁니다. */
+export function logGachaToSheets(input: GachaSheetLogInput) {
+  void logGachaToSheetsAsync(input).catch((error) => {
+    console.error("gacha sheet log failed:", error);
   });
 }

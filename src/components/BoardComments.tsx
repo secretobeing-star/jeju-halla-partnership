@@ -11,6 +11,7 @@ import { confirmDeletion, maybeAlertPasswordError, resolveBoardActionError, aler
 import { containsProfanity } from "@/lib/profanity-filter";
 import { trackSiteAnalytics } from "@/lib/site-analytics";
 import { BoardComment, SiteSettings, supabase } from "@/lib/supabase";
+import { getLoggedInStudentId, SITE_MEMBER_SESSION_EVENT } from "@/lib/site-member-session";
 
 type BoardCommentsProps = {
   postId: string;
@@ -216,6 +217,17 @@ export default function BoardComments({
   const [editPassword, setEditPassword] = useState("");
   const wasInteractionEnabled = useRef(interactionEnabled);
 
+  useEffect(() => {
+    const fillAuthor = () => {
+      const studentId = getLoggedInStudentId();
+      if (!studentId) return;
+      setAuthorName((current) => (current.trim() ? current : studentId));
+    };
+    fillAuthor();
+    window.addEventListener(SITE_MEMBER_SESSION_EVENT, fillAuthor);
+    return () => window.removeEventListener(SITE_MEMBER_SESSION_EVENT, fillAuthor);
+  }, [showWriteForm, replyToComment]);
+
   const commentTree = useMemo(() => buildCommentTree(comments), [comments]);
 
   const loadComments = useCallback(async () => {
@@ -286,7 +298,7 @@ export default function BoardComments({
   }, [interactionEnabled]);
 
   function resetWriteForm() {
-    setAuthorName("");
+    setAuthorName(getLoggedInStudentId());
     setContent("");
     setPassword("");
     setWriteIsSecret(false);
@@ -1246,7 +1258,7 @@ function WriteFields({
             onChange={(e) => onAuthorNameChange(e.target.value)}
             required
             autoFocus={false}
-            placeholder="닉네임 또는 이름"
+            placeholder={getLoggedInStudentId() ? "학번" : "닉네임 또는 이름"}
             className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
           />
         </label>

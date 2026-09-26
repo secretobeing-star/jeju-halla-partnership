@@ -25,6 +25,7 @@ import {
   mapEventCommentRpcError,
 } from "@/lib/site-event-comments";
 import { SiteEventComment, SiteSettings, supabase } from "@/lib/supabase";
+import { getLoggedInStudentId, SITE_MEMBER_SESSION_EVENT } from "@/lib/site-member-session";
 
 type EventCommentsProps = {
   tabId: string;
@@ -48,6 +49,17 @@ export default function EventComments({
   const [content, setContent] = useState("");
   const [password, setPassword] = useState("");
   const [passwordPromptId, setPasswordPromptId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fillAuthor = () => {
+      const studentId = getLoggedInStudentId();
+      if (!studentId) return;
+      setAuthorName((current) => (current.trim() ? current : studentId));
+    };
+    fillAuthor();
+    window.addEventListener(SITE_MEMBER_SESSION_EVENT, fillAuthor);
+    return () => window.removeEventListener(SITE_MEMBER_SESSION_EVENT, fillAuthor);
+  }, []);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editAuthorName, setEditAuthorName] = useState("");
   const [editContent, setEditContent] = useState("");
@@ -535,7 +547,7 @@ export default function EventComments({
         <input
           value={authorName}
           onChange={(e) => setAuthorName(e.target.value)}
-          placeholder="닉네임 또는 이름"
+          placeholder={getLoggedInStudentId() ? "학번" : "닉네임 또는 이름"}
           required
           maxLength={20}
           className="site-event-comments__input"

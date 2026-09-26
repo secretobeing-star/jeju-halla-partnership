@@ -10,6 +10,7 @@ export const DEFAULT_STUDENT_PENDING_MESSAGE =
 export const DEFAULT_STUDENT_SHEETS_LOG_TAB = "사용자_로그";
 export const DEFAULT_STUDENT_SHEETS_APPROVAL_TAB = "승인";
 export const DEFAULT_SEASON_PASS_SHEETS_TAB = "시즌패스_로그";
+export const DEFAULT_GACHA_SHEETS_TAB = "확률형_로그";
 
 export const SITE_STUDENT_NEED_LOGIN_EVENT = "site-student-need-login";
 export const SITE_STUDENT_AUTH_INTENT_KEY = "site-student-auth-intent";
