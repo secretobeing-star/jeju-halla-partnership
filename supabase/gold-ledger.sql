@@ -8,6 +8,7 @@ create table if not exists public.gold_ledger (
   source text not null check (source in (
     'attendance',
     'visit',
+    'event',
     'quest',
     'claim',
     'shop_spend',
@@ -35,6 +36,7 @@ alter table public.gold_ledger
   check (source in (
     'attendance',
     'visit',
+    'event',
     'quest',
     'claim',
     'shop_spend',

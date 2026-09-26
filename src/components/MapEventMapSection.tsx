@@ -11,6 +11,7 @@ import {
   completionRewardsOf,
   formatCooldownRemain,
   isEventLive,
+  remainingCooldownMs,
   type MapAppConfig,
   type MapEvent,
   type UserEventProgress,
@@ -145,7 +146,6 @@ type RewardModalState = {
 
 export default function MapEventMapSection(props: MapEventMapSectionProps) {
   const [isPwaMode, setIsPwaMode] = useState<boolean | null>(null);
-  const [isDuplicateAccess, setIsDuplicateAccess] = useState(false);
 
   const [config, setConfig] = useState<
     MapAppConfig & {
@@ -202,24 +202,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     };
 
     checkEnvironment();
-
-    if (!userId) return;
-
-    const deviceSessionKey = `halla_event_device_token_${userId}`;
-    let currentDeviceToken = localStorage.getItem(deviceSessionKey);
-    if (!currentDeviceToken) {
-      currentDeviceToken = Math.random().toString(36).substring(2) + Date.now().toString(36);
-      localStorage.setItem(deviceSessionKey, currentDeviceToken);
-    }
-
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === deviceSessionKey && e.newValue && e.newValue !== currentDeviceToken) {
-        setIsDuplicateAccess(true);
-      }
-    };
-
-    window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
   }, [userId]);
 
   const isDefaultTab = !activeTabId || activeTabId === DEFAULT_TAB_ID;
@@ -333,16 +315,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     return null;
   }, [nearestTargetPartner]);
 
-  const getPartnerCooldownKey = useCallback(
-    (eventId: string, placeId: string) => `site_event_remain_seconds_${userId || "guest"}_${eventId}_${placeId}`,
-    [userId],
-  );
-
-  const getPartnerInitializedKey = useCallback(
-    (eventId: string, placeId: string) => `site_event_initialized_${userId || "guest"}_${eventId}_${placeId}`,
-    [userId],
-  );
-
   const currentActivePartnerId = nearestUnstampedPartnerInside?.partner.id || "";
   const currentActivePartnerName = nearestUnstampedPartnerInside?.partner.name || "";
 
@@ -390,43 +362,26 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   }, []);
 
   useEffect(() => {
-    if (isDefaultTab || !activeEvent || isGuest || !currentActivePartnerId) {
+    if (isDefaultTab || !activeEvent || isGuest) {
       setCooldownTargetTime(0);
       setCooldownRemainMs(0);
       return;
     }
 
-    const storageKey = getPartnerCooldownKey(activeEvent.id, currentActivePartnerId);
-    const initKey = getPartnerInitializedKey(activeEvent.id, currentActivePartnerId);
-    const savedTarget = localStorage.getItem(storageKey);
-    const isInitialized = localStorage.getItem(initKey);
-    const now = Date.now();
-    const cooldownMinutes = Math.max(0, Number(activeEvent?.cooldown_minutes) || 0);
-
-    if (savedTarget !== null) {
-      const targetTime = Number(savedTarget);
-      if (targetTime > now) {
-        setCooldownTargetTime(targetTime);
-        setCooldownRemainMs(targetTime - now);
-        return;
-      }
-    }
-
-    if (!isInitialized && cooldownMinutes > 0) {
-      const newTargetTime = now + cooldownMinutes * 60_000;
-      localStorage.setItem(storageKey, String(newTargetTime));
-      localStorage.setItem(initKey, "true");
-      setCooldownTargetTime(newTargetTime);
-      setCooldownRemainMs(cooldownMinutes * 60_000);
+    const remain = remainingCooldownMs(progress?.last_stamped_at, activeEvent.cooldown_minutes);
+    if (remain <= 0 || !progress?.last_stamped_at) {
+      setCooldownTargetTime(0);
+      setCooldownRemainMs(0);
       return;
     }
 
-    setCooldownTargetTime(0);
-    setCooldownRemainMs(0);
-  }, [activeEvent, activeTabId, isDefaultTab, isGuest, currentActivePartnerId, getPartnerCooldownKey, getPartnerInitializedKey]);
+    const last = Date.parse(progress.last_stamped_at);
+    setCooldownTargetTime(last + Math.max(0, Number(activeEvent.cooldown_minutes) || 0) * 60_000);
+    setCooldownRemainMs(remain);
+  }, [isDefaultTab, activeEvent, isGuest, progress?.last_stamped_at]);
 
   useEffect(() => {
-    if (isDefaultTab || !activeEvent || isGuest || !currentActivePartnerId || cooldownTargetTime <= 0) {
+    if (isDefaultTab || !activeEvent || isGuest || cooldownTargetTime <= 0) {
       return;
     }
 
@@ -436,13 +391,14 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       if (remain <= 0) {
         setCooldownRemainMs(0);
         setCooldownTargetTime(0);
-        localStorage.removeItem(getPartnerCooldownKey(activeEvent.id, currentActivePartnerId));
-        notifyStampReady(
-          activeEvent.id,
-          currentActivePartnerId,
-          currentActivePartnerName,
-          cooldownTargetTime,
-        );
+        if (currentActivePartnerId) {
+          notifyStampReady(
+            activeEvent.id,
+            currentActivePartnerId,
+            currentActivePartnerName,
+            cooldownTargetTime,
+          );
+        }
       } else {
         setCooldownRemainMs(remain);
       }
@@ -451,7 +407,7 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
     updateRemain();
     const timer = window.setInterval(updateRemain, 1000);
     return () => window.clearInterval(timer);
-  }, [isDefaultTab, activeEvent, isGuest, currentActivePartnerId, currentActivePartnerName, cooldownTargetTime, getPartnerCooldownKey, notifyStampReady]);
+  }, [isDefaultTab, activeEvent, isGuest, currentActivePartnerId, currentActivePartnerName, cooldownTargetTime, notifyStampReady]);
 
   const isTimerPaused = useMemo(() => {
     if (isDefaultTab || !activeEvent) return false;
@@ -567,6 +523,25 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
   useEffect(() => {
     void loadProgress();
   }, [loadProgress]);
+
+  useEffect(() => {
+    if (!activeEvent || !userId) {
+      return;
+    }
+    function refresh() {
+      if (document.visibilityState === "visible") {
+        void loadProgress();
+      }
+    }
+    document.addEventListener("visibilitychange", refresh);
+    window.addEventListener("focus", refresh);
+    const timer = window.setInterval(refresh, 8000);
+    return () => {
+      document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("focus", refresh);
+      window.clearInterval(timer);
+    };
+  }, [activeEvent, userId, loadProgress]);
 
   useEffect(() => {
     if (!activeEvent || !userId) return;
@@ -697,7 +672,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
           const remainMs = payload.cooldownMs ?? 60_000;
           if (activeEvent) {
             const targetTime = Date.now() + remainMs;
-            localStorage.setItem(getPartnerCooldownKey(activeEvent.id, partner.id), String(targetTime));
             setCooldownTargetTime(targetTime);
             setCooldownRemainMs(remainMs);
           }
@@ -742,12 +716,10 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
       const activeCooldownMinutes = Number(activeEvent?.cooldown_minutes) || 0;
       if (activeCooldownMinutes > 0) {
         const nextTargetTime = Date.now() + activeCooldownMinutes * 60_000;
-        localStorage.setItem(getPartnerCooldownKey(activeEvent.id, partner.id), String(nextTargetTime));
         setCooldownTargetTime(nextTargetTime);
         setCooldownRemainMs(activeCooldownMinutes * 60_000);
         scheduleStampReadyOnDevice(nextTargetTime, partner.name);
       } else {
-        localStorage.removeItem(getPartnerCooldownKey(activeEvent.id, partner.id));
         setCooldownTargetTime(0);
         setCooldownRemainMs(0);
       }
@@ -871,24 +843,6 @@ export default function MapEventMapSection(props: MapEventMapSectionProps) {
             💡 <b>홈 화면 추가 방법:</b><br />
             • 크롬/삼성: 우측 상단 메뉴 ➔ '앱 설치' 또는 '홈 화면에 추가'<br />
             • 사파리(아이폰): 하단 공유 버튼 ➔ '홈 화면에 추가'
-          </div>
-        </div>
-      ) : !isDefaultTab && isDuplicateAccess ? (
-        <div style={{ position: "fixed", inset: 0, zIndex: 99999, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
-          <div style={{ background: "#fff", borderRadius: "16px", padding: "24px", maxWidth: "340px", width: "100%", textAlign: "center" }}>
-            <div style={{ fontSize: "42px", marginBottom: "12px" }}>⚠️</div>
-            <h3 style={{ fontSize: "18px", fontWeight: "700", color: "#111827", marginBottom: "8px" }}>동시 접속 감지</h3>
-            <p style={{ fontSize: "14px", color: "#4b5563", lineHeight: "1.5", marginBottom: "20px" }}>
-              다른 기기 또는 다른 창에서 이미 해당 계정으로 이벤트에 접속 중입니다.<br />
-              동일 계정으로 중복 접속은 이용하실 수 없습니다.
-            </p>
-            <button
-              type="button"
-              onClick={() => window.location.reload()}
-              style={{ width: "100%", background: "#059669", color: "#fff", padding: "12px", borderRadius: "8px", fontWeight: "600", border: "none", cursor: "pointer" }}
-            >
-              이 기기에서 다시 접속하기
-            </button>
           </div>
         </div>
       ) : (

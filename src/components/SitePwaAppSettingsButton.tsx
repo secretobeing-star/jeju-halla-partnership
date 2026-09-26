@@ -20,7 +20,6 @@ import {
   type PermissionDisplayState,
 } from "@/lib/site-pwa-permissions";
 import {
-  isPwaAppSettingsCategoryRegionEnabled,
   isPwaAppSettingsDarkModeEnabled,
   isPwaAppSettingsFontSizeEnabled,
   isPwaAppSettingsLocationEnabled,
@@ -225,10 +224,9 @@ export default function SitePwaAppSettingsButton({
   const showDarkMode = isPwaAppSettingsDarkModeEnabled(settings);
   const showFontSize = isPwaAppSettingsFontSizeEnabled(settings);
   const showPageBackground = isPwaAppSettingsPageBackgroundEnabled(settings);
-  const showCategoryRegion = isPwaAppSettingsCategoryRegionEnabled(settings);
   const showLab = showFontSize || showDarkMode || showPageBackground;
   const showPermissions = showNotification || showLocation;
-  const showMainScreen = showCategoryRegion;
+  const showMainScreen = false;
   const pageBackgroundDefaultEnabled = settings.page_background_default_enabled ?? true;
 
   const [open, setOpen] = useState(false);
@@ -639,13 +637,6 @@ export default function SitePwaAppSettingsButton({
             }`}
           >
             <p className="site-pwa-app-settings__section-label">메인 화면</p>
-            {showCategoryRegion ? (
-              <ToggleRow
-                label="카테고리·지역"
-                checked={prefs.show_category_region ?? true}
-                onChange={(value) => updatePrefs({ show_category_region: value })}
-              />
-            ) : null}
           </div>
         ) : null}
         {showPermissions ? (

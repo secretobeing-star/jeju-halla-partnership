@@ -43,6 +43,7 @@ export async function GET(request: NextRequest) {
       current_stamps: Number(data.current_stamps) || 0,
       is_completed: Boolean(data.is_completed),
       stamped_places: asStringArray(data.stamped_places),
+      last_stamped_at: data.last_stamped_at ?? null,
     },
   });
 }

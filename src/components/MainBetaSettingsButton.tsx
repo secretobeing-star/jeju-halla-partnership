@@ -312,8 +312,7 @@ export default function MainBetaSettingsButton({
     prefs.site_nav_background ?? navBackgroundDefaultEnabled;
   const effectiveNavFloatingChips =
     prefs.site_nav_floating_chips ?? navFloatingChipsDefaultEnabled;
-  const hasMainScreenToggles =
-    categoryRegionToggleAvailable || mainMapToggleAvailable;
+  const hasMainScreenToggles = mainMapToggleAvailable;
   const hasBetaFeatures =
     fontSizeAvailable ||
     darkModeAvailable ||
@@ -532,13 +531,6 @@ export default function MainBetaSettingsButton({
                 <p className="main-settings-section-label text-xs font-semibold tracking-wide text-gray-500">
                   메인 화면
                 </p>
-                {categoryRegionToggleAvailable ? (
-                  <ToggleRow
-                    label="카테고리·지역"
-                    checked={prefs.show_category_region ?? true}
-                    onChange={(value) => update({ show_category_region: value })}
-                  />
-                ) : null}
                 {mainMapToggleAvailable ? (
                   <ToggleRow
                     label="제휴 지도"

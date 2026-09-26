@@ -591,8 +591,11 @@ async function writeGoldLedger(
     source,
   };
   const { error } = await admin.from("gold_ledger").insert(payload);
-  if (error && source === "gacha") {
-    await admin.from("gold_ledger").insert({ ...payload, source: "shop_reward" });
+  if (error && (source === "gacha" || source === "event")) {
+    await admin.from("gold_ledger").insert({
+      ...payload,
+      source: source === "event" ? "visit" : "shop_reward",
+    });
   }
 }
 
@@ -633,7 +636,11 @@ async function adjustGold(
   return next;
 }
 
-export async function creditStudentGold(userIdRaw: string, amountRaw: number) {
+export async function creditStudentGold(
+  userIdRaw: string,
+  amountRaw: number,
+  source: GoldLedgerSource = "admin",
+) {
   const userId = userIdRaw.trim();
   const amount = Math.floor(Number(amountRaw) || 0);
   if (!userId || amount <= 0) {
@@ -645,7 +652,7 @@ export async function creditStudentGold(userIdRaw: string, amountRaw: number) {
   }
   const season = await getActiveSeason(admin);
   if (season) {
-    await adjustGold(admin, userId, season, amount, "admin");
+    await adjustGold(admin, userId, season, amount, source);
     return;
   }
   const wallet = await loadWalletGold(admin, userId);
@@ -665,12 +672,20 @@ export async function creditStudentGold(userIdRaw: string, amountRaw: number) {
         : error.message,
     );
   }
-  void admin.from("gold_ledger").insert({
+  const { error: ledgerError } = await admin.from("gold_ledger").insert({
     user_id: userId,
     season_id: null,
     amount,
-    source: "admin",
+    source,
   });
+  if (ledgerError && source === "event") {
+    await admin.from("gold_ledger").insert({
+      user_id: userId,
+      season_id: null,
+      amount,
+      source: "visit",
+    });
+  }
 }
 
 export async function debitStudentGold(userIdRaw: string, amountRaw: number) {
@@ -828,7 +843,7 @@ export async function completeVisit(input: {
       const wallet = await loadWalletGold(admin, userId);
       const goldBefore = wallet ?? 0;
       if (visitGold > 0) {
-        await creditStudentGold(userId, visitGold);
+        await creditStudentGold(userId, visitGold, "event");
       }
       return {
         applied: true,
@@ -876,7 +891,7 @@ export async function completeVisit(input: {
     }
     let goldAfter = goldBefore;
     if (visitGold > 0) {
-      goldAfter = await adjustGold(admin, userId, season, visitGold, "visit");
+      goldAfter = await adjustGold(admin, userId, season, visitGold, "event");
     }
 
     if (firstVisit) {

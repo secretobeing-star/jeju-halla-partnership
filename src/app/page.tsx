@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import BoardSection from "@/components/BoardSection";
 import BottomPcAdBanner from "@/components/BottomPcAdBanner";
 import MobileAdBanner from "@/components/MobileAdBanner";
@@ -637,7 +638,7 @@ export default function HomePage() {
     };
     setSettings(merged);
     if (options?.resetSort !== false) {
-      setPartnerSort(getInitialPartnerSort(merged));
+    setPartnerSort(getInitialPartnerSort(merged));
     }
     cacheSiteLoadingSettings(merged);
     cachePwaLoadingSettings(merged);
@@ -660,9 +661,9 @@ export default function HomePage() {
     }
 
     const { data } = await supabase
-      .from("partners")
-      .select("*")
-      .eq("is_active", true)
+          .from("partners")
+          .select("*")
+          .eq("is_active", true)
       .order("name");
 
     if (data) {
@@ -742,10 +743,10 @@ export default function HomePage() {
 
     async function fetchPopups() {
       const { data } = await supabase
-        .from("site_popups")
-        .select("*")
-        .eq("is_active", true)
-        .order("sort_order", { ascending: true })
+          .from("site_popups")
+          .select("*")
+          .eq("is_active", true)
+          .order("sort_order", { ascending: true })
         .order("created_at", { ascending: false });
 
       if (data) {
@@ -877,18 +878,13 @@ export default function HomePage() {
     if (!categoryGearOpen) {
       return;
     }
-    function onPointerDown(event: PointerEvent) {
-      const target = event.target;
-      if (!(target instanceof Node)) {
-        return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setCategoryGearOpen(false);
       }
-      if (categoryGearWrapRef.current?.contains(target)) {
-        return;
-      }
-      setCategoryGearOpen(false);
     }
-    document.addEventListener("pointerdown", onPointerDown);
-    return () => document.removeEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
   }, [categoryGearOpen]);
 
   useEffect(() => {
@@ -961,7 +957,7 @@ export default function HomePage() {
         return;
       }
       dispatchSiteMapRefresh();
-      void refreshSettings();
+        void refreshSettings();
       void loadPartners({ silent: true });
     }
 
@@ -1482,59 +1478,75 @@ export default function HomePage() {
               <circle cx="12" cy="12" r="3" />
             </svg>
           </button>
-          {categoryGearOpen ? (
-            <div className="partner-category-section__gear-menu" role="menu">
-              {customCategories.length === 0 ? (
-                <p>수정할 카테고리가 없습니다.</p>
-              ) : (
-                customCategories.map((category) => (
+          {categoryGearOpen && typeof document !== "undefined"
+            ? createPortal(
+                <div className="partner-category-edit-overlay" role="dialog" aria-modal="true" aria-labelledby="partner-category-edit-title">
                   <button
-                    key={category.id}
                     type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      setCategoryGearOpen(false);
-                      setEditingCustomCategory(category);
-                      setEditorPresetPartnerIds([]);
-                      setCustomCategoryEditorOpen(true);
-                    }}
-                  >
-                    {category.label} 수정
-                  </button>
-                ))
-              )}
-            </div>
-          ) : null}
+                    className="partner-category-edit-overlay__backdrop"
+                    aria-label="닫기"
+                    onClick={() => setCategoryGearOpen(false)}
+                  />
+                  <div className="partner-category-edit-overlay__box">
+                    <div className="partner-category-edit-overlay__header">
+                      <h3 id="partner-category-edit-title">카테고리 수정</h3>
+                      <button type="button" onClick={() => setCategoryGearOpen(false)}>
+                        닫기
+                      </button>
+                    </div>
+                    {customCategories.length === 0 ? (
+                      <p className="partner-category-edit-overlay__empty">수정할 카테고리가 없습니다.</p>
+                    ) : (
+                      customCategories.map((category) => (
+                        <button
+                          key={category.id}
+                          type="button"
+                          onClick={() => {
+                            setCategoryGearOpen(false);
+                            setEditingCustomCategory(category);
+                            setEditorPresetPartnerIds([]);
+                            setCustomCategoryEditorOpen(true);
+                          }}
+                        >
+                          {category.label} 수정
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>,
+                document.body,
+              )
+            : null}
         </div>
       ) : null}
       <div className="partner-category-grid">
-        {categoryOptions.map((category) => {
-          const isSelected = selectedCategory === category;
+          {categoryOptions.map((category) => {
+            const isSelected = selectedCategory === category;
 
-          return (
-            <button
-              key={category}
-              type="button"
-              onClick={() => setSelectedCategory(category)}
+            return (
+              <button
+                key={category}
+                type="button"
+                onClick={() => setSelectedCategory(category)}
               className={[
                 "partner-category-chip rounded-full px-3.5 py-2 text-xs font-medium transition sm:px-4 sm:text-sm",
-                isSelected
+                  isSelected
                   ? "partner-category-chip--selected bg-emerald-500 text-white shadow-sm"
                   : "bg-gray-100 text-gray-600 hover:bg-gray-200",
               ].join(" ")}
-            >
-              {category}
-            </button>
-          );
-        })}
+              >
+                {category}
+              </button>
+            );
+          })}
         {memberStudentLoggedIn
           ? customCategories.map((category) => {
           const value = customCategoryValue(category.id);
           const isSelected = selectedCategory === value;
           return (
-            <button
+                    <button
               key={category.id}
-              type="button"
+                      type="button"
               onClick={() => setSelectedCategory(value)}
               className={[
                 "partner-category-chip partner-category-chip--custom rounded-full px-3.5 py-2 text-xs font-medium transition sm:px-4 sm:text-sm",
@@ -1544,14 +1556,14 @@ export default function HomePage() {
               ].join(" ")}
             >
               {category.label}
-            </button>
+                    </button>
           );
         })
           : null}
         {memberStudentLoggedIn &&
         customCategories.length < USER_CUSTOM_CATEGORY_LIMITS.maxCategories ? (
-          <button
-            type="button"
+                    <button
+                      type="button"
             className="partner-category-chip partner-category-chip--add rounded-full px-3.5 py-2 text-xs font-medium sm:px-4 sm:text-sm"
             onClick={() => {
               setCategoryGearOpen(false);
@@ -1561,9 +1573,9 @@ export default function HomePage() {
             }}
           >
             + 내 카테고리
-          </button>
+                    </button>
         ) : null}
-      </div>
+                </div>
 
       {regionFilterEnabled ? (
         <PartnerRegionFilterPanel
@@ -1728,8 +1740,8 @@ export default function HomePage() {
             <p className="shrink-0 text-sm text-gray-500">{partnerListSummary}</p>
           ) : (
             <span className="flex-1" aria-hidden />
-          )}
-        </div>
+              )}
+            </div>
         {showYearFilter || hasPartnerSortControls ? (
           <div className="partner-list-toolbar__right">
             {showYearFilter ? (
@@ -1799,13 +1811,13 @@ export default function HomePage() {
     </div>
   ) : (
     <>
-      <PartnerPostGrid
-        partners={paginatedPartners}
+            <PartnerPostGrid
+              partners={paginatedPartners}
         gridColumns={partnerListLayout.gridColumns}
         benefitMinHeightMobile={partnerListLayout.benefitMinHeightMobile}
         benefitMinHeightDesktop={partnerListLayout.benefitMinHeightDesktop}
-        benefitBoxBgColor={settings.partner_benefit_box_bg_color}
-        benefitBoxBorderColor={settings.partner_benefit_box_border_color}
+              benefitBoxBgColor={settings.partner_benefit_box_bg_color}
+              benefitBoxBorderColor={settings.partner_benefit_box_border_color}
         businessInfoDefaultExpanded={settings.partner_business_info_default_expanded ?? false}
         reactionsEnabled={partnerReactionsEnabled}
         reviewsEnabled={partnerReviewsEnabled}
@@ -1822,18 +1834,18 @@ export default function HomePage() {
         reportReasons={reportReasons}
         reportSuccessSettings={settings}
         selectedPartnerId={detailPopupEnabled ? selectedPartnerId : null}
-      />
-      <Pagination
-        currentPage={currentPage}
-        totalPages={totalPages}
-        onPageChange={setCurrentPage}
+            />
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
         scrollTargetId={
           settings.pagination_scroll_top_enabled ?? true
             ? "partner-list-anchor"
             : undefined
         }
-      />
-    </>
+            />
+          </>
   );
 
   const partnerDetailModal =
@@ -1878,8 +1890,8 @@ export default function HomePage() {
             <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-amber-950 sm:text-base">
               {settings.site_maintenance_text}
             </p>
-          )}
-        </section>
+        )}
+      </section>
       )}
 
       {(settings.notice_text_enabled ?? true) && activeNoticeItems.length > 0 ? (
@@ -1957,11 +1969,11 @@ export default function HomePage() {
           />
         ) : null}
         {settingsPanelEnabled && !pwaAppSettingsActive ? (
-          <MainBetaSettingsButton
+      <MainBetaSettingsButton
             layout="toolbar"
             settingsPanelEnabled={settingsPanelEnabled}
-            darkModeAvailable={settings.dark_mode_enabled ?? false}
-            mobilePcModeAvailable={settings.mobile_pc_mode_enabled ?? false}
+        darkModeAvailable={settings.dark_mode_enabled ?? false}
+        mobilePcModeAvailable={settings.mobile_pc_mode_enabled ?? false}
             fontSizeAvailable={settings.main_font_size_enabled ?? false}
             boardPositionAvailable={
               (settings.main_board_position_enabled ?? false) &&
@@ -1987,9 +1999,9 @@ export default function HomePage() {
               (settings.partner_category_section_enabled ?? true) &&
               (settings.main_category_region_user_toggle_enabled ?? true)
             }
-            noticeText={settings.settings_panel_notice_text}
-            noticeUrl={settings.settings_panel_notice_url}
-            noticeColor={settings.settings_panel_notice_color}
+        noticeText={settings.settings_panel_notice_text}
+        noticeUrl={settings.settings_panel_notice_url}
+        noticeColor={settings.settings_panel_notice_color}
             withdrawEnabled={settings.site_member_withdraw_enabled !== false}
           />
         ) : null}
@@ -2128,8 +2140,8 @@ export default function HomePage() {
               <div className="relative bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-700 px-4 py-10 text-center text-white sm:px-6 sm:py-14">
                 <div className="relative mx-auto max-w-3xl">
                   <span className="inline-block rounded-full bg-white/20 px-3 py-1 text-xs font-medium sm:text-sm">
-                    2026 제주한라대학교 제41대 다온 총학생회
-                  </span>
+              2026 제주한라대학교 제41대 다온 총학생회
+            </span>
                   {showTitleText && (
                     <HeroTitle
                       settings={settings}
@@ -2138,15 +2150,15 @@ export default function HomePage() {
                       onNavAction={handleTopNavAction}
                     />
                   )}
-                  {showSubText && (
-                    <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-emerald-50 sm:text-base">
-                      {settings.header_sub}
-                    </p>
-                  )}
-                </div>
+          {showSubText && (
+            <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-emerald-50 sm:text-base">
+              {settings.header_sub}
+            </p>
+          )}
+        </div>
               </div>
             )}
-          </header>
+      </header>
         )}
       </div>
 
@@ -2234,7 +2246,7 @@ export default function HomePage() {
       {pwaSplashVisible ? <SitePwaLoadingSplash {...pwaSplashProps} /> : null}
       <SiteAnalyticsBeacon />
       <AiChatbotWidget />
-      </div>
+    </div>
       </StudentIdProvider>
     </SitePwaInstallProvider>
   );

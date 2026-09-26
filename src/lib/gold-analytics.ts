@@ -1,6 +1,7 @@
 export const GOLD_LEDGER_SOURCES = [
   "attendance",
   "visit",
+  "event",
   "quest",
   "claim",
   "shop_spend",
@@ -15,6 +16,7 @@ export type GoldLedgerSource = (typeof GOLD_LEDGER_SOURCES)[number];
 export const GOLD_SOURCE_LABELS: Record<GoldLedgerSource, string> = {
   attendance: "출석",
   visit: "제휴 방문",
+  event: "이벤트",
   quest: "퀘스트",
   claim: "시즌패스 보상",
   shop_spend: "골드상점 구매",
