@@ -3852,6 +3852,7 @@ export default function AdminPage() {
                       </button>
                     </span>
                   </label>
+                  {partnerPhotosUploading && (
                     <p className="mt-2 text-sm text-gray-500">추가 사진 업로드 중...</p>
                   )}
                   {partnerExtraPhotos.length > 0 && (
