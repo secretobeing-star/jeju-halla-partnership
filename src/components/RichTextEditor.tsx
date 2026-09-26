@@ -115,6 +115,14 @@ function IconLink() {
   );
 }
 
+function IconImage() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden className="rich-editor-toolbar-icon">
+      <path d="M2.5 3.5h11v9h-11v-9zm1.3 1.3v6.4l2.4-2.4 1.8 1.8 2.5-3.2 2 2.5V4.8H3.8zm1.8 1.4a1 1 0 1 0 0 2 1 1 0 0 0 0-2z" />
+    </svg>
+  );
+}
+
 function IconImageLink() {
   return (
     <svg viewBox="0 0 16 16" aria-hidden className="rich-editor-toolbar-icon">
